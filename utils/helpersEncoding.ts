@@ -1,7 +1,7 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { BigNumberish, BytesLike, ethers } from 'ethers';
-import { AngleRouter } from '../../typechain';
-import { ParamsSwapTypeStruct, PermitTypeStruct, TransferTypeStruct } from '../../typechain/AngleRouter';
+import { AngleRouter } from '../typechain';
+import { ParamsSwapTypeStruct, PermitTypeStruct, TransferTypeStruct } from '../typechain/AngleRouter';
 import { TypePermit } from './helpers';
 
 type Call = {

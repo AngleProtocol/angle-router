@@ -20,26 +20,24 @@ import {
   ActionType,
   SwapType,
   BASE_PARAMS,
-} from '../../test/typeScript/helpers';
+} from '../../utils/helpers';
+
+import { AngleRouter, MockANGLE, MockTokenPermit, Mock1Inch } from '../../typechain';
+
 import {
   AgToken,
   AngleDistributor,
-  AngleRouter,
   FeeDistributor,
   LiquidityGaugeV4,
-  MockANGLE,
-  MockTokenPermit,
-  Mock1Inch,
   PerpetualManagerFront,
   PoolManager,
   SanToken,
   StableMasterFront,
   VeANGLE,
   VeBoostProxy,
-} from '../../typechain';
+} from '../../typechain/core';
 
-import { signPermit } from '../../test/utils';
-import { OneInchAggregatorV4 } from '@angleprotocol/sdk/dist/constants/types';
+import { signPermit } from '../../utils/sign';
 
 let ANGLE: MockANGLE;
 let veANGLE: VeANGLE;
@@ -106,8 +104,6 @@ let REWARD_SANWBTC: BigNumber;
 let REWARD_AGEUR: BigNumber;
 const REWARD_ANGLE: BigNumber = parseAmount.ether(1000);
 
-let oneInch: OneInchAggregatorV4;
-
 export async function invariantFunds(owner: string): Promise<void> {
   expect(await agEUR.balanceOf(owner)).to.be.equal(ethers.constants.Zero);
   expect(await wBTC.balanceOf(owner)).to.be.equal(ethers.constants.Zero);
@@ -146,7 +142,7 @@ export async function invariantFundsUser(): Promise<void> {
 }
 
 // Testing Angle Router
-describe('AngleRouter01', () => {
+describe('AngleRouter01 - e2e', () => {
   before(async () => {
     [deployer, guardian, user, governor, cleanAddress] = await ethers.getSigners();
 
@@ -160,8 +156,8 @@ describe('AngleRouter01', () => {
     USDCORACLEUSD = BigNumber.from('1');
     DAIORACLEUSD = BigNumber.from('1');
 
-    ({ token: wETH } = await initToken('wETH', ETHdecimal));
-    ({ token: USDC } = await initToken('USDC', USDCdecimal));
+    ({ token: wETH } = await initToken('wETH', ETHdecimal, governor));
+    ({ token: USDC } = await initToken('USDC', USDCdecimal, governor));
     ({
       ANGLE,
       veANGLE,
@@ -206,8 +202,6 @@ describe('AngleRouter01', () => {
       ETHORACLEUSD,
       USDCORACLEUSD,
     ));
-
-    oneInch = new ethers.Contract(oneInchRouter.address, Interfaces.OneInchAggregatorV4) as Mock1Inch;
 
     // Mint tokens of all type to user
     UNIT_ETH = BigNumber.from(10).pow(ETHdecimal);
@@ -324,7 +318,7 @@ describe('AngleRouter01', () => {
         await expect(angleRouter.connect(cleanAddress).mixer([], [], swaps, [], [])).to.be.revertedWith('117');
       });
       it('1inch - revert - slippage', async () => {
-        const payload1inch = oneInch.interface.encodeFunctionData('swap', [
+        const payload1inch = oneInchRouter.interface.encodeFunctionData('swap', [
           ethers.constants.AddressZero,
           {
             srcToken: USDC.address,
@@ -353,7 +347,7 @@ describe('AngleRouter01', () => {
         await expect(angleRouter.connect(cleanAddress).mixer([], [], swaps, [], [])).to.be.revertedWith('15');
       });
       it('1inch - revert - swap target doesn t match collateral', async () => {
-        const payload1inch = oneInch.interface.encodeFunctionData('swap', [
+        const payload1inch = oneInchRouter.interface.encodeFunctionData('swap', [
           ethers.constants.AddressZero,
           {
             srcToken: USDC.address,
@@ -387,7 +381,7 @@ describe('AngleRouter01', () => {
         );
       });
       it('1inch - revert - swap target doesn t match collateral and subsequent mint fails', async () => {
-        const payload1inch = oneInch.interface.encodeFunctionData('swap', [
+        const payload1inch = oneInchRouter.interface.encodeFunctionData('swap', [
           ethers.constants.AddressZero,
           {
             srcToken: USDC.address,
@@ -437,7 +431,7 @@ describe('AngleRouter01', () => {
         );
       });
       it('1inch - success', async () => {
-        const payload1inch = oneInch.interface.encodeFunctionData('swap', [
+        const payload1inch = oneInchRouter.interface.encodeFunctionData('swap', [
           ethers.constants.AddressZero,
           {
             srcToken: USDC.address,
@@ -615,7 +609,7 @@ describe('AngleRouter01', () => {
           { inToken: DAI.address, amountIn: UNIT_DAI },
         ];
 
-        const payload1inch = oneInch.interface.encodeFunctionData('swap', [
+        const payload1inch = oneInchRouter.interface.encodeFunctionData('swap', [
           ethers.constants.AddressZero,
           {
             srcToken: USDC.address,

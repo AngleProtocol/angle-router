@@ -16,15 +16,14 @@ import {
   WEEK,
   TypePermit,
 } from '../../utils/helpers';
+
+import { AngleRouter, MockANGLE, MockTokenPermit, Mock1Inch, MockUniswapV3Router } from '../../typechain';
+
 import {
   AgToken,
   AngleDistributor,
-  AngleRouter,
   LiquidityGaugeV4,
   ANGLE as ANGLEType,
-  MockTokenPermit,
-  MockUniswapV3Router,
-  Mock1Inch,
   PerpetualManagerFront,
   PoolManager,
   SanToken,
@@ -36,13 +35,12 @@ import {
   AngleDistributor__factory,
   StableMasterFront__factory,
   AgToken__factory,
-  MockANGLE,
   ANGLE__factory,
-} from '../../typechain';
+} from '../../typechain/core';
 import { BASE_18, ChainId, CONTRACTS_ADDRESSES, formatAmount, parseAmount } from '@angleprotocol/sdk';
-import { impersonate } from '../../scripts/utils';
+import { impersonate } from '../../utils/helpers';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
-import { signPermit } from '../../test/utils';
+import { signPermit } from '../../utils/sign';
 
 let ANGLE: ANGLEType;
 let veANGLE: VeANGLE;
@@ -52,8 +50,6 @@ let stableMasterEUR: StableMasterFront;
 let agEUR: AgToken;
 
 let angleRouter: AngleRouter;
-let uniswapRouter: MockUniswapV3Router;
-let oneInchRouter: Mock1Inch;
 
 let USDC: MockTokenPermit;
 let wETH: MockTokenPermit;
@@ -103,7 +99,6 @@ let wBTCdecimal: BigNumber;
 let DAIdecimal: BigNumber;
 
 let startTs: number;
-let AngleRouterArtifacts: ContractFactory;
 
 export async function invariantFunds(owner: string): Promise<void> {
   expect(await agEUR.balanceOf(owner)).to.be.equal(ethers.constants.Zero);
@@ -139,21 +134,6 @@ export async function invariantFundsUser(): Promise<void> {
 describe('AngleRouter01 - claim and lock', () => {
   before(async () => {
     startTs = await (await ethers.provider.getBlock('latest')).timestamp;
-  });
-  beforeEach(async () => {
-    // If the forked-network state needs to be reset between each test, run this
-    await hre.network.provider.request({
-      method: 'hardhat_reset',
-      params: [
-        {
-          forking: hre.config.networks.hardhat.forking
-            ? {
-                jsonRpcUrl: hre.config.networks.hardhat.forking.url,
-              }
-            : undefined,
-        },
-      ],
-    });
 
     [deployer, guardian, user, user2, cleanAddress] = await ethers.getSigners();
     const governorAddress = '0xdC4e6DFe07EFCa50a197DF15D9200883eF4Eb1c8';
@@ -170,8 +150,8 @@ describe('AngleRouter01 - claim and lock', () => {
     USDCORACLEUSD = BigNumber.from('1');
     DAIORACLEUSD = BigNumber.from('1');
 
-    ({ token: wETH } = await initToken('wETH', ETHdecimal));
-    ({ token: USDC } = await initToken('USDC', USDCdecimal));
+    ({ token: wETH } = await initToken('wETH', ETHdecimal, governor));
+    ({ token: USDC } = await initToken('USDC', USDCdecimal, governor));
 
     const contracts = CONTRACTS_ADDRESSES[1 as ChainId];
 
@@ -190,7 +170,34 @@ describe('AngleRouter01 - claim and lock', () => {
     ) as StableMasterFront;
     agEUR = new ethers.Contract(contracts.agEUR?.AgToken!, AgToken__factory.abi, deployer) as AgToken;
 
-    AngleRouterArtifacts = await ethers.getContractFactory('AngleRouter');
+    // Mint tokens of all type to user
+    UNIT_DAI = BigNumber.from(10).pow(DAIdecimal);
+    UNIT_ETH = BigNumber.from(10).pow(ETHdecimal);
+    UNIT_WBTC = BigNumber.from(10).pow(wBTCdecimal);
+    BALANCE_AGEUR = ethers.constants.Zero;
+    BALANCE_ANGLE = BigNumber.from(1_000_000).mul(BASE_18);
+    BALANCE_ETH = BigNumber.from(50).mul(BigNumber.from(10).pow(ETHdecimal));
+    BALANCE_USDC = BigNumber.from(50).mul(BigNumber.from(10).pow(USDCdecimal));
+    BALANCE_WBTC = BigNumber.from(50).mul(BigNumber.from(10).pow(wBTCdecimal));
+    BALANCE_DAI = BigNumber.from(50).mul(BigNumber.from(10).pow(DAIdecimal));
+    BALANCE_GOV_WBTC = BigNumber.from(50).mul(BigNumber.from(10).pow(wBTCdecimal));
+
+    BALANCE2_ANGLE = BigNumber.from(1_000_000).mul(BASE_18);
+  });
+  beforeEach(async () => {
+    // If the forked-network state needs to be reset between each test, run this
+    await hre.network.provider.request({
+      method: 'hardhat_reset',
+      params: [
+        {
+          forking: hre.config.networks.hardhat.forking
+            ? {
+                jsonRpcUrl: hre.config.networks.hardhat.forking.url,
+              }
+            : undefined,
+        },
+      ],
+    });
 
     ({
       token: wBTC,
@@ -228,7 +235,7 @@ describe('AngleRouter01 - claim and lock', () => {
     ({ gauge: gaugeSanEURWBTC2 } = await initGaugeFork(sanTokenWBTC.address, governor, ANGLE, veANGLE, veBoostProxy));
     ({ gauge: gaugeEUR } = await initGaugeFork(agEUR.address, governor, ANGLE, veANGLE, veBoostProxy));
 
-    ({ angleRouter, oneInchRouter } = await initRouter(
+    ({ angleRouter } = await initRouter(
       governor,
       guardian,
       stableMasterEUR,
@@ -240,20 +247,6 @@ describe('AngleRouter01 - claim and lock', () => {
       ETHORACLEUSD,
       USDCORACLEUSD,
     ));
-
-    // Mint tokens of all type to user
-    UNIT_DAI = BigNumber.from(10).pow(DAIdecimal);
-    UNIT_ETH = BigNumber.from(10).pow(ETHdecimal);
-    UNIT_WBTC = BigNumber.from(10).pow(wBTCdecimal);
-    BALANCE_AGEUR = ethers.constants.Zero;
-    BALANCE_ANGLE = BigNumber.from(1_000_000).mul(BASE_18);
-    BALANCE_ETH = BigNumber.from(50).mul(BigNumber.from(10).pow(ETHdecimal));
-    BALANCE_USDC = BigNumber.from(50).mul(BigNumber.from(10).pow(USDCdecimal));
-    BALANCE_WBTC = BigNumber.from(50).mul(BigNumber.from(10).pow(wBTCdecimal));
-    BALANCE_DAI = BigNumber.from(50).mul(BigNumber.from(10).pow(DAIdecimal));
-    BALANCE_GOV_WBTC = BigNumber.from(50).mul(BigNumber.from(10).pow(wBTCdecimal));
-
-    BALANCE2_ANGLE = BigNumber.from(1_000_000).mul(BASE_18);
 
     await (await wBTC.connect(governor).mint(user.address, BALANCE_WBTC)).wait();
     await (await wETH.connect(governor).mint(user.address, BALANCE_ETH)).wait();

@@ -1,4 +1,4 @@
-import { expect } from '../../test/end-to-end/chai-setup';
+import { expect } from '../../utils/chai-setup';
 import { BigNumber } from 'ethers';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { ethers, web3 } from 'hardhat';
@@ -17,25 +17,26 @@ import {
   ActionType,
   SwapType,
   BASE_PARAMS,
-} from '../../test/typeScript/helpers';
+} from '../../utils/helpers';
+
+import { AngleRouter, MockANGLE, MockTokenPermit } from '../../typechain';
+
 import {
   AgToken,
   AngleDistributor,
-  AngleRouter,
   ERC20,
   ERC20__factory,
   LiquidityGaugeV4,
-  MockANGLE,
-  MockTokenPermit,
   PerpetualManagerFront,
   PoolManager,
   SanToken,
   StableMasterFront,
   VeANGLE,
   VeBoostProxy,
-} from '../../typechain';
+} from '../../typechain/core';
+
 import { BASE_18, parseAmount } from '@angleprotocol/sdk';
-import { signPermit } from '../../test/utils';
+import { signPermit } from '../../utils/sign';
 
 let ANGLE: MockANGLE;
 let veANGLE: VeANGLE;
@@ -130,7 +131,7 @@ describe('AngleRouter01 - functionalities ETH', () => {
       ERC20__factory.createInterface(),
       deployer,
     ) as ERC20;
-    ({ token: USDC } = await initToken('USDC', USDCdecimal));
+    ({ token: USDC } = await initToken('USDC', USDCdecimal, governor));
     ({
       ANGLE,
       veANGLE,

@@ -22,7 +22,14 @@ import {
   BASE_PARAMS,
 } from '../../utils/helpers';
 
-import { AngleRouter, MockANGLE, MockTokenPermit, Mock1Inch, MockVaultManager } from '../../typechain';
+import {
+  AngleRouter,
+  MockANGLE,
+  MockTokenPermit,
+  Mock1Inch,
+  MockVaultManager,
+  MockVaultManager__factory,
+} from '../../typechain';
 
 import {
   AgToken,
@@ -35,7 +42,7 @@ import {
   StableMasterFront,
   VeANGLE,
   VeBoostProxy,
-} from '@angleprotocol/sdk/dist/constants/types';
+} from '../../typechain/core';
 
 import { addCollateral, createVault, mixer } from '../../utils/helpersEncoding';
 
@@ -145,7 +152,7 @@ export async function invariantFundsUser(): Promise<void> {
 }
 
 // Testing Angle Router
-describe('AngleRouter01', () => {
+describe('AngleRouter01 - borrower', () => {
   before(async () => {
     [deployer, guardian, user, governor, cleanAddress, treasury] = await ethers.getSigners();
 
@@ -159,8 +166,8 @@ describe('AngleRouter01', () => {
     USDCORACLEUSD = BigNumber.from('1');
     DAIORACLEUSD = BigNumber.from('1');
 
-    ({ token: wETH } = await initToken('wETH', ETHdecimal));
-    ({ token: USDC } = await initToken('USDC', USDCdecimal));
+    ({ token: wETH } = await initToken('wETH', ETHdecimal, governor));
+    ({ token: USDC } = await initToken('USDC', USDCdecimal, governor));
     ({
       ANGLE,
       veANGLE,
@@ -208,9 +215,8 @@ describe('AngleRouter01', () => {
 
     oneInch = new ethers.Contract(oneInchRouter.address, Interfaces.OneInchAggregatorV4) as Mock1Inch;
 
-    const VaultManagerArtifact = await ethers.getContractFactory('MockVaultManager');
-    const VaultManagerA = (await VaultManagerArtifact.deploy(treasury)) as MockVaultManager;
-    const VaultManagerB = (await VaultManagerArtifact.deploy(treasury)) as MockVaultManager;
+    const VaultManagerA = (await new MockVaultManager__factory(governor).deploy(treasury.address)) as MockVaultManager;
+    const VaultManagerB = (await new MockVaultManager__factory(governor).deploy(treasury.address)) as MockVaultManager;
 
     // Mint tokens of all type to user
     UNIT_ETH = BigNumber.from(10).pow(ETHdecimal);

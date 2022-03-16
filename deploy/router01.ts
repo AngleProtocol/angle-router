@@ -1,15 +1,16 @@
 import yargs from 'yargs';
 import { DeployFunction } from 'hardhat-deploy/types';
-import { CONTRACTS_ADDRESSES, ChainId, Interfaces } from '@angleprotocol/sdk';
+import { CONTRACTS_ADDRESSES, ChainId } from '@angleprotocol/sdk';
 
 import params from './networks';
+// eslint-disable-next-line camelcase
 import { AngleRouter__factory } from '../typechain';
 
 const argv = yargs.env('').boolean('ci').parseSync();
 
 const func: DeployFunction = async ({ ethers, deployments, network }) => {
   const { deploy } = deployments;
-  const { deployer, guardian, governor } = await ethers.getNamedSigners();
+  const [deployer, guardian, governor] = await ethers.getSigners();
 
   console.log('Deploying router');
 
@@ -53,17 +54,15 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
   try {
     await deployments.get('AngleRouter');
   } catch {
-    let proxyAdmin: string;
-    if (!network.live) {
-      // If we're in mainnet fork, we're using the `ProxyAdmin` address from mainnet
-      proxyAdmin = CONTRACTS_ADDRESSES[ChainId.MAINNET].ProxyAdmin!;
-    } else {
-      // Otherwise, we're using the proxy admin address from the desired network
-      proxyAdmin = CONTRACTS_ADDRESSES[network.config.chainId as ChainId].ProxyAdmin!;
-    }
+    console.log('deploy implementation');
 
-    console.log('Now deploying angleRouter');
-    console.log('Starting with the implementation');
+    const proxyAdmin = CONTRACTS_ADDRESSES[network.config.chainId as ChainId].ProxyAdmin!;
+
+    console.log('ProxyAdmin', proxyAdmin);
+    console.log('deployer ', deployer.address);
+
+    console.log('ProxyAdmin', proxyAdmin);
+
     await deploy('AngleRouter_Implementation', {
       contract: 'AngleRouter',
       from: deployer.address,
@@ -71,11 +70,13 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
     });
 
     const angleRouterImplementation = (await deployments.get('AngleRouter_Implementation')).address;
-    console.log(`Successfully deployed the implementation for AngleRouter at ${angleRouterImplementation}`);
+
+    console.log(`Successfully deployed Angle router implementation at the address ${angleRouterImplementation}`);
     console.log('');
 
     const dataRouter = new ethers.Contract(
       angleRouterImplementation,
+      // eslint-disable-next-line camelcase
       AngleRouter__factory.createInterface(),
     ).interface.encodeFunctionData('initialize', [
       governorAddress,
@@ -87,7 +88,6 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
       gauges,
     ]);
 
-    console.log('Now deploying the Proxy');
     await deploy('AngleRouter', {
       contract: 'TransparentUpgradeableProxy',
       from: deployer.address,

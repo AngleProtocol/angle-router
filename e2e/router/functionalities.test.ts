@@ -20,25 +20,25 @@ import {
   ActionType,
   SwapType,
   BASE_PARAMS,
-} from '../../test/typeScript/helpers';
+} from '../../utils/helpers';
+
+import { AngleRouter, MockANGLE, MockTokenPermit } from '../../typechain';
+
 import {
   AgToken,
   AngleDistributor,
-  AngleRouter,
   FeeDistributor,
   LiquidityGaugeV4,
-  MockANGLE,
-  MockTokenPermit,
   PerpetualManagerFront,
   PoolManager,
   SanToken,
   StableMasterFront,
   VeANGLE,
   VeBoostProxy,
-} from '../../typechain';
+} from '../../typechain/core';
 import { BASE_18, ChainId, formatAmount, parseAmount } from '@angleprotocol/sdk';
-import { expectApproxDelta } from '../../scripts/utils';
-import { domainSeparator, signPermit } from '../../test/utils';
+import { expectApproxDelta } from '../../utils/helpers';
+import { domainSeparator, signPermit } from '../../utils/sign';
 
 let ANGLE: MockANGLE;
 let veANGLE: VeANGLE;
@@ -145,8 +145,8 @@ describe('AngleRouter01 - functionalities', () => {
     USDCORACLEUSD = BigNumber.from('1');
     DAIORACLEUSD = BigNumber.from('1');
 
-    ({ token: wETH } = await initToken('wETH', ETHdecimal));
-    ({ token: USDC } = await initToken('USDC', USDCdecimal));
+    ({ token: wETH } = await initToken('wETH', ETHdecimal, governor));
+    ({ token: USDC } = await initToken('USDC', USDCdecimal, governor));
     ({
       ANGLE,
       veANGLE,

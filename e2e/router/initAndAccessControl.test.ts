@@ -10,15 +10,21 @@ import {
   initToken,
   initGaugeFork,
 } from '../../utils/helpers';
+
 import {
-  AgToken,
-  AngleDistributor,
   AngleRouter,
-  LiquidityGaugeV4,
-  ANGLE as ANGLEType,
+  MockANGLE,
   MockTokenPermit,
   MockUniswapV3Router,
   Mock1Inch,
+  AngleRouter__factory,
+} from '../../typechain';
+
+import {
+  AgToken,
+  AngleDistributor,
+  LiquidityGaugeV4,
+  ANGLE as ANGLEType,
   PerpetualManagerFront,
   PoolManager,
   SanToken,
@@ -30,11 +36,10 @@ import {
   AngleDistributor__factory,
   StableMasterFront__factory,
   AgToken__factory,
-  MockANGLE,
   ANGLE__factory,
-} from '../../typechain';
+} from '../../typechain/core';
 import { BASE_18, ChainId, CONTRACTS_ADDRESSES } from '@angleprotocol/sdk';
-import { impersonate } from '../../scripts/utils';
+import { impersonate } from '../../utils/helpers';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 
 let ANGLE: ANGLEType;
@@ -92,8 +97,6 @@ let USDCdecimal: BigNumber;
 let wBTCdecimal: BigNumber;
 let DAIdecimal: BigNumber;
 
-let AngleRouterArtifacts: ContractFactory;
-
 export async function invariantFunds(owner: string): Promise<void> {
   expect(await agEUR.balanceOf(owner)).to.be.equal(ethers.constants.Zero);
   expect(await wBTC.balanceOf(owner)).to.be.equal(ethers.constants.Zero);
@@ -132,8 +135,6 @@ describe('AngleRouter01 - init & access control', () => {
     governor = await impersonate(governorAddress, undefined, false);
     await hre.network.provider.send('hardhat_setBalance', [governor.address, '0x10000000000000000000000000000']);
 
-    AngleRouterArtifacts = await ethers.getContractFactory('AngleRouter');
-
     ETHdecimal = BigNumber.from('18');
     USDCdecimal = BigNumber.from('6');
     wBTCdecimal = BigNumber.from('8');
@@ -144,8 +145,8 @@ describe('AngleRouter01 - init & access control', () => {
     USDCORACLEUSD = BigNumber.from('1');
     DAIORACLEUSD = BigNumber.from('1');
 
-    ({ token: wETH } = await initToken('wETH', ETHdecimal));
-    ({ token: USDC } = await initToken('USDC', USDCdecimal));
+    ({ token: wETH } = await initToken('wETH', ETHdecimal, governor));
+    ({ token: USDC } = await initToken('USDC', USDCdecimal, governor));
 
     const contracts = CONTRACTS_ADDRESSES[1 as ChainId];
 
@@ -247,7 +248,7 @@ describe('AngleRouter01 - init & access control', () => {
   describe('Init', () => {
     describe('Initializer', () => {
       it('revert - governor - zero address', async () => {
-        const angleRouter = (await AngleRouterArtifacts.deploy()) as AngleRouter;
+        const angleRouter = (await new AngleRouter__factory(deployer).deploy()) as AngleRouter;
         await expect(
           angleRouter
             .connect(governor)
@@ -263,7 +264,7 @@ describe('AngleRouter01 - init & access control', () => {
         ).to.be.revertedWith('0');
       });
       it('revert - guardian - zero address', async () => {
-        const angleRouter = (await AngleRouterArtifacts.deploy()) as AngleRouter;
+        const angleRouter = (await new AngleRouter__factory(deployer).deploy()) as AngleRouter;
         await expect(
           angleRouter
             .connect(governor)
@@ -279,7 +280,7 @@ describe('AngleRouter01 - init & access control', () => {
         ).to.be.revertedWith('0');
       });
       it('revert - governor same as guardian', async () => {
-        const angleRouter = (await AngleRouterArtifacts.deploy()) as AngleRouter;
+        const angleRouter = (await new AngleRouter__factory(deployer).deploy()) as AngleRouter;
         await expect(
           angleRouter
             .connect(governor)
@@ -295,7 +296,7 @@ describe('AngleRouter01 - init & access control', () => {
         ).to.be.revertedWith('49');
       });
       it('revert - uniswapRouter - zero address', async () => {
-        const angleRouter = (await AngleRouterArtifacts.deploy()) as AngleRouter;
+        const angleRouter = (await new AngleRouter__factory(deployer).deploy()) as AngleRouter;
         await expect(
           angleRouter
             .connect(governor)
@@ -311,7 +312,7 @@ describe('AngleRouter01 - init & access control', () => {
         ).to.be.revertedWith('0');
       });
       it('revert - 1InchRouter - zero address', async () => {
-        const angleRouter = (await AngleRouterArtifacts.deploy()) as AngleRouter;
+        const angleRouter = (await new AngleRouter__factory(deployer).deploy()) as AngleRouter;
         await expect(
           angleRouter
             .connect(governor)
@@ -327,7 +328,7 @@ describe('AngleRouter01 - init & access control', () => {
         ).to.be.revertedWith('0');
       });
       it('revert - stablemaster - zero address', async () => {
-        const angleRouter = (await AngleRouterArtifacts.deploy()) as AngleRouter;
+        const angleRouter = (await new AngleRouter__factory(deployer).deploy()) as AngleRouter;
         await expect(
           angleRouter
             .connect(governor)
@@ -343,7 +344,7 @@ describe('AngleRouter01 - init & access control', () => {
         ).to.be.reverted;
       });
       it('revert - poolManagers - invalid array length', async () => {
-        const angleRouter = (await AngleRouterArtifacts.deploy()) as AngleRouter;
+        const angleRouter = (await new AngleRouter__factory(deployer).deploy()) as AngleRouter;
         await expect(
           angleRouter
             .connect(governor)
@@ -359,7 +360,7 @@ describe('AngleRouter01 - init & access control', () => {
         ).to.be.revertedWith('104');
       });
       it('revert - gauges - invalid array length', async () => {
-        const angleRouter = (await AngleRouterArtifacts.deploy()) as AngleRouter;
+        const angleRouter = (await new AngleRouter__factory(deployer).deploy()) as AngleRouter;
         await expect(
           angleRouter
             .connect(governor)
@@ -375,7 +376,7 @@ describe('AngleRouter01 - init & access control', () => {
         ).to.be.revertedWith('104');
       });
       it('revert - poolManagers - zero address', async () => {
-        const angleRouter = (await AngleRouterArtifacts.deploy()) as AngleRouter;
+        const angleRouter = (await new AngleRouter__factory(deployer).deploy()) as AngleRouter;
         await expect(
           angleRouter
             .connect(governor)
@@ -391,7 +392,7 @@ describe('AngleRouter01 - init & access control', () => {
         ).to.be.reverted;
       });
       it('revert - duplicated poolManager', async () => {
-        const angleRouter = (await AngleRouterArtifacts.deploy()) as AngleRouter;
+        const angleRouter = (await new AngleRouter__factory(deployer).deploy()) as AngleRouter;
         await expect(
           angleRouter
             .connect(governor)
@@ -407,7 +408,7 @@ describe('AngleRouter01 - init & access control', () => {
         ).to.be.revertedWith('114');
       });
       it('revert - gauge - wrong contract', async () => {
-        const angleRouter = (await AngleRouterArtifacts.deploy()) as AngleRouter;
+        const angleRouter = (await new AngleRouter__factory(deployer).deploy()) as AngleRouter;
         await expect(
           angleRouter.initialize(
             governor.address,

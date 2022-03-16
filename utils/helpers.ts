@@ -3,34 +3,59 @@ import { BigNumber, Contract } from 'ethers';
 import { parseAmount, multBy10e15 } from './bignumber';
 
 import {
-  //   AgToken,
-  Core,
-  PoolManager,
-  FeeManager,
+  AngleRouter,
   MockANGLE,
   MockOracle,
   MockTokenPermit,
+  MockUniswapV3Router,
+  Mock1Inch,
+  MockWETH,
+  MockANGLE__factory,
+  MockUniswapV3Router__factory,
+  Mock1Inch__factory,
+  MockWETH__factory,
+  MockTokenPermit__factory,
+  MockOracle__factory,
+} from '../typechain';
+
+import {
+  AgToken,
+  Core,
+  ERC20,
+  PoolManager,
+  FeeManager,
   PerpetualManagerFront,
   SanToken,
-  StableMasterFront,
   VeANGLE,
   AngleDistributor,
   GaugeController,
   LiquidityGaugeV4,
   VeBoostProxy,
   SmartWalletWhitelist,
-  AngleRouter,
-  MockUniswapV3Router,
-  ERC20,
-  StableMaster,
   FeeDistributor,
-  Mock1Inch,
-  MockWETH,
+  StableMasterFront,
   ANGLE,
-} from '@angleprotocol/sdk/dist/constants/types';
+  Core__factory,
+  VeANGLE__factory,
+  VeBoost__factory,
+  VeBoostProxy__factory,
+  SmartWalletChecker__factory,
+  SmartWalletWhitelist__factory,
+  GaugeController__factory,
+  AngleDistributor__factory,
+  StableMaster__factory,
+  AgToken__factory,
+  FeeDistributor__factory,
+  LiquidityGaugeV4__factory,
+  PoolManager__factory,
+  SanToken__factory,
+  PerpetualManager__factory,
+  FeeManager__factory,
+  PerpetualManagerFront__factory,
+  StableMasterFront__factory,
+} from '../typechain/core';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { expect } from './chai-setup';
-import { AgToken } from '@angleprotocol/sdk/dist/constants/types';
 
 export const BASE = parseAmount.ether(1);
 export const BASE_PARAMS = parseAmount.gwei(1);
@@ -106,32 +131,24 @@ export async function initAngle(
 }> {
   const initInflationRate = BigNumber.from('5').pow(BigNumber.from('10'));
 
-  const CoreArtifacts = await ethers.getContractFactory('Core');
-  const MockANGLEArtifacts = await ethers.getContractFactory('MockANGLE');
-  const veANGLEArtifacts = await ethers.getContractFactory('veANGLE');
-  const veBoostProxyArtifacts = await ethers.getContractFactory('veBoostProxy');
-  const smartWalletCheckerArtifacts = await ethers.getContractFactory('SmartWalletWhitelist');
-  const gaugeControllerArtifacts = await ethers.getContractFactory('GaugeController');
-  const angleDistributorArtifacts = await ethers.getContractFactory('AngleDistributor');
-  const AgTokenArtifacts = await ethers.getContractFactory('AgToken');
-  const StableMasterArtifacts = await ethers.getContractFactory('StableMasterFront');
-
-  const core = (await CoreArtifacts.deploy(governor.address, guardian.address)) as Core;
-  const ANGLE = (await MockANGLEArtifacts.deploy('ANGLE', 'ANGLE')) as MockANGLE;
-  const smartWalletChecker = (await smartWalletCheckerArtifacts.deploy(governor.address)) as SmartWalletWhitelist;
-  const veANGLE = (await veANGLEArtifacts.deploy()) as VeANGLE;
+  const core = (await new Core__factory(governor).deploy(governor.address, guardian.address)) as unknown as Core;
+  const ANGLE = (await new MockANGLE__factory(governor).deploy('ANGLE', 'ANGLE')) as MockANGLE;
+  const smartWalletChecker = (await new SmartWalletWhitelist__factory(governor).deploy(
+    governor.address,
+  )) as unknown as SmartWalletWhitelist;
+  const veANGLE = (await new VeANGLE__factory(governor).deploy()) as unknown as VeANGLE;
   await veANGLE.initialize(governor.address, ANGLE.address, smartWalletChecker.address, 'veANGLE', 'veANGLE');
-  const veBoostProxy = (await veBoostProxyArtifacts.deploy(
+  const veBoostProxy = (await new VeBoostProxy__factory(governor).deploy(
     veANGLE.address,
     ethers.constants.AddressZero,
     governor.address,
-  )) as VeBoostProxy;
-  const gaugeController = (await gaugeControllerArtifacts.deploy(
+  )) as unknown as VeBoostProxy;
+  const gaugeController = (await new GaugeController__factory(governor).deploy(
     ANGLE.address,
     veANGLE.address,
     governor.address,
-  )) as GaugeController;
-  const angleDistributor = (await angleDistributorArtifacts.deploy()) as AngleDistributor;
+  )) as unknown as GaugeController;
+  const angleDistributor = (await new AngleDistributor__factory(governor).deploy()) as unknown as AngleDistributor;
   await angleDistributor.initialize(
     ANGLE.address,
     gaugeController.address,
@@ -141,9 +158,9 @@ export async function initAngle(
     guardian.address,
     guardian.address,
   );
-  const stableMaster = (await StableMasterArtifacts.deploy()) as StableMasterFront;
+  const stableMaster = (await new StableMasterFront__factory(governor).deploy()) as unknown as StableMasterFront;
   await stableMaster.initialize(core.address);
-  const agToken = (await AgTokenArtifacts.deploy()) as AgToken;
+  const agToken = (await new AgToken__factory(governor).deploy()) as unknown as AgToken;
   await agToken.initialize('agEUR', 'agEUR', stableMaster.address);
 
   await (await core.connect(governor).deployStableMaster(agToken.address)).wait();
@@ -154,12 +171,12 @@ export async function initAngle(
 export async function initRouter(
   governor: SignerWithAddress,
   guardian: SignerWithAddress,
-  stableMaster: StableMaster,
+  stableMaster: StableMasterFront,
   poolManagers: PoolManager[],
   gauges: LiquidityGaugeV4[],
-  tokenA: ERC20,
-  tokenB: ERC20,
-  tokenC: ERC20,
+  tokenA: ERC20 | MockTokenPermit,
+  tokenB: ERC20 | MockTokenPermit,
+  tokenC: ERC20 | MockTokenPermit,
   oracleUni: BigNumber,
   oracle1Inch: BigNumber,
 ): Promise<{
@@ -167,15 +184,16 @@ export async function initRouter(
   uniswapRouter: MockUniswapV3Router;
   oneInchRouter: Mock1Inch;
 }> {
-  const MockUniswapV3Router = await ethers.getContractFactory('MockUniswapV3Router');
-  const uniswapRouter = (await MockUniswapV3Router.deploy(tokenA.address, tokenC.address)) as MockUniswapV3Router;
+  const uniswapRouter = (await new MockUniswapV3Router__factory(governor).deploy(
+    tokenA.address,
+    tokenC.address,
+  )) as MockUniswapV3Router;
   await uniswapRouter.updateExchangeRate(parseAmount.ether(oracleUni));
-  const Mock1InchRouter = await ethers.getContractFactory('Mock1Inch');
-  const oneInchRouter = (await Mock1InchRouter.deploy(tokenB.address, tokenC.address)) as Mock1Inch;
+  const oneInchRouter = (await new Mock1Inch__factory(governor).deploy(tokenB.address, tokenC.address)) as Mock1Inch;
   await oneInchRouter.updateExchangeRate(parseAmount.ether(oracle1Inch));
 
   const AngleRouterArtifacts = await ethers.getContractFactory('AngleRouter');
-  const angleRouter = (await AngleRouterArtifacts.deploy()) as AngleRouter;
+  const angleRouter = (await AngleRouterArtifacts.deploy()) as unknown as AngleRouter;
   await angleRouter.initialize(
     governor.address,
     guardian.address,
@@ -197,36 +215,35 @@ export async function initFeeDistributor(
   feeDistributor: FeeDistributor;
 }> {
   const curTs = await (await web3.eth.getBlock('latest')).timestamp;
-  const FeeDistributorArtifacts = await ethers.getContractFactory('FeeDistributor');
-  const feeDistributor = (await FeeDistributorArtifacts.deploy(
+  const feeDistributor = (await new FeeDistributor__factory(governor).deploy(
     veANGLE.address,
     curTs,
     rewardToken,
     governor.address,
     governor.address,
-  )) as FeeDistributor;
+  )) as unknown as FeeDistributor;
   return { feeDistributor };
 }
 
 export async function initWETH(
   name: string,
   decimals = BigNumber.from('18'),
+  governor: SignerWithAddress,
 ): Promise<{
   token: MockWETH;
 }> {
-  const MockWETHArtifacts = await ethers.getContractFactory('MockWETH');
-  const token = (await MockWETHArtifacts.deploy(name, name, decimals)) as MockWETH;
+  const token = (await new MockWETH__factory(governor).deploy(name, name, decimals)) as MockWETH;
   return { token };
 }
 
 export async function initToken(
   name: string,
   decimals = BigNumber.from('18'),
+  governor: SignerWithAddress,
 ): Promise<{
   token: MockTokenPermit;
 }> {
-  const MockTokenArtifacts = await ethers.getContractFactory('MockTokenPermit');
-  const token = (await MockTokenArtifacts.deploy(name, name, decimals)) as MockTokenPermit;
+  const token = (await new MockTokenPermit__factory(governor).deploy(name, name, decimals)) as MockTokenPermit;
   return { token };
 }
 
@@ -239,8 +256,7 @@ export async function initGauge(
 ): Promise<{
   gauge: LiquidityGaugeV4;
 }> {
-  const LiquidityGaugeArtifacts = await ethers.getContractFactory('LiquidityGaugeV4');
-  const gauge = (await LiquidityGaugeArtifacts.deploy()) as LiquidityGaugeV4;
+  const gauge = (await new LiquidityGaugeV4__factory(governor).deploy()) as LiquidityGaugeV4;
   await gauge.initialize(
     stakedToken,
     governor.address,
@@ -269,8 +285,7 @@ export async function initGaugeFork(
 ): Promise<{
   gauge: LiquidityGaugeV4;
 }> {
-  const LiquidityGaugeArtifacts = await ethers.getContractFactory('LiquidityGaugeV4');
-  const gauge = (await LiquidityGaugeArtifacts.deploy()) as LiquidityGaugeV4;
+  const gauge = (await new LiquidityGaugeV4__factory(governor).deploy()) as LiquidityGaugeV4;
   await gauge.initialize(
     stakedToken,
     governor.address,
@@ -306,24 +321,22 @@ export async function initCollateral(
   perpetualManager: PerpetualManagerFront;
   feeManager: FeeManager;
 }> {
-  const SanTokenArtifacts = await ethers.getContractFactory('SanToken');
-  const PoolManagerArtifacts = await ethers.getContractFactory('PoolManager');
-  const PerpetualManagerArtifacts = await ethers.getContractFactory('PerpetualManagerFront');
-  const FeeManagerArtifacts = await ethers.getContractFactory('FeeManager');
-  const MockOracleArtifacts = await ethers.getContractFactory('MockOracle');
-  const MockTokenArtifacts = await ethers.getContractFactory('MockTokenPermit');
-
-  const token = (await MockTokenArtifacts.deploy(name, name, collatBase)) as MockTokenPermit;
-  const oracle = (await MockOracleArtifacts.deploy(oracleValue.mul(BASE_ORACLE), collatBase)) as MockOracle;
-  const manager = (await PoolManagerArtifacts.deploy()) as PoolManager;
+  const token = (await new MockTokenPermit__factory(governor).deploy(name, name, collatBase)) as MockTokenPermit;
+  const oracle = (await new MockOracle__factory(governor).deploy(
+    oracleValue.mul(BASE_ORACLE),
+    collatBase,
+  )) as MockOracle;
+  const manager = (await new PoolManager__factory(governor).deploy()) as unknown as PoolManager;
 
   await manager.initialize(token.address, stableMaster.address);
   const sanName = `san_${name}`;
-  const sanToken = (await SanTokenArtifacts.deploy()) as SanToken;
+  const sanToken = (await new SanToken__factory(governor).deploy()) as unknown as SanToken;
   await sanToken.initialize(sanName, sanName, manager.address);
-  const perpetualManager = (await PerpetualManagerArtifacts.deploy()) as PerpetualManagerFront;
+  const perpetualManager = (await new PerpetualManagerFront__factory(
+    governor,
+  ).deploy()) as unknown as PerpetualManagerFront;
   await perpetualManager.initialize(manager.address, ANGLE.address);
-  const feeManager = (await FeeManagerArtifacts.deploy(manager.address)) as FeeManager;
+  const feeManager = (await new FeeManager__factory(governor).deploy(manager.address)) as unknown as FeeManager;
 
   await (
     await stableMaster
@@ -531,6 +544,12 @@ export function piecewiseFunction(value: BigNumber, xArray: BigNumber[], yArray:
     .add(yArray[i]);
 
   return normalized;
+}
+
+export async function expectApproxDelta(actual: BigNumber, expected: BigNumber, delta: BigNumber): Promise<void> {
+  const margin = expected.div(delta);
+  expect(expected.lte(actual.add(margin)));
+  expect(expected.gte(actual.sub(margin)));
 }
 
 export async function impersonate(
