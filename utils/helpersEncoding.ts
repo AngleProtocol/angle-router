@@ -72,25 +72,25 @@ export function encodeAngleBorrow(
     data.push(o.data);
   });
 
+  console.log('before encoding the data is ', data);
   return ethers.utils.defaultAbiCoder.encode(
-    ['uint256[]', 'address', 'address', 'address', 'bytes[]', 'bytes'],
-    [actions, vaultManager, to, who, data, repayData],
+    ['address', 'address', 'address', 'uint256[]', 'bytes[]', 'bytes'],
+    [vaultManager, to, who, actions, data, repayData],
   );
 }
 
-export async function mixer(
-  router: AngleRouter,
-  signer: SignerWithAddress,
-  paramsPermit: PermitTypeStruct[],
-  paramsTransfer: TransferTypeStruct[],
-  paramsSwap: ParamsSwapTypeStruct[],
-  calls: Call[],
-): Promise<void> {
-  const actions: number[] = [];
-  const datas: BytesLike[] = [];
-  calls.forEach(o => {
-    actions.push(o.action);
-    datas.push(o.data);
-  });
-  await router.connect(signer).mixer(paramsPermit, paramsTransfer, paramsSwap, actions, datas);
-}
+// export async function mixer(
+//   router: AngleRouter,
+//   signer: SignerWithAddress,
+//   paramsPermit: PermitTypeStruct[],
+//   paramsTransfer: TransferTypeStruct[],
+//   paramsSwap: ParamsSwapTypeStruct[],
+//   calls: Call[],
+// ): Promise<void> {
+//   const actions: number[] = [];
+//   const datas: BytesLike[] = [];
+//   calls.forEach(o => {
+//     actions.push(o.action);
+//     datas.push(o.data);
+//   });
+// }

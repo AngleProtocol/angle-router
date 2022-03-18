@@ -15,6 +15,9 @@ import "./interfaces/IStableMasterFront.sol";
 import "./interfaces/IVeANGLE.sol";
 import "./interfaces/external/IWETH9.sol";
 import "./interfaces/external/uniswap/IUniswapRouter.sol";
+import "./interfaces/IVaultManager.sol";
+import "hardhat/console.sol";
+import "./interfaces/external/lido/IWStETH.sol";
 
 /// @title Angle Router
 /// @author Angle Core Team
@@ -37,8 +40,8 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
     IERC20 public constant ANGLE = IERC20(0x31429d1856aD1377A8A0079410B297e1a9e214c2);
     // @notice veANGLE contract
     IVeANGLE public constant VEANGLE = IVeANGLE(0x0C462Dbb9EC8cD1630f1728B2CFD2769d09f0dd5);
-
-    receive() external payable {}
+    /// @notice Wrapped StETH contract
+    IWStETH public constant WSTETH = IWStETH(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0);
 
     // =========================== Structs and Enums ===============================
 
@@ -52,13 +55,15 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         deposit,
         openPerpetual,
         addToPerpetual,
-        veANGLEDeposit
+        veANGLEDeposit,
+        borrower
     }
 
     /// @notice All possible swaps
     enum SwapType {
         UniswapV3,
-        oneINCH
+        oneINCH,
+        WrapStETH
     }
 
     /// @notice Params for swaps
@@ -135,6 +140,10 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
     /// @notice Address of 1Inch router used for swaps
     address public oneInch;
 
+    uint256[50] private __gap;
+
+    // constructor() initializer {}
+
     /// @notice Deploys the `AngleRouter` contract
     /// @param _governor Governor address
     /// @param _guardian Guardian address
@@ -176,13 +185,14 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
 
         // for veANGLEDeposit action
         ANGLE.safeApprove(address(VEANGLE), type(uint256).max);
+        // To wrap StETH into wStETH action
+        IERC20 StETH = IERC20(WSTETH.stETH());
+        StETH.safeApprove(address(WSTETH), type(uint256).max);
 
         for (uint256 i = 0; i < existingPoolManagers.length; i++) {
             _addPair(existingStableMaster, existingPoolManagers[i], existingLiquidityGauges[i]);
         }
     }
-
-    // constructor() initializer {}
 
     // ============================== Modifiers ====================================
 
@@ -755,6 +765,16 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
 
                 amount = _computeProportion(amount, listTokens, balanceTokens, collateral);
                 _addToPerpetual(amount, perpetualID, addressProcessed, stablecoinOrPerpetualManager, collateral);
+            } else if (actions[i] == ActionType.borrower) {
+                (
+                    address vaultManager,
+                    address to,
+                    address who,
+                    ActionBorrowType[] memory actionsBorrow,
+                    bytes[] memory dataBorrow,
+                    bytes memory repayData
+                ) = abi.decode(data[i], (address, address, address, ActionBorrowType[], bytes[], bytes));
+                _angleBorrower(vaultManager, actionsBorrow, dataBorrow, to, who, repayData);
             }
         }
 
@@ -765,6 +785,8 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
             if (balanceTokens[i] > 0) IERC20(listTokens[i]).safeTransfer(msg.sender, balanceTokens[i]);
         }
     }
+
+    receive() external payable {}
 
     // ======================== Internal Utility Functions =========================
     // Most internal utility functions have a wrapper built on top of it
@@ -818,6 +840,23 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
     /// @param amount Amount to deposit
     function _depositOnLocker(address user, uint256 amount) internal {
         VEANGLE.deposit_for(user, amount);
+    }
+
+    /// @notice Allows to call angle builder actions on VaultManager (Angle Protocol borrowing module)
+    /// @param vaultManager Address of the vault to perform actions on
+    /// @param actionsBorrow Actions type to perform on the vaultManager
+    /// @param dataBorrow Data needed for each actions
+    /// @param dataBorrow Data needed for each actions
+    /// @param dataBorrow Data needed for each actions
+    function _angleBorrower(
+        address vaultManager,
+        ActionBorrowType[] memory actionsBorrow,
+        bytes[] memory dataBorrow,
+        address to,
+        address who,
+        bytes memory repayData
+    ) internal {
+        IVaultManagerFunctions(vaultManager).angle(actionsBorrow, dataBorrow, msg.sender, to, who, repayData);
     }
 
     /// @notice Allows to claim weekly interest distribution and if wanted to transfer it to the `angleRouter` for future use
@@ -1236,17 +1275,44 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         uint256 minAmountOut,
         SwapType swapType,
         bytes memory args
-    ) internal returns (uint256 amountOut) {
-        if (address(inToken) == address(WETH9) && address(this).balance >= amount) {
-            WETH9.deposit{ value: amount }(); // wrap only what is needed to pay
+    ) internal returns (uint256) {
+        if (address(this).balance >= amount) {
+            if (address(inToken) == address(WETH9)) {
+                WETH9.deposit{ value: amount }(); // wrap only what is needed to pay
+            } else if (address(inToken) == address(WSTETH)) {
+                //solhint-disable-next-line
+                (bool success, bytes memory result) = address(WSTETH).call{ value: amount }("");
+                if (!success) _revertBytes(result);
+            }
         } else {
             inToken.safeTransferFrom(msg.sender, address(this), amount);
         }
+        return _swap(inToken, amount, minAmountOut, swapType, args);
+    }
+
+    /// @notice swap an amount of inToken
+    /// @param inToken Token to swap for the collateral
+    /// @param amount Amount of in token to swap for the collateral
+    /// @param minAmountOut Minimum amount accepted for the swap to happen
+    /// @param swapType Choice on which contracts to swap
+    function _swap(
+        IERC20 inToken,
+        uint256 amount,
+        uint256 minAmountOut,
+        SwapType swapType,
+        bytes memory args
+    ) internal returns (uint256 amountOut) {
         if (swapType == SwapType.UniswapV3) amountOut = _swapOnUniswapV3(inToken, amount, minAmountOut, args);
         else if (swapType == SwapType.oneINCH) amountOut = _swapOn1Inch(inToken, minAmountOut, args);
+        else if (swapType == SwapType.WrapStETH) amountOut = _wrapStETH(amount, minAmountOut);
         else require(false, "3");
 
         return amountOut;
+    }
+
+    function _wrapStETH(uint256 amount, uint256 minAmountOut) internal returns (uint256 amountOut) {
+        amountOut = WSTETH.wrap(amount);
+        require(amountOut >= minAmountOut, "15");
     }
 
     /// @notice Allows to swap any token to an accepted collateral via UniswapV3 (if there is a path)

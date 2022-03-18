@@ -29,6 +29,7 @@ import {
   Mock1Inch,
   MockVaultManager,
   MockVaultManager__factory,
+  AngleRouter__factory,
 } from '../../typechain';
 
 import {
@@ -44,7 +45,7 @@ import {
   VeBoostProxy,
 } from '../../typechain/core';
 
-import { addCollateral, createVault, mixer } from '../../utils/helpersEncoding';
+import { addCollateral, borrow, createVault, encodeAngleBorrow } from '../../utils/helpersEncoding';
 
 let ANGLE: MockANGLE;
 let veANGLE: VeANGLE;
@@ -108,10 +109,8 @@ let USDCdecimal: BigNumber;
 let wBTCdecimal: BigNumber;
 let DAIdecimal: BigNumber;
 
-let REWARD_SANWBTC: BigNumber;
-let REWARD_AGEUR: BigNumber;
-const REWARD_ANGLE: BigNumber = parseAmount.ether(1000);
-
+let VaultManagerA: MockVaultManager;
+let VaultManagerB: MockVaultManager;
 let oneInch: Mock1Inch;
 
 export async function invariantFunds(owner: string): Promise<void> {
@@ -215,8 +214,8 @@ describe('AngleRouter01 - borrower', () => {
 
     oneInch = new ethers.Contract(oneInchRouter.address, Interfaces.OneInchAggregatorV4) as Mock1Inch;
 
-    const VaultManagerA = (await new MockVaultManager__factory(governor).deploy(treasury.address)) as MockVaultManager;
-    const VaultManagerB = (await new MockVaultManager__factory(governor).deploy(treasury.address)) as MockVaultManager;
+    VaultManagerA = (await new MockVaultManager__factory(governor).deploy(treasury.address)) as MockVaultManager;
+    VaultManagerB = (await new MockVaultManager__factory(governor).deploy(treasury.address)) as MockVaultManager;
 
     // Mint tokens of all type to user
     UNIT_ETH = BigNumber.from(10).pow(ETHdecimal);
@@ -261,9 +260,36 @@ describe('AngleRouter01 - borrower', () => {
   describe('Borrower test', () => {
     describe('Decoding test', () => {
       it('read', async () => {
-        const calls = [createVault(user.address), createVault(user.address), addCollateral(2, UNIT_DAI)];
+        const calls1Borrow = [createVault(user.address), createVault(user.address), addCollateral(1, UNIT_DAI)];
+        const calls2Borrow = [
+          createVault(user.address),
+          addCollateral(1, UNIT_DAI),
+          borrow(1, UNIT_DAI.div(BigNumber.from(2))),
+        ];
 
-        await mixer(angleRouter, user, [], [], [], calls);
+        const dataBorrow1 = await encodeAngleBorrow(
+          VaultManagerA.address,
+          cleanAddress.address,
+          treasury.address,
+          '0x',
+          calls1Borrow,
+        );
+
+        const dataBorrow2 = await encodeAngleBorrow(
+          VaultManagerB.address,
+          governor.address,
+          VaultManagerA.address,
+          '0x1200339990',
+          calls2Borrow,
+        );
+
+        const actions = [ActionType.borrower, ActionType.borrower];
+        const dataMixer = [dataBorrow1, dataBorrow2];
+
+        console.log('dataBorrow1', dataBorrow1);
+        console.log('dataBorrow1', dataBorrow2);
+
+        await angleRouter.connect(deployer).mixer([], [], [], actions, dataMixer);
       });
     });
   });

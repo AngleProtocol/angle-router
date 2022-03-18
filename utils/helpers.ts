@@ -586,6 +586,7 @@ export enum ActionType {
   openPerpetual,
   addToPerpetual,
   veANGLEDeposit,
+  borrower,
 }
 export enum SwapType {
   UniswapV3,

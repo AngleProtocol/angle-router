@@ -23,7 +23,7 @@
     "size": "hardhat size-contracts",
     "test": "hardhat test",
     "test:e2e": "FORK=true hardhat test e2e/**/*.ts",
-    "test:router": "FORK=true hardhat test e2e/router/claimAndLock.test.ts",
+    "test:router": "FORK=true hardhat test e2e/router/borrow.test.ts",
     "test:all": "yarn test && yarn test:e2e"
   },
   "repository": {
