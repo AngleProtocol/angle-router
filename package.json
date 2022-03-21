@@ -17,6 +17,7 @@
     "lint": "yarn lint:sol && yarn lint:js:fix",
     "lint:js:fix": "eslint --ignore-path .gitignore --fix --max-warnings 30 'test/**/*.{js,ts}' '*.{js,ts}'",
     "lint:sol": "solhint --fix --max-warnings 20 \"contracts/**/*.sol\"",
+    "node:instant": "FORK=true hardhat node --tags instant",
     "prettier": "yarn prettier:js && yarn prettier:sol",
     "prettier:sol": "prettier --write 'contracts/**/*.sol'",
     "prettier:js": "prettier --write 'test/**/*.{js,ts}' '*.{js,ts}'",
@@ -24,7 +25,8 @@
     "test": "hardhat test",
     "test:e2e": "FORK=true hardhat test e2e/**/*.ts",
     "test:router": "FORK=true hardhat test e2e/router/borrow.test.ts",
-    "test:all": "yarn test && yarn test:e2e"
+    "test:all": "yarn test && yarn test:e2e",
+    "upgrade:fork:router": "FORK=true hardhat node --tags routerUpgrade"
   },
   "repository": {
     "type": "git",

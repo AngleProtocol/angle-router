@@ -1,26 +1,11 @@
-import { ethers, network, web3 } from 'hardhat';
+import { ethers } from 'hardhat';
 import { expect } from '../../utils/chai-setup';
 import { BigNumber } from 'ethers';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
-import { Interfaces, BASE_18, parseAmount } from '@angleprotocol/sdk';
+import { Interfaces, BASE_18, CONTRACTS_ADDRESSES, ChainId } from '@angleprotocol/sdk';
 
 // we import our utilities
-import {
-  // functions
-  initAngle,
-  initRouter,
-  initCollateral,
-  initToken,
-  initGauge,
-  initFeeDistributor,
-  WEEK,
-  TypeSwap,
-  TypeTransfer,
-  TypePermit,
-  ActionType,
-  SwapType,
-  BASE_PARAMS,
-} from '../../utils/helpers';
+import { WEEK, ActionType } from '../../utils/helpers';
 
 import {
   AngleRouter,
@@ -31,27 +16,11 @@ import {
   MockVaultManager__factory,
   AngleRouter__factory,
 } from '../../typechain';
-
-import {
-  AgToken,
-  AngleDistributor,
-  FeeDistributor,
-  LiquidityGaugeV4,
-  PerpetualManagerFront,
-  PoolManager,
-  SanToken,
-  StableMasterFront,
-  VeANGLE,
-  VeBoostProxy,
-} from '../../typechain/core';
-
+import { AgToken, LiquidityGaugeV4, PerpetualManagerFront, SanToken, VeANGLE } from '../../typechain/core';
 import { addCollateral, borrow, createVault, encodeAngleBorrow } from '../../utils/helpersEncoding';
 
 let ANGLE: MockANGLE;
 let veANGLE: VeANGLE;
-let veBoostProxy: VeBoostProxy;
-let angleDistributor: AngleDistributor;
-let stableMasterEUR: StableMasterFront;
 let agEUR: AgToken;
 
 let angleRouter: AngleRouter;
@@ -61,21 +30,15 @@ let USDC: MockTokenPermit;
 let wETH: MockTokenPermit;
 
 let wBTC: MockTokenPermit;
-let managerWBTC: PoolManager;
 let sanTokenWBTC: SanToken;
 let perpEURWBTC: PerpetualManagerFront;
 let gaugeSanEURWBTC: LiquidityGaugeV4;
 let gaugeSanEURWBTC2: LiquidityGaugeV4;
 
 let DAI: MockTokenPermit;
-let managerDAI: PoolManager;
 let sanTokenDAI: SanToken;
 let perpEURDAI: PerpetualManagerFront;
 let gaugeSanEURDAI: LiquidityGaugeV4;
-
-let gaugeEUR: LiquidityGaugeV4;
-let interestDistributorSanwBTCEUR: FeeDistributor;
-let interestDistributorAgEUR: FeeDistributor;
 
 let deployer: SignerWithAddress;
 let guardian: SignerWithAddress;
@@ -155,6 +118,11 @@ describe('AngleRouter01 - borrower', () => {
   before(async () => {
     [deployer, guardian, user, governor, cleanAddress, treasury] = await ethers.getSigners();
 
+    angleRouter = new ethers.Contract(
+      CONTRACTS_ADDRESSES[ChainId.MAINNET].AngleRouter!,
+      AngleRouter__factory.createInterface(),
+    ) as AngleRouter;
+
     ETHdecimal = BigNumber.from('18');
     USDCdecimal = BigNumber.from('6');
     wBTCdecimal = BigNumber.from('8');
@@ -164,53 +132,6 @@ describe('AngleRouter01 - borrower', () => {
     wBTCORACLEUSD = BigNumber.from('30');
     USDCORACLEUSD = BigNumber.from('1');
     DAIORACLEUSD = BigNumber.from('1');
-
-    ({ token: wETH } = await initToken('wETH', ETHdecimal, governor));
-    ({ token: USDC } = await initToken('USDC', USDCdecimal, governor));
-    ({
-      ANGLE,
-      veANGLE,
-      veBoostProxy,
-      angleDistributor,
-      stableMaster: stableMasterEUR,
-      agToken: agEUR,
-    } = await initAngle(deployer, guardian));
-    ({
-      token: wBTC,
-      manager: managerWBTC,
-      sanToken: sanTokenWBTC,
-      perpetualManager: perpEURWBTC,
-    } = await initCollateral('wBTC', stableMasterEUR, ANGLE, deployer, wBTCdecimal, wBTCORACLEUSD, 0));
-    ({
-      token: DAI,
-      manager: managerDAI,
-      sanToken: sanTokenDAI,
-      perpetualManager: perpEURDAI,
-    } = await initCollateral('DAI', stableMasterEUR, ANGLE, deployer, DAIdecimal, DAIORACLEUSD, 0));
-    ({ gauge: gaugeSanEURWBTC } = await initGauge(sanTokenWBTC.address, governor, ANGLE, veANGLE, veBoostProxy));
-    ({ gauge: gaugeSanEURDAI } = await initGauge(sanTokenDAI.address, governor, ANGLE, veANGLE, veBoostProxy));
-    ({ gauge: gaugeSanEURWBTC2 } = await initGauge(sanTokenWBTC.address, governor, ANGLE, veANGLE, veBoostProxy));
-    ({ gauge: gaugeEUR } = await initGauge(agEUR.address, governor, ANGLE, veANGLE, veBoostProxy));
-
-    ({ feeDistributor: interestDistributorSanwBTCEUR } = await initFeeDistributor(
-      veANGLE,
-      sanTokenWBTC.address,
-      governor,
-    ));
-    ({ feeDistributor: interestDistributorAgEUR } = await initFeeDistributor(veANGLE, agEUR.address, governor));
-
-    ({ angleRouter, oneInchRouter } = await initRouter(
-      governor,
-      guardian,
-      stableMasterEUR,
-      [managerWBTC, managerDAI],
-      [gaugeSanEURWBTC, gaugeSanEURDAI],
-      wETH,
-      USDC,
-      DAI,
-      ETHORACLEUSD,
-      USDCORACLEUSD,
-    ));
 
     oneInch = new ethers.Contract(oneInchRouter.address, Interfaces.OneInchAggregatorV4) as Mock1Inch;
 

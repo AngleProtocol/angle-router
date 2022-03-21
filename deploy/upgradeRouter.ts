@@ -10,10 +10,16 @@ const func: DeployFunction = async ({ deployments, ethers, network }) => {
   const { deploy } = deployments;
   const [deployer] = await ethers.getSigners();
 
-  const chainIdNetwork = network.config.chainId as ChainId;
+  const proxyAdminAddress = CONTRACTS_ADDRESSES[ChainId.MAINNET].ProxyAdmin!;
+  const proxyAngleRouterAddress = CONTRACTS_ADDRESSES[ChainId.MAINNET].AngleRouter!;
 
-  const proxyAdminAddress = CONTRACTS_ADDRESSES[chainIdNetwork].ProxyAdmin!;
-  const proxyAngleRouterAddress = CONTRACTS_ADDRESSES[chainIdNetwork].AngleRouter!;
+  const governor = CONTRACTS_ADDRESSES[ChainId.MAINNET].GovernanceMultiSig! as string;
+  await network.provider.request({
+    method: 'hardhat_impersonateAccount',
+    params: [governor],
+  });
+  await network.provider.send('hardhat_setBalance', [governor, '0x10000000000000000000000000000']);
+  const governorSigner = await ethers.provider.getSigner(governor);
 
   console.log('-----------------------------------------------------------------------');
   console.log('Let us get it started with the deployment of Angle new router');
@@ -32,16 +38,24 @@ const func: DeployFunction = async ({ deployments, ethers, network }) => {
   console.log(`Successfully deployed Angle router implementation at the address ${AngleRouterImplementation}`);
   console.log('');
 
-  //   const proxyAdminAddress: string = proxyAdmin !== undefined ? proxyAdmin : '0x';
   console.log('proxyAdmin', proxyAdminAddress);
   const contractProxyAdmin = new ethers.Contract(
     proxyAdminAddress,
     Interfaces.ProxyAdmin_Interface,
-    deployer,
+    governorSigner,
   ) as ProxyAdmin;
-  console.log('Upgrading router with ', deployer.address);
-  await (await contractProxyAdmin.connect(deployer).upgrade(proxyAngleRouterAddress, AngleRouterImplementation)).wait();
+  console.log(
+    'Upgrading router ',
+    proxyAngleRouterAddress,
+    ' with ',
+    governor,
+    ' on address ',
+    AngleRouterImplementation,
+  );
+  await (
+    await contractProxyAdmin.connect(governorSigner).upgrade(proxyAngleRouterAddress, AngleRouterImplementation)
+  ).wait();
 };
 
-func.tags = ['routerUpgradeRinkeby'];
+func.tags = ['routerUpgrade'];
 export default func;

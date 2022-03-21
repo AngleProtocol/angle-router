@@ -24,6 +24,8 @@ contract MockVaultManager {
     uint256 public collateralFactor;
     uint256 public totalNormalizedDebt;
 
+    PaymentData public paymentData;
+
     constructor(address _treasury) {
         treasury = ITreasury(_treasury);
     }
@@ -85,6 +87,18 @@ contract MockVaultManager {
         token = _token;
     }
 
+    function setPaymentData(
+        uint256 stablecoinAmountToGive,
+        uint256 stablecoinAmountToReceive,
+        uint256 collateralAmountToGive,
+        uint256 collateralAmountToReceive
+    ) external {
+        paymentData.stablecoinAmountToGive = stablecoinAmountToGive;
+        paymentData.stablecoinAmountToReceive = stablecoinAmountToReceive;
+        paymentData.collateralAmountToGive = collateralAmountToGive;
+        paymentData.collateralAmountToReceive = collateralAmountToReceive;
+    }
+
     function getDebtOut(
         uint256 vaultID,
         uint256 amountStablecoins,
@@ -114,13 +128,16 @@ contract MockVaultManager {
         address to,
         address who,
         bytes memory repayData
-    ) public payable returns (PaymentData memory paymentData) {
+    ) public payable returns (PaymentData memory) {
+        datas;
+        from;
+        to;
+        who;
+        repayData;
         for (uint256 i = 0; i < actions.length; i++) {
             ActionBorrowType action = actions[i];
+            action;
         }
-        paymentData.stablecoinAmountToGive += 20000;
-        paymentData.stablecoinAmountToReceive += 40000;
-        paymentData.collateralAmountToGive += 40000;
-        paymentData.collateralAmountToReceive += 20000;
+        return paymentData;
     }
 }
