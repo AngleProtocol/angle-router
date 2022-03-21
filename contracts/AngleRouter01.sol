@@ -40,8 +40,6 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
     IERC20 public constant ANGLE = IERC20(0x31429d1856aD1377A8A0079410B297e1a9e214c2);
     // @notice veANGLE contract
     IVeANGLE public constant VEANGLE = IVeANGLE(0x0C462Dbb9EC8cD1630f1728B2CFD2769d09f0dd5);
-    /// @notice Wrapped StETH contract
-    IWStETH public constant WSTETH = IWStETH(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0);
 
     // =========================== Structs and Enums ===============================
 
@@ -142,6 +140,9 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
 
     uint256[50] private __gap;
 
+    /// @notice Wrapped StETH contract
+    IWStETH public constant WSTETH = IWStETH(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0);
+
     // constructor() initializer {}
 
     /// @notice Deploys the `AngleRouter` contract
@@ -185,9 +186,6 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
 
         // for veANGLEDeposit action
         ANGLE.safeApprove(address(VEANGLE), type(uint256).max);
-        // To wrap StETH into wStETH action
-        IERC20 StETH = IERC20(WSTETH.stETH());
-        StETH.safeApprove(address(WSTETH), type(uint256).max);
 
         for (uint256 i = 0; i < existingPoolManagers.length; i++) {
             _addPair(existingStableMaster, existingPoolManagers[i], existingLiquidityGauges[i]);
@@ -328,6 +326,8 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
     /// @param amounts Amounts to allow
     /// @dev Approvals are normally given in the `addGauges` method, in the initializer and in
     /// the internal functions to process swaps with Uniswap and 1Inch
+    /// TODO need to approve
+    /// StETH.safeApprove(address(WSTETH), type(uint256).max);
     function changeAllowance(
         IERC20[] calldata tokens,
         address[] calldata spenders,
@@ -767,14 +767,30 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                 _addToPerpetual(amount, perpetualID, addressProcessed, stablecoinOrPerpetualManager, collateral);
             } else if (actions[i] == ActionType.borrower) {
                 (
+                    address collateral,
                     address vaultManager,
                     address to,
                     address who,
                     ActionBorrowType[] memory actionsBorrow,
                     bytes[] memory dataBorrow,
                     bytes memory repayData
-                ) = abi.decode(data[i], (address, address, address, ActionBorrowType[], bytes[], bytes));
-                _angleBorrower(vaultManager, actionsBorrow, dataBorrow, to, who, repayData);
+                ) = abi.decode(data[i], (address, address, address, address, ActionBorrowType[], bytes[], bytes));
+                _changeAllowance(IERC20(collateral), address(vaultManager), type(uint256).max);
+                PaymentData memory paymentData = _angleBorrower(
+                    vaultManager,
+                    actionsBorrow,
+                    dataBorrow,
+                    to,
+                    who,
+                    repayData
+                );
+                _changeAllowance(IERC20(collateral), address(vaultManager), 0);
+                if (paymentData.collateralAmountToReceive > paymentData.collateralAmountToGive) {
+                    uint256 index = _searchList(listTokens, collateral);
+                    // add it to the list if non existent and we add tokens
+                    require(listTokens[index] != address(0), "0");
+                    balanceTokens[index] -= paymentData.collateralAmountToReceive - paymentData.collateralAmountToGive;
+                }
             }
         }
 
@@ -846,8 +862,9 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
     /// @param vaultManager Address of the vault to perform actions on
     /// @param actionsBorrow Actions type to perform on the vaultManager
     /// @param dataBorrow Data needed for each actions
-    /// @param dataBorrow Data needed for each actions
-    /// @param dataBorrow Data needed for each actions
+    /// @param to Address to send the funds to
+    /// @param who Address Swapper to handle repayments
+    /// @param repayData Bytes to use at the discretion of the msg.sender
     function _angleBorrower(
         address vaultManager,
         ActionBorrowType[] memory actionsBorrow,
@@ -855,8 +872,8 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         address to,
         address who,
         bytes memory repayData
-    ) internal {
-        IVaultManagerFunctions(vaultManager).angle(actionsBorrow, dataBorrow, msg.sender, to, who, repayData);
+    ) internal returns (PaymentData memory paymentData) {
+        return IVaultManagerFunctions(vaultManager).angle(actionsBorrow, dataBorrow, msg.sender, to, who, repayData);
     }
 
     /// @notice Allows to claim weekly interest distribution and if wanted to transfer it to the `angleRouter` for future use
