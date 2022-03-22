@@ -591,4 +591,6 @@ export enum ActionType {
 export enum SwapType {
   UniswapV3,
   oneINCH,
+  WrapStETH,
+  None,
 }

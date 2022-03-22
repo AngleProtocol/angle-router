@@ -59,6 +59,8 @@ export function permit(permitData: TypePermit): Call {
 }
 
 export function encodeAngleBorrow(
+  collateral: string,
+  stablecoin: string,
   vaultManager: string,
   to: string,
   who: string,
@@ -74,8 +76,8 @@ export function encodeAngleBorrow(
 
   console.log('before encoding the data is ', data);
   return ethers.utils.defaultAbiCoder.encode(
-    ['address', 'address', 'address', 'uint256[]', 'bytes[]', 'bytes'],
-    [vaultManager, to, who, actions, data, repayData],
+    ['address', 'address', 'address', 'address', 'address', 'uint256[]', 'bytes[]', 'bytes'],
+    [collateral, stablecoin, vaultManager, to, who, actions, data, repayData],
   );
 }
 

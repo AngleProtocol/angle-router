@@ -18,6 +18,7 @@ async function main() {
 
   const proxyAdminAddress = CONTRACTS_ADDRESSES[chainIdNetwork].ProxyAdmin!;
   const governor = CONTRACTS_ADDRESSES[ChainId.MAINNET].GovernanceMultiSig! as string;
+  const guardian = CONTRACTS_ADDRESSES[ChainId.MAINNET].Guardian! as string;
   await network.provider.request({
     method: 'hardhat_impersonateAccount',
     params: [governor],
@@ -33,7 +34,6 @@ async function main() {
     log: !argv.ci,
   });
   const AngleRouterImplementation = (await deployments.get('AngleRouter_Implementation')).address;
-  console.log('proxyAdmin', proxyAdminAddress);
   const contractProxyAdmin = new ethers.Contract(
     proxyAdminAddress,
     ProxyAdmin__factory.createInterface(),
@@ -60,6 +60,8 @@ async function main() {
 
   const json = await import('../../deploy/networks/mainnet.json');
 
+  expect(await angleRouter.governor()).to.be.equal(governor);
+  expect(await angleRouter.guardian()).to.be.equal(guardian);
   expect(await angleRouter.ANGLE()).to.be.equal(angleAddress);
   expect(await angleRouter.VEANGLE()).to.be.equal(veAngleAddress);
   expect(await angleRouter.WETH9()).to.be.equal(WETH9Address);

@@ -44,17 +44,12 @@ const func: DeployFunction = async ({ deployments, ethers, network }) => {
     Interfaces.ProxyAdmin_Interface,
     governorSigner,
   ) as ProxyAdmin;
-  console.log(
-    'Upgrading router ',
-    proxyAngleRouterAddress,
-    ' with ',
-    governor,
-    ' on address ',
-    AngleRouterImplementation,
-  );
   await (
     await contractProxyAdmin.connect(governorSigner).upgrade(proxyAngleRouterAddress, AngleRouterImplementation)
   ).wait();
+
+  console.log('success');
+  console.log('');
 };
 
 func.tags = ['routerUpgrade'];

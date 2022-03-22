@@ -110,7 +110,8 @@ const config: HardhatUserConfig = {
     proxyAdmin: 3,
     alice: 4,
     bob: 5,
-    charlie: 6,
+    user: 6,
+    treasury: 7,
   },
   contractSizer: {
     alphaSort: true,

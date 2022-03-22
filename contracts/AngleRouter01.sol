@@ -16,7 +16,7 @@ import "./interfaces/IVeANGLE.sol";
 import "./interfaces/external/IWETH9.sol";
 import "./interfaces/external/uniswap/IUniswapRouter.sol";
 import "./interfaces/IVaultManager.sol";
-import "hardhat/console.sol";
+import "./interfaces/external/lido/IStETH.sol";
 import "./interfaces/external/lido/IWStETH.sol";
 
 /// @title Angle Router
@@ -61,7 +61,8 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
     enum SwapType {
         UniswapV3,
         oneINCH,
-        WrapStETH
+        WrapStETH,
+        None
     }
 
     /// @notice Params for swaps
@@ -140,6 +141,8 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
 
     uint256[50] private __gap;
 
+    /// @notice StETH contract
+    IStETH public constant STETH = IStETH(0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84);
     /// @notice Wrapped StETH contract
     IWStETH public constant WSTETH = IWStETH(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0);
 
@@ -326,8 +329,6 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
     /// @param amounts Amounts to allow
     /// @dev Approvals are normally given in the `addGauges` method, in the initializer and in
     /// the internal functions to process swaps with Uniswap and 1Inch
-    /// TODO need to approve
-    /// StETH.safeApprove(address(WSTETH), type(uint256).max);
     function changeAllowance(
         IERC20[] calldata tokens,
         address[] calldata spenders,
@@ -768,13 +769,17 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
             } else if (actions[i] == ActionType.borrower) {
                 (
                     address collateral,
+                    address stablecoin,
                     address vaultManager,
                     address to,
                     address who,
                     ActionBorrowType[] memory actionsBorrow,
                     bytes[] memory dataBorrow,
                     bytes memory repayData
-                ) = abi.decode(data[i], (address, address, address, address, ActionBorrowType[], bytes[], bytes));
+                ) = abi.decode(
+                        data[i],
+                        (address, address, address, address, address, ActionBorrowType[], bytes[], bytes)
+                    );
                 _changeAllowance(IERC20(collateral), address(vaultManager), type(uint256).max);
                 PaymentData memory paymentData = _angleBorrower(
                     vaultManager,
@@ -785,11 +790,31 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                     repayData
                 );
                 _changeAllowance(IERC20(collateral), address(vaultManager), 0);
+
+                // handle collateral transfers
                 if (paymentData.collateralAmountToReceive > paymentData.collateralAmountToGive) {
                     uint256 index = _searchList(listTokens, collateral);
                     // add it to the list if non existent and we add tokens
                     require(listTokens[index] != address(0), "0");
                     balanceTokens[index] -= paymentData.collateralAmountToReceive - paymentData.collateralAmountToGive;
+                } else if (
+                    paymentData.collateralAmountToReceive < paymentData.collateralAmountToGive && to == address(this)
+                ) {
+                    _addToList(
+                        listTokens,
+                        balanceTokens,
+                        collateral,
+                        paymentData.collateralAmountToGive - paymentData.collateralAmountToReceive
+                    );
+                }
+                // handle stablecoins transfers
+                if (paymentData.stablecoinAmountToGive > paymentData.stablecoinAmountToReceive && to == address(this)) {
+                    _addToList(
+                        listTokens,
+                        balanceTokens,
+                        stablecoin,
+                        paymentData.stablecoinAmountToGive - paymentData.stablecoinAmountToReceive
+                    );
                 }
             }
         }
@@ -1298,8 +1323,11 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                 WETH9.deposit{ value: amount }(); // wrap only what is needed to pay
             } else if (address(inToken) == address(WSTETH)) {
                 //solhint-disable-next-line
+                uint256 amountOut = STETH.getSharesByPooledEth(amount);
+                if (amountOut == 0) amountOut = amount;
                 (bool success, bytes memory result) = address(WSTETH).call{ value: amount }("");
                 if (!success) _revertBytes(result);
+                amount = amountOut;
             }
         } else {
             inToken.safeTransferFrom(msg.sender, address(this), amount);
@@ -1322,6 +1350,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         if (swapType == SwapType.UniswapV3) amountOut = _swapOnUniswapV3(inToken, amount, minAmountOut, args);
         else if (swapType == SwapType.oneINCH) amountOut = _swapOn1Inch(inToken, minAmountOut, args);
         else if (swapType == SwapType.WrapStETH) amountOut = _wrapStETH(amount, minAmountOut);
+        else if (swapType == SwapType.None) amountOut = amount;
         else require(false, "3");
 
         return amountOut;

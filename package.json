@@ -24,7 +24,8 @@
     "size": "hardhat size-contracts",
     "test": "hardhat test",
     "test:e2e": "FORK=true hardhat test e2e/**/*.ts",
-    "test:router": "FORK=true hardhat test e2e/router/borrow.test.ts",
+    "test:router:local": "FORK=true hardhat test e2e/router/functionalitiesETH.test.ts",
+    "test:router": "hardhat test --network localhost e2e/router/borrow.test.ts",
     "test:all": "yarn test && yarn test:e2e",
     "upgrade:fork:router": "FORK=true hardhat node --tags routerUpgrade"
   },
