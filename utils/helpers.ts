@@ -1,5 +1,5 @@
 import hre, { ethers, network, web3 } from 'hardhat';
-import { BigNumber, Contract } from 'ethers';
+import { BigNumber, Contract, ContractFactory } from 'ethers';
 import { parseAmount, multBy10e15 } from './bignumber';
 
 import {
@@ -16,6 +16,9 @@ import {
   MockWETH__factory,
   MockTokenPermit__factory,
   MockOracle__factory,
+  TransparentUpgradeableProxy__factory,
+  MockAgToken__factory,
+  MockAgToken,
 } from '../typechain';
 
 import {
@@ -116,6 +119,20 @@ export async function setupUser<T extends { [contractName: string]: Contract }>(
   return user as { address: string } & T;
 }
 
+// eslint-disable-next-line
+async function deployUpgradeable(factory: ContractFactory, ...args: any[]): Promise<Contract> {
+  const { deployer, proxyAdmin, alice } = await ethers.getNamedSigners();
+
+  const Implementation = args.length === 0 ? await factory.deploy() : await factory.deploy(args[0], args[1]);
+  const Proxy = await new TransparentUpgradeableProxy__factory(deployer).deploy(
+    Implementation.address,
+    proxyAdmin.address,
+    '0x',
+  );
+
+  return new Contract(Proxy.address, factory.interface, alice);
+}
+
 export async function initAngle(
   governor: SignerWithAddress,
   guardian: SignerWithAddress,
@@ -127,7 +144,7 @@ export async function initAngle(
   gaugeController: GaugeController;
   angleDistributor: AngleDistributor;
   stableMaster: StableMasterFront;
-  agToken: AgToken;
+  agToken: MockAgToken;
 }> {
   const initInflationRate = BigNumber.from('5').pow(BigNumber.from('10'));
 
@@ -160,8 +177,9 @@ export async function initAngle(
   );
   const stableMaster = (await new StableMasterFront__factory(governor).deploy()) as unknown as StableMasterFront;
   await stableMaster.initialize(core.address);
-  const agToken = (await new AgToken__factory(governor).deploy()) as unknown as AgToken;
-  await agToken.initialize('agEUR', 'agEUR', stableMaster.address);
+
+  const agToken = (await deployUpgradeable(new MockAgToken__factory(governor))) as MockAgToken;
+  await agToken.initialize('agEUR', 'agEUR', stableMaster.address, guardian.address);
 
   await (await core.connect(governor).deployStableMaster(agToken.address)).wait();
 

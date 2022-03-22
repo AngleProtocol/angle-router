@@ -147,10 +147,8 @@ contract MockVaultManager {
             if (paymentData.collateralAmountToGive >= paymentData.collateralAmountToReceive) {
                 uint256 collateralAmountToGive = paymentData.collateralAmountToGive -
                     paymentData.collateralAmountToReceive;
-                if (collateralAmountToGive > 0) collateral.safeTransfer(to, collateralAmountToGive);
-                if (stablecoinPayment > 0) {
-                    stablecoin.burnFrom(stablecoinPayment, from, msg.sender);
-                }
+                collateral.safeTransfer(to, collateralAmountToGive);
+                stablecoin.burnFrom(stablecoinPayment, from, msg.sender);
             } else {
                 if (stablecoinPayment > 0) stablecoin.burnFrom(stablecoinPayment, from, msg.sender);
                 // In this case the collateral amount is necessarily non null
@@ -168,9 +166,7 @@ contract MockVaultManager {
                 collateral.safeTransfer(to, paymentData.collateralAmountToGive - paymentData.collateralAmountToReceive);
             } else {
                 uint256 collateralPayment = paymentData.collateralAmountToReceive - paymentData.collateralAmountToGive;
-                if (collateralPayment > 0) {
-                    collateral.safeTransferFrom(msg.sender, address(this), collateralPayment);
-                }
+                collateral.safeTransferFrom(msg.sender, address(this), collateralPayment);
             }
         }
 

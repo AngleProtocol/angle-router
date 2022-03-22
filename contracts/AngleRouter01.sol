@@ -794,7 +794,6 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                 // handle collateral transfers
                 if (paymentData.collateralAmountToReceive > paymentData.collateralAmountToGive) {
                     uint256 index = _searchList(listTokens, collateral);
-                    // add it to the list if non existent and we add tokens
                     require(listTokens[index] != address(0), "0");
                     balanceTokens[index] -= paymentData.collateralAmountToReceive - paymentData.collateralAmountToGive;
                 } else if (

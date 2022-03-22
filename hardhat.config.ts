@@ -112,6 +112,7 @@ const config: HardhatUserConfig = {
     bob: 5,
     user: 6,
     treasury: 7,
+    user2: 8,
   },
   contractSizer: {
     alphaSort: true,

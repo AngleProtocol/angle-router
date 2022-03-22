@@ -74,7 +74,6 @@ export function encodeAngleBorrow(
     data.push(o.data);
   });
 
-  console.log('before encoding the data is ', data);
   return ethers.utils.defaultAbiCoder.encode(
     ['address', 'address', 'address', 'address', 'address', 'uint256[]', 'bytes[]', 'bytes'],
     [collateral, stablecoin, vaultManager, to, who, actions, data, repayData],
