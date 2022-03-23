@@ -25,6 +25,8 @@ import {
   IWStETH__factory,
   MockAgToken,
   MockANGLE,
+  MockFraudVaultManager,
+  MockFraudVaultManager__factory,
   MockTokenPermit,
   MockVaultManager,
   MockVaultManager__factory,
@@ -77,6 +79,7 @@ let gaugeSanEURDAI: LiquidityGaugeV4;
 
 let vaultManagerA: MockVaultManager;
 let vaultManagerB: MockVaultManager;
+let vaultManagerFraud: MockVaultManager;
 
 let deployer: SignerWithAddress;
 let guardian: SignerWithAddress;
@@ -201,6 +204,9 @@ describe('AngleRouter01 - functionalities ETH', () => {
 
     vaultManagerA = (await new MockVaultManager__factory(user).deploy(treasury.address)) as MockVaultManager;
     vaultManagerB = (await new MockVaultManager__factory(user).deploy(treasury.address)) as MockVaultManager;
+    vaultManagerFraud = (await new MockFraudVaultManager__factory(user).deploy(
+      treasury.address,
+    )) as MockFraudVaultManager;
 
     vaultManagerA
       .connect(user)
@@ -214,6 +220,17 @@ describe('AngleRouter01 - functionalities ETH', () => {
         BigNumber.from(1),
       );
     vaultManagerB
+      .connect(user)
+      .setParams(
+        user.address,
+        WSTETHAddress,
+        agEUR.address,
+        BigNumber.from(1),
+        BigNumber.from(1),
+        BigNumber.from(1),
+        BigNumber.from(1),
+      );
+    vaultManagerFraud
       .connect(user)
       .setParams(
         user.address,
@@ -469,7 +486,25 @@ describe('AngleRouter01 - functionalities ETH', () => {
         await invariantFunds(cleanAddress.address);
       });
     });
-    describe('WSTETH', () => {
+    describe('swaps only', () => {
+      it('revert - would lose ETH', async () => {
+        const transfers: TypeTransfer[] = [];
+        const swaps: TypeSwap[] = [
+          {
+            inToken: STETH,
+            collateral: WSTETHAddress,
+            amountIn: UNIT_ETH,
+            minAmountOut: BigNumber.from(0),
+            args: '0x',
+            swapType: SwapType.None,
+          },
+        ];
+        const actions: ActionType[] = [];
+        const data: string[] = [];
+        await expect(
+          angleRouter.connect(user).mixer([], transfers, swaps, actions, data, { value: UNIT_ETH }),
+        ).to.be.revertedWith('ERC20: transfer amount exceeds balance');
+      });
       it('success - ETH -> wSTETH', async () => {
         const ETHBalanceBefore = await ethers.provider.getBalance(user.address);
 
@@ -645,6 +680,32 @@ describe('AngleRouter01 - functionalities ETH', () => {
         expect(await USDC.balanceOf(user.address)).to.be.equal(balanceUSDCBefore.add(UNIT_USDC));
         expect(await agEUR.balanceOf(user.address)).to.be.equal(balanceBefore);
         await await USDC.connect(user).burn(user.address, UNIT_USDC);
+      });
+      it('angle - revert - token not in list', async () => {
+        await await vaultManagerFraud
+          .connect(user)
+          .setPaymentData(ethers.constants.Zero, UNIT_DAI, ethers.constants.Zero, UNIT_USDC);
+
+        const permits: TypePermit[] = [];
+        const transfers: TypeTransfer[] = [];
+        const swaps: TypeSwap[] = [];
+        const callsBorrow = [createVault(user.address), addCollateral(1, UNIT_DAI)];
+        const dataBorrow = await encodeAngleBorrow(
+          USDC.address,
+          agEUR.address,
+          vaultManagerFraud.address,
+          cleanAddress.address,
+          treasury.address,
+          '0x',
+          callsBorrow,
+        );
+
+        const actions = [ActionType.borrower];
+        const dataMixer = [dataBorrow];
+
+        await expect(angleRouter.connect(user).mixer(permits, transfers, swaps, actions, dataMixer)).to.be.revertedWith(
+          'panic code 0x11 (Arithmetic operation underflowed or overflowed outside of an unchecked block)',
+        );
       });
       it('angle - success - 2nd state', async () => {
         await await vaultManagerA

@@ -794,7 +794,6 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                 // handle collateral transfers
                 if (paymentData.collateralAmountToReceive > paymentData.collateralAmountToGive) {
                     uint256 index = _searchList(listTokens, collateral);
-                    require(listTokens[index] != address(0), "0");
                     balanceTokens[index] -= paymentData.collateralAmountToReceive - paymentData.collateralAmountToGive;
                 } else if (
                     paymentData.collateralAmountToReceive < paymentData.collateralAmountToGive && to == address(this)
@@ -1321,9 +1320,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
             if (address(inToken) == address(WETH9)) {
                 WETH9.deposit{ value: amount }(); // wrap only what is needed to pay
             } else if (address(inToken) == address(WSTETH)) {
-                //solhint-disable-next-line
                 uint256 amountOut = STETH.getSharesByPooledEth(amount);
-                if (amountOut == 0) amountOut = amount;
                 (bool success, bytes memory result) = address(WSTETH).call{ value: amount }("");
                 if (!success) _revertBytes(result);
                 amount = amountOut;

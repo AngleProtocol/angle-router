@@ -25,9 +25,11 @@
     "test": "hardhat test",
     "test:e2e": "FORK=true hardhat test e2e/**/*.ts",
     "test:router:local": "FORK=true hardhat test e2e/router/functionalitiesETH.test.ts",
-    "test:router": "hardhat test --network localhost e2e/router/borrow.test.ts",
+    "test:router": "yarn upgrade:fork:router && yarn upgrade:fork:agToken && hardhat test --network localhost e2e/router/borrow.test.ts",
     "test:all": "yarn test && yarn test:e2e",
-    "upgrade:fork:router": "FORK=true hardhat node --tags routerUpgrade"
+    "upgrade:fork:router": "hardhat run --network localhost scripts/mainnet-fork/routerUpgrade.ts",
+    "upgrade:fork:agToken": "hardhat run --network localhost scripts/mainnet-fork/mockAgTokenUpgrade.ts",
+    "upgrade:local:router": "FORK=true hardhat node --tags routerUpgrade"
   },
   "repository": {
     "type": "git",

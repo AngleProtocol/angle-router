@@ -48,7 +48,7 @@ const func: DeployFunction = async ({ deployments, ethers, network }) => {
     await contractProxyAdmin.connect(governorSigner).upgrade(proxyAngleRouterAddress, AngleRouterImplementation)
   ).wait();
 
-  console.log('success');
+  console.log('Success');
   console.log('');
 };
 
