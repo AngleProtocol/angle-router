@@ -60,7 +60,7 @@ const config: HardhatUserConfig = {
       forking: {
         enabled: argv.fork || false,
         url: nodeUrl('fork'),
-        blockNumber: 14256515,
+        blockNumber: 14431146,
       },
       mining: argv.disableAutoMining
         ? {
@@ -110,7 +110,9 @@ const config: HardhatUserConfig = {
     proxyAdmin: 3,
     alice: 4,
     bob: 5,
-    charlie: 6,
+    user: 6,
+    treasury: 7,
+    user2: 8,
   },
   contractSizer: {
     alphaSort: true,

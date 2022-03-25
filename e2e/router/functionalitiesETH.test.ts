@@ -19,7 +19,18 @@ import {
   BASE_PARAMS,
 } from '../../utils/helpers';
 
-import { AngleRouter, MockANGLE, MockTokenPermit } from '../../typechain';
+import {
+  AngleRouter,
+  IStETH__factory,
+  IWStETH__factory,
+  MockAgToken,
+  MockANGLE,
+  MockFraudVaultManager,
+  MockFraudVaultManager__factory,
+  MockTokenPermit,
+  MockVaultManager,
+  MockVaultManager__factory,
+} from '../../typechain';
 
 import {
   AgToken,
@@ -37,18 +48,21 @@ import {
 
 import { BASE_18, parseAmount } from '@angleprotocol/sdk';
 import { signPermit } from '../../utils/sign';
+import { addCollateral, createVault, encodeAngleBorrow } from '../../utils/helpersEncoding';
 
 let ANGLE: MockANGLE;
 let veANGLE: VeANGLE;
 let veBoostProxy: VeBoostProxy;
 let angleDistributor: AngleDistributor;
 let stableMasterEUR: StableMasterFront;
-let agEUR: AgToken;
+let agEUR: MockAgToken;
 
 let angleRouter: AngleRouter;
 
 let USDC: MockTokenPermit;
 let wETH: ERC20;
+let WSTETHAddress: string;
+let STETH: string;
 
 let wBTC: MockTokenPermit;
 let managerWBTC: PoolManager;
@@ -63,15 +77,21 @@ let sanTokenDAI: SanToken;
 let perpEURDAI: PerpetualManagerFront;
 let gaugeSanEURDAI: LiquidityGaugeV4;
 
+let vaultManagerA: MockVaultManager;
+let vaultManagerB: MockVaultManager;
+let vaultManagerFraud: MockVaultManager;
+
 let deployer: SignerWithAddress;
 let guardian: SignerWithAddress;
 let user: SignerWithAddress;
 let user2: SignerWithAddress;
 let cleanAddress: SignerWithAddress;
 let governor: SignerWithAddress;
+let treasury: SignerWithAddress;
 
 let UNIT_ETH: BigNumber;
 let UNIT_DAI: BigNumber;
+let UNIT_USDC: BigNumber;
 let BALANCE_AGEUR: BigNumber;
 let BALANCE_ETH: BigNumber;
 let BALANCE_USDC: BigNumber;
@@ -114,7 +134,15 @@ export async function invariantFundsUser(): Promise<void> {
 // Testing Angle Router
 describe('AngleRouter01 - functionalities ETH', () => {
   before(async () => {
-    [deployer, guardian, user, user2, governor, cleanAddress] = await ethers.getSigners();
+    ({
+      deployer,
+      guardian,
+      user,
+      alice: user2,
+      governor,
+      bob: cleanAddress,
+      treasury,
+    } = await ethers.getNamedSigners());
 
     ETHdecimal = BigNumber.from('18');
     USDCdecimal = BigNumber.from('6');
@@ -131,6 +159,7 @@ describe('AngleRouter01 - functionalities ETH', () => {
       ERC20__factory.createInterface(),
       deployer,
     ) as ERC20;
+
     ({ token: USDC } = await initToken('USDC', USDCdecimal, governor));
     ({
       ANGLE,
@@ -170,9 +199,61 @@ describe('AngleRouter01 - functionalities ETH', () => {
       USDCORACLEUSD,
     ));
 
+    WSTETHAddress = await angleRouter.WSTETH();
+    STETH = '0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84';
+
+    vaultManagerA = (await new MockVaultManager__factory(user).deploy(treasury.address)) as MockVaultManager;
+    vaultManagerB = (await new MockVaultManager__factory(user).deploy(treasury.address)) as MockVaultManager;
+    vaultManagerFraud = (await new MockFraudVaultManager__factory(user).deploy(
+      treasury.address,
+    )) as MockFraudVaultManager;
+
+    vaultManagerA
+      .connect(user)
+      .setParams(
+        user.address,
+        USDC.address,
+        agEUR.address,
+        BigNumber.from(1),
+        BigNumber.from(1),
+        BigNumber.from(1),
+        BigNumber.from(1),
+      );
+    vaultManagerB
+      .connect(user)
+      .setParams(
+        user.address,
+        WSTETHAddress,
+        agEUR.address,
+        BigNumber.from(1),
+        BigNumber.from(1),
+        BigNumber.from(1),
+        BigNumber.from(1),
+      );
+    vaultManagerFraud
+      .connect(user)
+      .setParams(
+        user.address,
+        WSTETHAddress,
+        agEUR.address,
+        BigNumber.from(1),
+        BigNumber.from(1),
+        BigNumber.from(1),
+        BigNumber.from(1),
+      );
+
+    await (await agEUR.connect(guardian).addMinter(vaultManagerA.address)).wait();
+    await (await agEUR.connect(guardian).addMinter(vaultManagerB.address)).wait();
+    await (await agEUR.connect(guardian).addMinter(governor.address)).wait();
+
+    await (
+      await angleRouter.connect(guardian).changeAllowance([STETH], [WSTETHAddress], [ethers.constants.MaxUint256])
+    ).wait();
+
     // Mint tokens of all type to user
     UNIT_ETH = BigNumber.from(10).pow(ETHdecimal);
     UNIT_DAI = BigNumber.from(10).pow(DAIdecimal);
+    UNIT_USDC = BigNumber.from(10).pow(USDCdecimal);
     BALANCE_AGEUR = ethers.constants.Zero;
     BALANCE_ETH = await ethers.provider.getBalance(user.address);
     BALANCE_USDC = BigNumber.from(500000).mul(BigNumber.from(10).pow(USDCdecimal));
@@ -403,6 +484,418 @@ describe('AngleRouter01 - functionalities ETH', () => {
         expect(await perpData.entryRate).to.be.equal(parseAmount.ether(DAIORACLEUSD));
         await invariantFunds(angleRouter.address);
         await invariantFunds(cleanAddress.address);
+      });
+    });
+    describe('swaps only', () => {
+      it('revert - would lose ETH', async () => {
+        const transfers: TypeTransfer[] = [];
+        const swaps: TypeSwap[] = [
+          {
+            inToken: STETH,
+            collateral: WSTETHAddress,
+            amountIn: UNIT_ETH,
+            minAmountOut: BigNumber.from(0),
+            args: '0x',
+            swapType: SwapType.None,
+          },
+        ];
+        const actions: ActionType[] = [];
+        const data: string[] = [];
+        await expect(
+          angleRouter.connect(user).mixer([], transfers, swaps, actions, data, { value: UNIT_ETH }),
+        ).to.be.revertedWith('ERC20: transfer amount exceeds balance');
+      });
+      it('success - ETH -> wSTETH', async () => {
+        const ETHBalanceBefore = await ethers.provider.getBalance(user.address);
+
+        const stETHContract = new ethers.Contract(STETH, IStETH__factory.createInterface(), user);
+        const supposedAmountToReceive: BigNumber = await stETHContract.getSharesByPooledEth(UNIT_ETH);
+        const minAmountOut = supposedAmountToReceive.mul(BigNumber.from(95).div(BigNumber.from(100)));
+
+        const transfers: TypeTransfer[] = [];
+        const swaps: TypeSwap[] = [
+          {
+            inToken: WSTETHAddress,
+            collateral: WSTETHAddress,
+            amountIn: UNIT_ETH,
+            minAmountOut: BigNumber.from(0),
+            args: '0x',
+            swapType: SwapType.None,
+          },
+        ];
+        const actions: ActionType[] = [];
+        const datas: string[] = [];
+        const receipt = await (
+          await angleRouter.connect(user).mixer([], transfers, swaps, actions, datas, { value: UNIT_ETH })
+        ).wait();
+
+        const wSTETHContract = new ethers.Contract(WSTETHAddress, IWStETH__factory.createInterface(), user);
+        const balanceWSTETH: BigNumber = await wSTETHContract.balanceOf(user.address);
+        expect(balanceWSTETH.gte(minAmountOut)).to.be.true;
+      });
+      it('success - stETH -> wSTETH', async () => {
+        // first get some stETH
+        const stETHContract = new ethers.Contract(STETH, IStETH__factory.createInterface(), user);
+        await (await stETHContract.connect(user).submit(ethers.constants.AddressZero, { value: UNIT_ETH })).wait();
+        const balanceStETHBefore: BigNumber = await stETHContract.balanceOf(user.address);
+
+        await (await stETHContract.connect(user).approve(angleRouter.address, ethers.constants.MaxUint256)).wait();
+        const supposedAmountToReceive: BigNumber = await stETHContract.getSharesByPooledEth(balanceStETHBefore);
+        const minAmountOut = supposedAmountToReceive.mul(BigNumber.from(95).div(BigNumber.from(100)));
+
+        const transfers: TypeTransfer[] = [];
+        const swaps: TypeSwap[] = [
+          {
+            inToken: STETH,
+            collateral: WSTETHAddress,
+            amountIn: balanceStETHBefore,
+            minAmountOut: minAmountOut,
+            args: '0x',
+            swapType: SwapType.WrapStETH,
+          },
+        ];
+        const actions: ActionType[] = [];
+        const datas: string[] = [];
+        await (await angleRouter.connect(user).mixer([], transfers, swaps, actions, datas)).wait();
+
+        const wSTETHContract = new ethers.Contract(WSTETHAddress, IWStETH__factory.createInterface(), user);
+        const balanceWSTETH: BigNumber = await wSTETHContract.balanceOf(user.address);
+        const stETHBalanceAfter: BigNumber = await stETHContract.balanceOf(user.address);
+        expect(balanceWSTETH.gte(minAmountOut)).to.be.true;
+      });
+    });
+    describe('VaultManager', () => {
+      it('angle - revert - 1st state', async () => {
+        await await vaultManagerA
+          .connect(user)
+          .setPaymentData(ethers.constants.Zero, UNIT_DAI, UNIT_USDC, ethers.constants.Zero);
+
+        await (await USDC.connect(governor).mint(vaultManagerA.address, UNIT_USDC)).wait();
+        await (await agEUR.connect(governor).mint(user.address, UNIT_DAI)).wait();
+
+        const permits: TypePermit[] = [];
+        const transfers: TypeTransfer[] = [];
+        const swaps: TypeSwap[] = [];
+        const callsBorrow = [createVault(user.address), addCollateral(1, UNIT_DAI)];
+        const dataBorrow = await encodeAngleBorrow(
+          USDC.address,
+          agEUR.address,
+          vaultManagerA.address,
+          cleanAddress.address,
+          treasury.address,
+          '0x',
+          callsBorrow,
+        );
+
+        const actions = [ActionType.borrower];
+        const dataMixer = [dataBorrow];
+
+        await expect(
+          angleRouter.connect(user2).mixer(permits, transfers, swaps, actions, dataMixer),
+        ).to.be.revertedWith('23');
+      });
+      it('angle - success - 1st state', async () => {
+        await await vaultManagerA
+          .connect(user)
+          .setPaymentData(ethers.constants.Zero, UNIT_DAI, UNIT_USDC, ethers.constants.Zero);
+
+        const balanceBefore = await agEUR.balanceOf(user.address);
+
+        await (await USDC.connect(governor).mint(vaultManagerA.address, UNIT_USDC)).wait();
+        await (await agEUR.connect(governor).mint(user.address, UNIT_DAI)).wait();
+
+        const permits: TypePermit[] = [
+          await signPermit(
+            user,
+            (await agEUR.nonces(user.address)).toNumber(),
+            agEUR.address,
+            Number(await (await web3.eth.getBlock('latest')).timestamp) + 1000,
+            angleRouter.address,
+            UNIT_DAI,
+            'agEUR',
+          ),
+        ];
+        const transfers: TypeTransfer[] = [];
+        // const transfers: TypeTransfer[] = [{ inToken: USDC.address, amountIn: UNIT_USDC }];
+        const swaps: TypeSwap[] = [];
+        const callsBorrow = [createVault(user.address), addCollateral(1, UNIT_DAI)];
+        const dataBorrow = await encodeAngleBorrow(
+          USDC.address,
+          agEUR.address,
+          vaultManagerA.address,
+          cleanAddress.address,
+          treasury.address,
+          '0x',
+          callsBorrow,
+        );
+
+        const actions = [ActionType.borrower];
+        const dataMixer = [dataBorrow];
+
+        await angleRouter.connect(user).mixer(permits, transfers, swaps, actions, dataMixer);
+        expect(await USDC.balanceOf(cleanAddress.address)).to.be.equal(UNIT_USDC);
+        expect(await agEUR.balanceOf(user.address)).to.be.equal(balanceBefore);
+        await await USDC.connect(cleanAddress).burn(cleanAddress.address, UNIT_USDC);
+      });
+      it('angle - success - 1st state - send back to router', async () => {
+        await await vaultManagerA
+          .connect(user)
+          .setPaymentData(ethers.constants.Zero, UNIT_DAI, UNIT_USDC, ethers.constants.Zero);
+
+        const balanceBefore = await agEUR.balanceOf(user.address);
+        const balanceUSDCBefore = await USDC.balanceOf(user.address);
+
+        await (await USDC.connect(governor).mint(vaultManagerA.address, UNIT_USDC)).wait();
+        await (await agEUR.connect(governor).mint(user.address, UNIT_DAI)).wait();
+
+        const permits: TypePermit[] = [
+          await signPermit(
+            user,
+            (await agEUR.nonces(user.address)).toNumber(),
+            agEUR.address,
+            Number(await (await web3.eth.getBlock('latest')).timestamp) + 1000,
+            angleRouter.address,
+            UNIT_DAI,
+            'agEUR',
+          ),
+        ];
+        const transfers: TypeTransfer[] = [];
+        // const transfers: TypeTransfer[] = [{ inToken: USDC.address, amountIn: UNIT_USDC }];
+        const swaps: TypeSwap[] = [];
+        const callsBorrow = [createVault(user.address), addCollateral(1, UNIT_DAI)];
+        const dataBorrow = await encodeAngleBorrow(
+          USDC.address,
+          agEUR.address,
+          vaultManagerA.address,
+          angleRouter.address,
+          treasury.address,
+          '0x',
+          callsBorrow,
+        );
+
+        const actions = [ActionType.borrower];
+        const dataMixer = [dataBorrow];
+
+        await angleRouter.connect(user).mixer(permits, transfers, swaps, actions, dataMixer);
+        expect(await USDC.balanceOf(user.address)).to.be.equal(balanceUSDCBefore.add(UNIT_USDC));
+        expect(await agEUR.balanceOf(user.address)).to.be.equal(balanceBefore);
+        await await USDC.connect(user).burn(user.address, UNIT_USDC);
+      });
+      it('angle - revert - token not in list', async () => {
+        await await vaultManagerFraud
+          .connect(user)
+          .setPaymentData(ethers.constants.Zero, UNIT_DAI, ethers.constants.Zero, UNIT_USDC);
+
+        const permits: TypePermit[] = [];
+        const transfers: TypeTransfer[] = [];
+        const swaps: TypeSwap[] = [];
+        const callsBorrow = [createVault(user.address), addCollateral(1, UNIT_DAI)];
+        const dataBorrow = await encodeAngleBorrow(
+          USDC.address,
+          agEUR.address,
+          vaultManagerFraud.address,
+          cleanAddress.address,
+          treasury.address,
+          '0x',
+          callsBorrow,
+        );
+
+        const actions = [ActionType.borrower];
+        const dataMixer = [dataBorrow];
+
+        await expect(angleRouter.connect(user).mixer(permits, transfers, swaps, actions, dataMixer)).to.be.revertedWith(
+          'panic code 0x11 (Arithmetic operation underflowed or overflowed outside of an unchecked block)',
+        );
+      });
+      it('angle - success - 2nd state', async () => {
+        await await vaultManagerA
+          .connect(user)
+          .setPaymentData(ethers.constants.Zero, UNIT_DAI, ethers.constants.Zero, UNIT_USDC);
+
+        const balanceBefore = await agEUR.balanceOf(user.address);
+        const balanceUSDCBefore = await USDC.balanceOf(user.address);
+
+        await (await agEUR.connect(governor).mint(user.address, UNIT_DAI)).wait();
+
+        const permits: TypePermit[] = [
+          await signPermit(
+            user,
+            (await agEUR.nonces(user.address)).toNumber(),
+            agEUR.address,
+            Number(await (await web3.eth.getBlock('latest')).timestamp) + 1000,
+            angleRouter.address,
+            UNIT_DAI,
+            'agEUR',
+          ),
+          await signPermit(
+            user,
+            (await USDC.nonces(user.address)).toNumber(),
+            USDC.address,
+            Number(await (await web3.eth.getBlock('latest')).timestamp) + 1000,
+            angleRouter.address,
+            UNIT_USDC,
+            'USDC',
+          ),
+        ];
+        const transfers: TypeTransfer[] = [{ inToken: USDC.address, amountIn: UNIT_USDC }];
+        const swaps: TypeSwap[] = [];
+        const callsBorrow = [createVault(user.address), addCollateral(1, UNIT_DAI)];
+        const dataBorrow = await encodeAngleBorrow(
+          USDC.address,
+          agEUR.address,
+          vaultManagerA.address,
+          cleanAddress.address,
+          treasury.address,
+          '0x',
+          callsBorrow,
+        );
+
+        const actions = [ActionType.borrower];
+        const dataMixer = [dataBorrow];
+
+        await angleRouter.connect(user).mixer(permits, transfers, swaps, actions, dataMixer);
+        expect(await USDC.balanceOf(user.address)).to.be.equal(balanceUSDCBefore.sub(UNIT_USDC));
+        expect(await agEUR.balanceOf(user.address)).to.be.equal(balanceBefore);
+      });
+      it('angle - success - 3rd state', async () => {
+        await await vaultManagerA
+          .connect(user)
+          .setPaymentData(UNIT_DAI, ethers.constants.Zero, UNIT_USDC, ethers.constants.Zero);
+
+        const balanceBefore = await agEUR.balanceOf(user.address);
+        const balanceUSDCBefore = await USDC.balanceOf(user.address);
+
+        await (await USDC.connect(governor).mint(vaultManagerA.address, UNIT_USDC)).wait();
+        await (await agEUR.connect(governor).mint(vaultManagerA.address, UNIT_DAI)).wait();
+
+        const permits: TypePermit[] = [];
+        const transfers: TypeTransfer[] = [];
+        const swaps: TypeSwap[] = [];
+        const callsBorrow = [createVault(user.address), addCollateral(1, UNIT_DAI)];
+        const dataBorrow = await encodeAngleBorrow(
+          USDC.address,
+          agEUR.address,
+          vaultManagerA.address,
+          cleanAddress.address,
+          treasury.address,
+          '0x',
+          callsBorrow,
+        );
+
+        const actions = [ActionType.borrower];
+        const dataMixer = [dataBorrow];
+
+        await angleRouter.connect(user).mixer(permits, transfers, swaps, actions, dataMixer);
+        expect(await USDC.balanceOf(cleanAddress.address)).to.be.equal(UNIT_USDC);
+        expect(await agEUR.balanceOf(cleanAddress.address)).to.be.equal(UNIT_DAI);
+      });
+      it('angle - revert - 3rd state - wrong stablecoin', async () => {
+        await await vaultManagerA
+          .connect(user)
+          .setPaymentData(UNIT_DAI, ethers.constants.Zero, UNIT_USDC, ethers.constants.Zero);
+
+        await (await USDC.connect(governor).mint(vaultManagerA.address, UNIT_USDC)).wait();
+        await (await agEUR.connect(governor).mint(vaultManagerA.address, UNIT_DAI)).wait();
+
+        const permits: TypePermit[] = [];
+        const transfers: TypeTransfer[] = [];
+        const swaps: TypeSwap[] = [];
+        const callsBorrow = [createVault(user.address), addCollateral(1, UNIT_DAI)];
+        const dataBorrow = await encodeAngleBorrow(
+          USDC.address,
+          wBTC.address,
+          vaultManagerA.address,
+          angleRouter.address,
+          treasury.address,
+          '0x',
+          callsBorrow,
+        );
+
+        const actions = [ActionType.borrower];
+        const dataMixer = [dataBorrow];
+
+        await expect(
+          angleRouter.connect(user2).mixer(permits, transfers, swaps, actions, dataMixer),
+        ).to.be.revertedWith('ERC20: transfer amount exceeds balance');
+      });
+      it('angle - success - 3rd state - send back to router', async () => {
+        await await vaultManagerA
+          .connect(user)
+          .setPaymentData(UNIT_DAI, ethers.constants.Zero, UNIT_USDC, ethers.constants.Zero);
+
+        const balanceBefore = await agEUR.balanceOf(user.address);
+        const balanceUSDCBefore = await USDC.balanceOf(user.address);
+
+        await (await USDC.connect(governor).mint(vaultManagerA.address, UNIT_USDC)).wait();
+        await (await agEUR.connect(governor).mint(vaultManagerA.address, UNIT_DAI)).wait();
+
+        const permits: TypePermit[] = [];
+        const transfers: TypeTransfer[] = [];
+        const swaps: TypeSwap[] = [];
+        const callsBorrow = [createVault(user.address), addCollateral(1, UNIT_DAI)];
+        const dataBorrow = await encodeAngleBorrow(
+          USDC.address,
+          agEUR.address,
+          vaultManagerA.address,
+          angleRouter.address,
+          treasury.address,
+          '0x',
+          callsBorrow,
+        );
+
+        const actions = [ActionType.borrower];
+        const dataMixer = [dataBorrow];
+
+        await angleRouter.connect(user).mixer(permits, transfers, swaps, actions, dataMixer);
+        expect(await USDC.balanceOf(user.address)).to.be.equal(balanceUSDCBefore.add(UNIT_USDC));
+        expect(await agEUR.balanceOf(user.address)).to.be.equal(balanceBefore.add(UNIT_DAI));
+
+        await await USDC.connect(cleanAddress).burn(user.address, UNIT_USDC);
+        await await agEUR.connect(user).burnStablecoin(UNIT_USDC);
+      });
+      it('angle - success - 4th state - send back to router', async () => {
+        await await vaultManagerA
+          .connect(user)
+          .setPaymentData(UNIT_DAI, ethers.constants.Zero, ethers.constants.Zero, UNIT_USDC);
+
+        const balanceBefore = await agEUR.balanceOf(user.address);
+        const balanceUSDCBefore = await USDC.balanceOf(user.address);
+
+        await (await USDC.connect(governor).mint(user.address, UNIT_USDC)).wait();
+        await (await agEUR.connect(governor).mint(vaultManagerA.address, UNIT_DAI)).wait();
+
+        const permits: TypePermit[] = [
+          await signPermit(
+            user,
+            (await USDC.nonces(user.address)).toNumber(),
+            USDC.address,
+            Number(await (await web3.eth.getBlock('latest')).timestamp) + 1000,
+            angleRouter.address,
+            UNIT_USDC,
+            'USDC',
+          ),
+        ];
+        const transfers: TypeTransfer[] = [{ inToken: USDC.address, amountIn: UNIT_USDC }];
+        const swaps: TypeSwap[] = [];
+        const callsBorrow = [createVault(user.address), addCollateral(1, UNIT_DAI)];
+        const dataBorrow = await encodeAngleBorrow(
+          USDC.address,
+          agEUR.address,
+          vaultManagerA.address,
+          angleRouter.address,
+          treasury.address,
+          '0x',
+          callsBorrow,
+        );
+
+        const actions = [ActionType.borrower];
+        const dataMixer = [dataBorrow];
+
+        await angleRouter.connect(user).mixer(permits, transfers, swaps, actions, dataMixer);
+        expect(await USDC.balanceOf(user.address)).to.be.equal(balanceUSDCBefore);
+        expect(await agEUR.balanceOf(user.address)).to.be.equal(balanceBefore.add(UNIT_DAI));
+
+        await await agEUR.connect(user).burnStablecoin(UNIT_USDC);
       });
     });
   });

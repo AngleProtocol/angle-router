@@ -9,7 +9,7 @@ import "../interfaces/IVaultManager.sol";
 import "../interfaces/ITreasury.sol";
 import "../interfaces/IAgToken.sol";
 
-contract MockVaultManager {
+contract MockFraudVaultManager {
     using SafeERC20 for IERC20;
 
     ITreasury public treasury;
@@ -140,34 +140,6 @@ contract MockVaultManager {
         for (uint256 i = 0; i < actions.length; i++) {
             ActionBorrowType action = actions[i];
             action;
-        }
-
-        if (paymentData.stablecoinAmountToReceive >= paymentData.stablecoinAmountToGive) {
-            uint256 stablecoinPayment = paymentData.stablecoinAmountToReceive - paymentData.stablecoinAmountToGive;
-            if (paymentData.collateralAmountToGive >= paymentData.collateralAmountToReceive) {
-                uint256 collateralAmountToGive = paymentData.collateralAmountToGive -
-                    paymentData.collateralAmountToReceive;
-                collateral.safeTransfer(to, collateralAmountToGive);
-                stablecoin.burnFrom(stablecoinPayment, from, msg.sender);
-            } else {
-                if (stablecoinPayment > 0) stablecoin.burnFrom(stablecoinPayment, from, msg.sender);
-                // In this case the collateral amount is necessarily non null
-                collateral.safeTransferFrom(
-                    msg.sender,
-                    address(this),
-                    paymentData.collateralAmountToReceive - paymentData.collateralAmountToGive
-                );
-            }
-        } else {
-            uint256 stablecoinPayment = paymentData.stablecoinAmountToGive - paymentData.stablecoinAmountToReceive;
-            // `stablecoinPayment` is strictly positive in this case
-            stablecoin.mint(to, stablecoinPayment);
-            if (paymentData.collateralAmountToGive > paymentData.collateralAmountToReceive) {
-                collateral.safeTransfer(to, paymentData.collateralAmountToGive - paymentData.collateralAmountToReceive);
-            } else {
-                uint256 collateralPayment = paymentData.collateralAmountToReceive - paymentData.collateralAmountToGive;
-                collateral.safeTransferFrom(msg.sender, address(this), collateralPayment);
-            }
         }
 
         return paymentData;

@@ -22,7 +22,7 @@ import {
   BASE_PARAMS,
 } from '../../utils/helpers';
 
-import { AngleRouter, MockANGLE, MockTokenPermit } from '../../typechain';
+import { AngleRouter, MockAgToken, MockANGLE, MockTokenPermit } from '../../typechain';
 
 import {
   AgToken,
@@ -45,7 +45,7 @@ let veANGLE: VeANGLE;
 let veBoostProxy: VeBoostProxy;
 let angleDistributor: AngleDistributor;
 let stableMasterEUR: StableMasterFront;
-let agEUR: AgToken;
+let agEUR: MockAgToken;
 
 let angleRouter: AngleRouter;
 
