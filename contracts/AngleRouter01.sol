@@ -1370,7 +1370,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
     ) internal returns (uint256 amountOut) {
         // Approve transfer to the `uniswapV3Router` if it is the first time that the token is used
         if (!uniAllowedToken[inToken]) {
-            inToken.safeIncreaseAllowance(address(uniswapV3Router), type(uint256).max);
+            inToken.safeApprove(address(uniswapV3Router), type(uint256).max);
             uniAllowedToken[inToken] = true;
         }
         amountOut = uniswapV3Router.exactInput(
@@ -1388,7 +1388,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
     ) internal returns (uint256 amountOut) {
         // Approve transfer to the `oneInch` router if it is the first time the token is used
         if (!oneInchAllowedToken[inToken]) {
-            inToken.safeIncreaseAllowance(address(oneInch), type(uint256).max);
+            inToken.safeApprove(address(oneInch), type(uint256).max);
             oneInchAllowedToken[inToken] = true;
         }
 
