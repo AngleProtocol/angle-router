@@ -776,7 +776,10 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                     ActionBorrowType[] memory actionsBorrow,
                     bytes[] memory dataBorrow,
                     bytes memory repayData
-                ) = abi.decode(data[i], (address, address, address, address, address, ActionBorrowType[], bytes[], bytes));
+                ) = abi.decode(
+                        data[i],
+                        (address, address, address, address, address, ActionBorrowType[], bytes[], bytes)
+                    );
                 _changeAllowance(IERC20(collateral), address(vaultManager), type(uint256).max);
                 uint256 stablecoinBalance;
                 uint256 collateralBalance;
@@ -810,7 +813,8 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                     uint256 index = _searchList(listTokens, collateral);
                     balanceTokens[index] -= paymentData.collateralAmountToReceive - paymentData.collateralAmountToGive;
                 } else if (
-                    paymentData.collateralAmountToReceive < paymentData.collateralAmountToGive && (to == address(this) || repayData.length > 0)
+                    paymentData.collateralAmountToReceive < paymentData.collateralAmountToGive &&
+                    (to == address(this) || repayData.length > 0)
                 ) {
                     _addToList(
                         listTokens,
@@ -822,9 +826,12 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                 // handle stablecoins transfers
                 if (paymentData.stablecoinAmountToReceive > paymentData.stablecoinAmountToGive) {
                     uint256 index = _searchList(listTokens, stablecoin);
-                    balanceTokens[index] -= paymentData.stablecoinAmountToReceive - paymentData.stablecoinAmountToGive;                    
+                    balanceTokens[index] -= paymentData.stablecoinAmountToReceive - paymentData.stablecoinAmountToGive;
                 }
-                if (paymentData.stablecoinAmountToGive > paymentData.stablecoinAmountToReceive && (to == address(this) || repayData.length > 0)) {
+                if (
+                    paymentData.stablecoinAmountToGive > paymentData.stablecoinAmountToReceive &&
+                    (to == address(this) || repayData.length > 0)
+                ) {
                     _addToList(
                         listTokens,
                         balanceTokens,
