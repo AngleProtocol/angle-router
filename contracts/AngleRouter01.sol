@@ -776,11 +776,17 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                     ActionBorrowType[] memory actionsBorrow,
                     bytes[] memory dataBorrow,
                     bytes memory repayData
-                ) = abi.decode(
-                        data[i],
-                        (address, address, address, address, address, ActionBorrowType[], bytes[], bytes)
-                    );
+                ) = abi.decode(data[i], (address, address, address, address, address, ActionBorrowType[], bytes[], bytes));
                 _changeAllowance(IERC20(collateral), address(vaultManager), type(uint256).max);
+                uint256 stablecoinBalance;
+                uint256 collateralBalance;
+                // In this case, this may mean that the `VaultManager` will engage in some way in a swap of stablecoins or collateral
+                // and we should not trust the amounts outputted by the `_angleBorrower` function as the true amounts
+                if (repayData.length > 0) {
+                    stablecoinBalance = IERC20(stablecoin).balanceOf(address(this));
+                    collateralBalance = IERC20(collateral).balanceOf(address(this));
+                }
+
                 PaymentData memory paymentData = _angleBorrower(
                     vaultManager,
                     actionsBorrow,
@@ -789,14 +795,22 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                     who,
                     repayData
                 );
+
                 _changeAllowance(IERC20(collateral), address(vaultManager), 0);
+
+                if (repayData.length > 0) {
+                    paymentData.collateralAmountToGive = IERC20(collateral).balanceOf(address(this));
+                    paymentData.stablecoinAmountToGive = IERC20(stablecoin).balanceOf(address(this));
+                    paymentData.collateralAmountToReceive = collateralBalance;
+                    paymentData.stablecoinAmountToReceive = stablecoinBalance;
+                }
 
                 // handle collateral transfers
                 if (paymentData.collateralAmountToReceive > paymentData.collateralAmountToGive) {
                     uint256 index = _searchList(listTokens, collateral);
                     balanceTokens[index] -= paymentData.collateralAmountToReceive - paymentData.collateralAmountToGive;
                 } else if (
-                    paymentData.collateralAmountToReceive < paymentData.collateralAmountToGive && to == address(this)
+                    paymentData.collateralAmountToReceive < paymentData.collateralAmountToGive && (to == address(this) || repayData.length > 0)
                 ) {
                     _addToList(
                         listTokens,
@@ -806,7 +820,11 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                     );
                 }
                 // handle stablecoins transfers
-                if (paymentData.stablecoinAmountToGive > paymentData.stablecoinAmountToReceive && to == address(this)) {
+                if (paymentData.stablecoinAmountToReceive > paymentData.stablecoinAmountToGive) {
+                    uint256 index = _searchList(listTokens, stablecoin);
+                    balanceTokens[index] -= paymentData.stablecoinAmountToReceive - paymentData.stablecoinAmountToGive;                    
+                }
+                if (paymentData.stablecoinAmountToGive > paymentData.stablecoinAmountToReceive && (to == address(this) || repayData.length > 0)) {
                     _addToList(
                         listTokens,
                         balanceTokens,
@@ -1321,6 +1339,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                 WETH9.deposit{ value: amount }(); // wrap only what is needed to pay
             } else if (address(inToken) == address(WSTETH)) {
                 uint256 amountOut = STETH.getSharesByPooledEth(amount);
+                //solhint-disable-next-line
                 (bool success, bytes memory result) = address(WSTETH).call{ value: amount }("");
                 if (!success) _revertBytes(result);
                 amount = amountOut;
