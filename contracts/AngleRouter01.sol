@@ -752,8 +752,8 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                 _changeAllowance(IERC20(collateral), address(vaultManager), type(uint256).max);
                 uint256 stablecoinBalance;
                 uint256 collateralBalance;
-                // In this case, this may mean that the `VaultManager` will engage in some way in a swap of stablecoins or collateral
-                // and we should not trust the amounts outputted by the `_angleBorrower` function as the true amounts
+                // In this case, this may mean that the `VaultManager` will engage in some way in a swap of stablecoins 
+                // or collateral and we should not trust the amounts outputted by the `_angleBorrower` function as the true amounts
                 if (repayData.length > 0) {
                     stablecoinBalance = IERC20(stablecoin).balanceOf(address(this));
                     collateralBalance = IERC20(collateral).balanceOf(address(this));
@@ -777,11 +777,12 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                     paymentData.stablecoinAmountToReceive = stablecoinBalance;
                 }
 
-                // handle collateral transfers
+                // Handle collateral transfers
                 if (paymentData.collateralAmountToReceive > paymentData.collateralAmountToGive) {
                     uint256 index = _searchList(listTokens, collateral);
                     balanceTokens[index] -= paymentData.collateralAmountToReceive - paymentData.collateralAmountToGive;
                 } else if (
+                    // TODO handle case where `repayData` does not correctly specify the repay address
                     paymentData.collateralAmountToReceive < paymentData.collateralAmountToGive &&
                     (to == address(this) || repayData.length > 0)
                 ) {
@@ -792,13 +793,12 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                         paymentData.collateralAmountToGive - paymentData.collateralAmountToReceive
                     );
                 }
-                // handle stablecoins transfers
+                // Handle stablecoins transfers
                 if (paymentData.stablecoinAmountToReceive > paymentData.stablecoinAmountToGive) {
                     uint256 index = _searchList(listTokens, stablecoin);
                     balanceTokens[index] -= paymentData.stablecoinAmountToReceive - paymentData.stablecoinAmountToGive;
-                }
-                if (
-                    paymentData.stablecoinAmountToGive > paymentData.stablecoinAmountToReceive &&
+                } else if (
+                    paymentData.stablecoinAmountToReceive < paymentData.stablecoinAmountToGive &&
                     (to == address(this) || repayData.length > 0)
                 ) {
                     _addToList(
@@ -813,56 +813,9 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
 
         // Once all actions have been performed, the router sends back the unused funds from users
         // If a user sends funds (through a swap) but specifies incorrectly the collateral associated to it, then the mixer will revert
-        // When trying to send remaining funds back
+        // when trying to send the remaining funds back
         for (uint256 i = 0; i < balanceTokens.length; i++) {
             if (balanceTokens[i] > 0) IERC20(listTokens[i]).safeTransfer(msg.sender, balanceTokens[i]);
-        }
-    }
-
-    function _parseVaultIDs(
-        ActionBorrowType[] memory actionsBorrow,
-        bytes[] memory dataBorrow,
-        address vaultManager
-    ) internal view {
-        if (actionsBorrow.length >= _MAX_TOKENS) revert IncompatibleLengths();
-        uint256[_MAX_TOKENS] memory vaultIDsToCheckOwnershipOf;
-        bool createVaultAction;
-        uint256 lastVaultID;
-        uint256 vaultIDLength;
-        for (uint256 i = 0; i < actionsBorrow.length; i++) {
-            uint256 vaultID;
-            if (actionsBorrow[i] == ActionBorrowType.createVault) createVaultAction = true;
-            else if (
-                actionsBorrow[i] == ActionBorrowType.repayDebt ||
-                actionsBorrow[i] == ActionBorrowType.removeCollateral ||
-                actionsBorrow[i] == ActionBorrowType.borrow
-            ) {
-                (vaultID, ) = abi.decode(dataBorrow[i], (uint256, uint256));
-            } else if (actionsBorrow[i] == ActionBorrowType.closeVault) {
-                vaultID = abi.decode(dataBorrow[i], (uint256));
-            } else if (actionsBorrow[i] == ActionBorrowType.getDebtIn) {
-                (vaultID, , , ) = abi.decode(dataBorrow[i], (uint256, address, uint256, uint256));
-            }
-            if (vaultID == 0 && !createVaultAction) {
-                if (lastVaultID == 0) {
-                    lastVaultID = IVaultManagerStorage(vaultManager).vaultIDCount();
-                }
-                vaultID = lastVaultID;
-            }
-            bool add = true;
-            for (uint256 j = 0; j < vaultIDLength; j++) {
-                if (vaultIDsToCheckOwnershipOf[j] == vaultID) {
-                    add = false;
-                    break;
-                }
-            }
-            if (add) {
-                vaultIDsToCheckOwnershipOf[vaultIDLength] = vaultID;
-                vaultIDLength += 1;
-            }
-        }
-        for (uint256 i = 0; i < vaultIDLength; i++) {
-            if (!IVaultManagerFunctions(vaultManager).isApprovedOrOwner(msg.sender, vaultIDsToCheckOwnershipOf[i])) revert NotApprovedOrOwner();
         }
     }
 
@@ -1189,6 +1142,65 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
     }
 
     // ======================== Internal Utility Functions =========================
+
+    /// @notice Parses the actions submitted to the router contract to interact with a `VaultManager` and makes sure that
+    /// the calling address is well approved for all the vaults with which it is interacting
+    /// @dev If such check was not made, we could end up in a situation where an address has given an approval for all its
+    /// vaults to the router contract, and another address takes advantage of this to instruct actions on these other vaults
+    /// to the router: it is hence super important for the router to pay attention to the fact that the addresses interacting
+    /// with a vault are approved for this vault
+    function _parseVaultIDs(
+        ActionBorrowType[] memory actionsBorrow,
+        bytes[] memory dataBorrow,
+        address vaultManager
+    ) internal view {
+        if (actionsBorrow.length >= _MAX_TOKENS) revert IncompatibleLengths();
+        // The amount of vaults to check should be smaller than the amount of actions
+        uint256[_MAX_TOKENS] memory vaultIDsToCheckOwnershipOf;
+        bool createVaultAction;
+        uint256 lastVaultID;
+        uint256 vaultIDLength;
+        for (uint256 i = 0; i < actionsBorrow.length; i++) {
+            uint256 vaultID;
+            // If there is a createVault action, the router should not worry about looking at
+            // next vaultIDs given equal to 0
+            if (actionsBorrow[i] == ActionBorrowType.createVault) createVaultAction = true;
+            // There are different ways depending on the action with which vaultIDs are structured
+            else if (
+                actionsBorrow[i] == ActionBorrowType.repayDebt ||
+                actionsBorrow[i] == ActionBorrowType.removeCollateral ||
+                actionsBorrow[i] == ActionBorrowType.borrow
+            ) {
+                (vaultID, ) = abi.decode(dataBorrow[i], (uint256, uint256));
+            } else if (actionsBorrow[i] == ActionBorrowType.closeVault) {
+                vaultID = abi.decode(dataBorrow[i], (uint256));
+            } else if (actionsBorrow[i] == ActionBorrowType.getDebtIn) {
+                (vaultID, , , ) = abi.decode(dataBorrow[i], (uint256, address, uint256, uint256));
+            }
+            if (vaultID == 0 && !createVaultAction) {
+                // If we haven't stored the last vaultID, we need to fetch it
+                if (lastVaultID == 0) {
+                    lastVaultID = IVaultManagerStorage(vaultManager).vaultIDCount();
+                }
+                vaultID = lastVaultID;
+            }
+            // We keep a list of all vaultIDs to parse and only update it when we see a new vaultID
+            bool add = true;
+            for (uint256 j = 0; j < vaultIDLength; j++) {
+                if (vaultIDsToCheckOwnershipOf[j] == vaultID) {
+                    add = false;
+                    break;
+                }
+            }
+            if (add) {
+                vaultIDsToCheckOwnershipOf[vaultIDLength] = vaultID;
+                vaultIDLength += 1;
+            }
+        }
+        for (uint256 i = 0; i < vaultIDLength; i++) {
+            if (!IVaultManagerFunctions(vaultManager).isApprovedOrOwner(msg.sender, vaultIDsToCheckOwnershipOf[i])) revert NotApprovedOrOwner();
+        }
+    }
 
     /// @notice Checks if collateral in the list
     /// @param list List of addresses
