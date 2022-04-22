@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
-pragma solidity ^0.8.7;
+pragma solidity 0.8.12;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/draft-IERC20PermitUpgradeable.sol";
@@ -16,7 +16,7 @@ import "./interfaces/IVeANGLE.sol";
 import "./interfaces/external/IWETH9.sol";
 import "./interfaces/external/uniswap/IUniswapRouter.sol";
 import "./interfaces/IVaultManager.sol";
-import "./interfaces/external/lido/IStETH.sol";
+import "./interfaces/external/lido/ISteth.sol";
 import "./interfaces/external/lido/IWStETH.sol";
 
 /// @title Angle Router

@@ -2,7 +2,7 @@ import yargs from 'yargs';
 import { DeployFunction } from 'hardhat-deploy/types';
 // import { BigNumber } from 'ethers';
 import { CONTRACTS_ADDRESSES, ChainId, Interfaces } from '@angleprotocol/sdk';
-import { ProxyAdmin } from '../typechain/core';
+import { ProxyAdmin, ProxyAdmin__factory } from '../typechain';
 
 const argv = yargs.env('').boolean('ci').parseSync();
 
@@ -22,20 +22,21 @@ const func: DeployFunction = async ({ deployments, ethers, network }) => {
   const governorSigner = await ethers.provider.getSigner(governor);
 
   console.log('-----------------------------------------------------------------------');
-  console.log('Let us get it started with the deployment of Angle new router');
+  console.log('Let us get it started with the upgrade of Angle new router');
   console.log('');
   console.log('');
   console.log('Now deploying AngleRouter');
   console.log('Starting with the implementation');
-  await deploy('AngleRouter_Implementation', {
+  await deploy('AngleRouter_NewImplementation', {
     contract: 'AngleRouter',
     from: deployer.address,
     log: !argv.ci,
   });
 
-  const AngleRouterImplementation = (await deployments.get('AngleRouter_Implementation')).address;
+  const AngleRouterImplementation = (await deployments.get('AngleRouter_NewImplementation')).address;
 
   console.log(`Successfully deployed Angle router implementation at the address ${AngleRouterImplementation}`);
+  console.log(`The address of the router is ${proxyAngleRouterAddress}`);
   console.log('');
 
   console.log('proxyAdmin', proxyAdminAddress);
