@@ -29,7 +29,7 @@
     "test:all": "yarn test && yarn test:e2e",
     "upgrade:fork:router": "hardhat run --network localhost scripts/mainnet-fork/routerUpgrade.ts",
     "upgrade:fork:agToken": "hardhat run --network localhost scripts/mainnet-fork/mockAgTokenUpgrade.ts",
-    "upgrade:local:router": "FORK=true hardhat node --tags routerUpgrade"
+    "upgrade:local:router": "hardhat deploy --network localhost --tags routerUpgrade"
   },
   "repository": {
     "type": "git",
