@@ -53,6 +53,10 @@ contract Mock1Inch {
             uint256 gasLeft
         )
     {
+        caller;
+        data;
+        spentAmount;
+        gasLeft;
         tokenA.transferFrom(msg.sender, address(this), desc.amount);
         returnAmount = (((desc.amount * exchangeRate) / 1 ether) * 10**decimalsB) / 10**decimalsA;
         tokenB.transfer(msg.sender, returnAmount);

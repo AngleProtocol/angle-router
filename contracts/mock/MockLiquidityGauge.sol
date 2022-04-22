@@ -43,16 +43,22 @@ contract MockLiquidityGauge is ILiquidityGauge {
         // solhint-disable-next-line
         bool _claim_rewards
     ) external pure override {
+        _value;
+        _addr;
+        _claim_rewards;
         return;
     }
 
     // solhint-disable-next-line
     function claim_rewards(address _addr) external pure override {
+        _addr;
         return;
     }
 
     // solhint-disable-next-line
     function claim_rewards(address _addr, address _receiver) external pure override {
+        _addr;
+        _receiver;
         return;
     }
 }

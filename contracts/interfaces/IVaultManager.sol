@@ -85,6 +85,12 @@ interface IVaultManagerFunctions {
         address who,
         bytes memory repayData
     ) external payable returns (PaymentData memory paymentData);
+
+    /// @notice Checks whether a given address is approved for a vault or owns this vault
+    /// @param spender Address for which vault ownership should be checked
+    /// @param vaultID ID of the vault to check
+    /// @return Whether the `spender` address owns or is approved for `vaultID`
+    function isApprovedOrOwner(address spender, uint256 vaultID) external view returns (bool);
 }
 
 /// @title IVaultManagerStorage
@@ -98,4 +104,8 @@ interface IVaultManagerStorage {
 
     /// @notice Reference to the collateral handled by this `VaultManager`
     function collateral() external view returns (IERC20);
+
+    /// @notice ID of the last vault created. The `vaultIDCount` variables serves as a counter to generate a unique
+    /// `vaultID` for each vault: it is like `tokenID` in basic ERC721 contracts
+    function vaultIDCount() external view returns (uint256);
 }

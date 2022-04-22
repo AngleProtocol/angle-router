@@ -146,54 +146,22 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
     /// @notice Wrapped StETH contract
     IWStETH public constant WSTETH = IWStETH(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0);
 
+    // ============================= Error Messages ================================
+
+    error AlreadyAdded();
+    error IncompatibleLengths();
+    error InvalidAddress();
+    error InvalidCall();
+    error InvalidConditions();
+    error InvalidToken();
+    error NotApprovedOrOwner();
+    error NotGovernorOrGuardian();
+    error TooSmallAmountOut();
+    error ZeroAddress();
+
     // constructor() initializer {}
 
-    /// @notice Deploys the `AngleRouter` contract
-    /// @param _governor Governor address
-    /// @param _guardian Guardian address
-    /// @param _uniswapV3Router UniswapV3 router address
-    /// @param _oneInch 1Inch aggregator address
-    /// @param existingStableMaster Address of the existing `StableMaster`
-    /// @param existingPoolManagers Addresses of the associated poolManagers
-    /// @param existingLiquidityGauges Addresses of liquidity gauge contracts associated to sanTokens
-    /// @dev Be cautious with safe approvals, all tokens will have unlimited approvals within the protocol or
-    /// UniswapV3 and 1Inch
-    function initialize(
-        address _governor,
-        address _guardian,
-        IUniswapV3Router _uniswapV3Router,
-        address _oneInch,
-        IStableMasterFront existingStableMaster,
-        IPoolManager[] calldata existingPoolManagers,
-        ILiquidityGauge[] calldata existingLiquidityGauges
-    ) public initializer {
-        // Checking the parameters passed
-        require(
-            address(_uniswapV3Router) != address(0) &&
-                _oneInch != address(0) &&
-                _governor != address(0) &&
-                _guardian != address(0),
-            "0"
-        );
-        require(_governor != _guardian, "49");
-        require(existingPoolManagers.length == existingLiquidityGauges.length, "104");
-        // Fetching the stablecoin and mapping it to the `StableMaster`
-        mapStableMasters[
-            IERC20(address(IStableMaster(address(existingStableMaster)).agToken()))
-        ] = existingStableMaster;
-        // Setting roles
-        governor = _governor;
-        guardian = _guardian;
-        uniswapV3Router = _uniswapV3Router;
-        oneInch = _oneInch;
-
-        // for veANGLEDeposit action
-        ANGLE.safeApprove(address(VEANGLE), type(uint256).max);
-
-        for (uint256 i = 0; i < existingPoolManagers.length; i++) {
-            _addPair(existingStableMaster, existingPoolManagers[i], existingLiquidityGauges[i]);
-        }
-    }
+    // Removed the `initialize` function in this implementation since it has already been called and can not be called again
 
     // ============================== Modifiers ====================================
 
@@ -201,7 +169,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
     /// @dev There is no Access Control here, because it can be handled cheaply through this modifier
     /// @dev In this contract, the `governor` and the `guardian` address have exactly similar rights
     modifier onlyGovernorOrGuardian() {
-        require(msg.sender == governor || msg.sender == guardian, "115");
+        if (msg.sender != governor && msg.sender != guardian) revert NotGovernorOrGuardian();
         _;
     }
 
@@ -213,8 +181,8 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
     /// @dev There can only be one guardian and one governor address in the router
     /// and both need to be different
     function setGovernorOrGuardian(address admin, bool setGovernor) external onlyGovernorOrGuardian {
-        require(admin != address(0), "0");
-        require(guardian != admin && governor != admin, "49");
+        if(admin == address(0)) revert ZeroAddress();
+        if(guardian == admin || governor == admin) revert InvalidAddress();
         if (setGovernor) governor = admin;
         else guardian = admin;
         emit AdminChanged(admin, setGovernor);
@@ -226,9 +194,9 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
     function addStableMaster(IERC20 stablecoin, IStableMasterFront stableMaster) external onlyGovernorOrGuardian {
         // No need to check if the `stableMaster` address is a zero address as otherwise the call to `stableMaster.agToken()`
         // would revert
-        require(address(stablecoin) != address(0), "0");
-        require(address(mapStableMasters[stablecoin]) == address(0), "114");
-        require(stableMaster.agToken() == address(stablecoin), "20");
+        if (address(stablecoin) == address(0)) revert ZeroAddress();
+        if (address(mapStableMasters[stablecoin]) != address(0)) revert AlreadyAdded();
+        if (stableMaster.agToken() != address(stablecoin)) revert InvalidToken();
         mapStableMasters[stablecoin] = stableMaster;
         emit StablecoinAdded(address(stableMaster));
     }
@@ -253,7 +221,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         IPoolManager[] calldata poolManagers,
         ILiquidityGauge[] calldata liquidityGauges
     ) external onlyGovernorOrGuardian {
-        require(poolManagers.length == stablecoins.length && liquidityGauges.length == stablecoins.length, "104");
+        if(poolManagers.length != stablecoins.length || liquidityGauges.length != stablecoins.length) revert IncompatibleLengths();
         for (uint256 i = 0; i < stablecoins.length; i++) {
             IStableMasterFront stableMaster = mapStableMasters[stablecoins[i]];
             _addPair(stableMaster, poolManagers[i], liquidityGauges[i]);
@@ -272,7 +240,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         IERC20[] calldata collaterals,
         IStableMasterFront[] calldata stableMasters
     ) external onlyGovernorOrGuardian {
-        require(collaterals.length == stablecoins.length && stableMasters.length == collaterals.length, "104");
+        if(collaterals.length != stablecoins.length || stableMasters.length != collaterals.length) revert IncompatibleLengths();
         Pairs memory pairs;
         IStableMasterFront stableMaster;
         for (uint256 i = 0; i < stablecoins.length; i++) {
@@ -303,20 +271,20 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         IERC20[] calldata collaterals,
         ILiquidityGauge[] calldata newLiquidityGauges
     ) external onlyGovernorOrGuardian {
-        require(collaterals.length == stablecoins.length && newLiquidityGauges.length == stablecoins.length, "104");
+        if(collaterals.length != stablecoins.length || newLiquidityGauges.length != stablecoins.length) revert IncompatibleLengths();
         for (uint256 i = 0; i < stablecoins.length; i++) {
             IStableMasterFront stableMaster = mapStableMasters[stablecoins[i]];
             Pairs storage pairs = mapPoolManagers[stableMaster][collaterals[i]];
             ILiquidityGauge gauge = pairs.gauge;
             ISanToken sanToken = pairs.sanToken;
-            require(address(stableMaster) != address(0) && address(pairs.poolManager) != address(0), "0");
+            if (address(stableMaster) == address(0) || address(pairs.poolManager) == address(0)) revert ZeroAddress();
             pairs.gauge = newLiquidityGauges[i];
             if (address(gauge) != address(0)) {
                 sanToken.approve(address(gauge), 0);
             }
             if (address(newLiquidityGauges[i]) != address(0)) {
                 // Checking compatibility of the staking token: it should be the sanToken
-                require(address(newLiquidityGauges[i].staking_token()) == address(sanToken), "20");
+                if (address(newLiquidityGauges[i].staking_token()) != address(sanToken)) revert InvalidToken();
                 sanToken.approve(address(newLiquidityGauges[i]), type(uint256).max);
             }
             emit SanTokenLiquidityGaugeUpdated(address(sanToken), address(newLiquidityGauges[i]));
@@ -334,7 +302,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         address[] calldata spenders,
         uint256[] calldata amounts
     ) external onlyGovernorOrGuardian {
-        require(tokens.length == spenders.length && tokens.length == amounts.length, "104");
+        if(tokens.length != spenders.length || tokens.length != amounts.length) revert IncompatibleLengths();
         for (uint256 i = 0; i < tokens.length; i++) {
             _changeAllowance(tokens[i], spenders[i], amounts[i]);
         }
@@ -780,6 +748,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                         data[i],
                         (address, address, address, address, address, ActionBorrowType[], bytes[], bytes)
                     );
+                _parseVaultIDs(actionsBorrow, dataBorrow, vaultManager);
                 _changeAllowance(IERC20(collateral), address(vaultManager), type(uint256).max);
                 uint256 stablecoinBalance;
                 uint256 collateralBalance;
@@ -850,6 +819,53 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         }
     }
 
+    function _parseVaultIDs(
+        ActionBorrowType[] memory actionsBorrow,
+        bytes[] memory dataBorrow,
+        address vaultManager
+    ) internal view {
+        if (actionsBorrow.length >= _MAX_TOKENS) revert IncompatibleLengths();
+        uint256[_MAX_TOKENS] memory vaultIDsToCheckOwnershipOf;
+        bool createVaultAction;
+        uint256 lastVaultID;
+        uint256 vaultIDLength;
+        for (uint256 i = 0; i < actionsBorrow.length; i++) {
+            uint256 vaultID;
+            if (actionsBorrow[i] == ActionBorrowType.createVault) createVaultAction = true;
+            else if (
+                actionsBorrow[i] == ActionBorrowType.repayDebt ||
+                actionsBorrow[i] == ActionBorrowType.removeCollateral ||
+                actionsBorrow[i] == ActionBorrowType.borrow
+            ) {
+                (vaultID, ) = abi.decode(dataBorrow[i], (uint256, uint256));
+            } else if (actionsBorrow[i] == ActionBorrowType.closeVault) {
+                vaultID = abi.decode(dataBorrow[i], (uint256));
+            } else if (actionsBorrow[i] == ActionBorrowType.getDebtIn) {
+                (vaultID, , , ) = abi.decode(dataBorrow[i], (uint256, address, uint256, uint256));
+            }
+            if (vaultID == 0 && !createVaultAction) {
+                if (lastVaultID == 0) {
+                    lastVaultID = IVaultManagerStorage(vaultManager).vaultIDCount();
+                }
+                vaultID = lastVaultID;
+            }
+            bool add = true;
+            for (uint256 j = 0; j < vaultIDLength; j++) {
+                if (vaultIDsToCheckOwnershipOf[j] == vaultID) {
+                    add = false;
+                    break;
+                }
+            }
+            if (add) {
+                vaultIDsToCheckOwnershipOf[vaultIDLength] = vaultID;
+                vaultIDLength += 1;
+            }
+        }
+        for (uint256 i = 0; i < vaultIDLength; i++) {
+            if (!IVaultManagerFunctions(vaultManager).isApprovedOrOwner(msg.sender, vaultIDsToCheckOwnershipOf[i])) revert NotApprovedOrOwner();
+        }
+    }
+
     receive() external payable {}
 
     // ======================== Internal Utility Functions =========================
@@ -876,10 +892,9 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         address[] memory stablecoins,
         address[] memory collateralsOrPerpetualManagers
     ) internal {
-        require(
-            stablecoins.length == perpetualIDs.length && collateralsOrPerpetualManagers.length == perpetualIDs.length,
-            "104"
-        );
+        if(
+            stablecoins.length != perpetualIDs.length || collateralsOrPerpetualManagers.length != perpetualIDs.length
+        ) revert IncompatibleLengths();
 
         for (uint256 i = 0; i < liquidityGauges.length; i++) {
             ILiquidityGauge(liquidityGauges[i]).claim_rewards(gaugeUser);
@@ -1222,7 +1237,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         uint256 index = _searchList(list, searchFor);
 
         // Reverts if the index was not found
-        require(list[index] != address(0), "33");
+        if (list[index] == address(0)) revert InvalidConditions();
 
         amount = (proportion * balances[index]) / BASE_PARAMS;
         balances[index] -= amount;
@@ -1245,7 +1260,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         // and `pairs.sanToken` will be zero
         // Last, if any of `pairs.perpetualManager`, `pairs.poolManager` or `pairs.sanToken` is zero, this means
         // that all others should be null from the `addPairs` and `removePairs` functions which keep this invariant
-        require(address(stableMaster) != address(0) && address(pairs.poolManager) != address(0), "0");
+        if (address(stableMaster) == address(0) || address(pairs.poolManager) == address(0)) revert ZeroAddress();
 
         return (stableMaster, pairs);
     }
@@ -1291,14 +1306,14 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         Pairs storage _pairs = mapPoolManagers[stableMaster][collateral];
         // Checking if the pair has not already been initialized: if yes we need to make the function revert
         // otherwise we could end up with still approved `PoolManager` and `PerpetualManager` contracts
-        require(address(_pairs.poolManager) == address(0), "114");
+        if (address(_pairs.poolManager) != address(0)) revert AlreadyAdded();
 
         _pairs.poolManager = poolManager;
         _pairs.perpetualManager = IPerpetualManagerFrontWithClaim(address(perpetualManager));
         _pairs.sanToken = sanToken;
         // In the future, it is possible that sanTokens do not have an associated liquidity gauge
         if (address(liquidityGauge) != address(0)) {
-            require(address(sanToken) == liquidityGauge.staking_token(), "20");
+            if (address(sanToken) != liquidityGauge.staking_token()) revert InvalidToken();
             _pairs.gauge = liquidityGauge;
             sanToken.approve(address(liquidityGauge), type(uint256).max);
         }
@@ -1373,14 +1388,14 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         else if (swapType == SwapType.oneINCH) amountOut = _swapOn1Inch(inToken, minAmountOut, args);
         else if (swapType == SwapType.WrapStETH) amountOut = _wrapStETH(amount, minAmountOut);
         else if (swapType == SwapType.None) amountOut = amount;
-        else require(false, "3");
+        else revert InvalidCall();
 
         return amountOut;
     }
 
     function _wrapStETH(uint256 amount, uint256 minAmountOut) internal returns (uint256 amountOut) {
         amountOut = WSTETH.wrap(amount);
-        require(amountOut >= minAmountOut, "15");
+        if (amountOut < minAmountOut) revert TooSmallAmountOut();
     }
 
     /// @notice Allows to swap any token to an accepted collateral via UniswapV3 (if there is a path)
@@ -1423,7 +1438,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         if (!success) _revertBytes(result);
 
         amountOut = abi.decode(result, (uint256));
-        require(amountOut >= minAmountOut, "15");
+        if (amountOut < minAmountOut) revert TooSmallAmountOut();
     }
 
     /// @notice Internal function used for error handling
