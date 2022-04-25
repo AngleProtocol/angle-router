@@ -47,7 +47,9 @@ contract MockVaultManagerPermit {
     error InvalidSignature();
 
     constructor(string memory _name) {
-        _PERMIT_TYPEHASH = keccak256("Permit(address owner,address spender,bool approved,uint256 nonce,uint256 deadline)");
+        _PERMIT_TYPEHASH = keccak256(
+            "Permit(address owner,address spender,bool approved,uint256 nonce,uint256 deadline)"
+        );
         _HASHED_NAME = keccak256(bytes(_name));
         _HASHED_VERSION = keccak256(bytes("1"));
     }
@@ -195,6 +197,7 @@ contract MockVaultManagerPermit {
 
         return paymentData;
     }
+
     /// @notice Allows an address to give or revoke approval for all its vaults to another address
     /// @param owner Address signing the permit and giving (or revoking) its approval for all the controlled vaults
     /// @param spender Address to give approval to
@@ -233,7 +236,8 @@ contract MockVaultManagerPermit {
             )
         );
         if (owner.isContract()) {
-            if (IERC1271(owner).isValidSignature(digest, abi.encodePacked(r, s, v)) != 0x1626ba7e) revert InvalidSignature();
+            if (IERC1271(owner).isValidSignature(digest, abi.encodePacked(r, s, v)) != 0x1626ba7e)
+                revert InvalidSignature();
         } else {
             address signer = ecrecover(digest, v, r, s);
             if (signer != owner || signer == address(0)) revert InvalidSignature();
@@ -242,8 +246,12 @@ contract MockVaultManagerPermit {
         _setApprovalForAll(owner, spender, approvedStatus);
     }
 
-    function approveSpenderVault(address spender, uint256 vaultID, bool status) external {
-        approved[vaultID][spender] =  status;
+    function approveSpenderVault(
+        address spender,
+        uint256 vaultID,
+        bool status
+    ) external {
+        approved[vaultID][spender] = status;
     }
 
     /// @notice Checks whether a given address is approved for a vault or owns this vault
@@ -253,7 +261,6 @@ contract MockVaultManagerPermit {
     function isApprovedOrOwner(address spender, uint256 vaultID) external view returns (bool) {
         return approved[vaultID][spender];
     }
-
 
     /// @notice Internal version of the `setApprovalForAll` function
     /// @dev It contains an `approver` field to be used in case someone signs a permit for a particular
@@ -294,7 +301,7 @@ contract MockVaultManagerPermit {
             );
     }
 
-    /// @notice Consumes a nonce for an address: returns the current value and increments it 
+    /// @notice Consumes a nonce for an address: returns the current value and increments it
     function _useNonce(address owner) internal returns (uint256 current) {
         current = _nonces[owner];
         _nonces[owner] = current + 1;

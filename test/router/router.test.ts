@@ -108,7 +108,7 @@ contract('Router - VaultManager New functionalities', () => {
       );
     await agEUR.addMinter(vaultManager.address);
   });
-  /*
+
   describe('mixer - parseVaultIDs', () => {
     it('success - addCollateral - to 1 vault', async () => {
       await vaultManager.connect(alice).setPaymentData(ethers.constants.Zero, 0, 0, UNIT_USDC);
@@ -893,8 +893,8 @@ contract('Router - VaultManager New functionalities', () => {
       );
     });
   });
-  */
-  describe('mixerVaultManagerPermit', () => {
+
+  describe('mixerVaultManagerPermit - permit', () => {
     it('success - permit signed on vaultManager', async () => {
       const name = 'testVM';
       const permitData = await signPermitNFT(
@@ -1120,6 +1120,481 @@ contract('Router - VaultManager New functionalities', () => {
       await expect(
         router.mixerVaultManagerPermit([permitParam, permitParam2], permits, transfers, swaps, actions, dataMixer),
       ).to.be.revertedWith('InvalidSignature');
+    });
+  });
+  describe('mixerVaultManagerPermit - accounting management', () => {
+    it('success - composition of different actions in the vault with all approved vaults', async () => {
+      const name = 'testVM';
+      const permitData = await signPermitNFT(
+        bob,
+        0,
+        vaultManager.address,
+        (await latestTime()) + 1000,
+        router.address,
+        true,
+        name,
+      );
+      const permitParam = {
+        vaultManager: permitData.contract,
+        owner: permitData.owner,
+        approved: permitData.approved,
+        deadline: permitData.deadline,
+        v: permitData.v,
+        r: permitData.r,
+        s: permitData.s,
+      };
+      await vaultManager.connect(alice).setPaymentData(0, 0, 0, 0);
+      await vaultManager.approveSpenderVault(alice.address, 1, true);
+      await vaultManager.approveSpenderVault(alice.address, 2, true);
+      await vaultManager.approveSpenderVault(alice.address, 3, true);
+      await vaultManager.updateVaultIDCount(10);
+      await vaultManager.approveSpenderVault(alice.address, 10, true);
+      const permits: TypePermit[] = [];
+      const transfers: TypeTransfer[] = [];
+      const swaps: TypeSwap[] = [];
+      const callsBorrow = [
+        repayDebt(0, UNIT_USDC),
+        addCollateral(10, 0),
+        borrow(1, 0),
+        removeCollateral(2, 0),
+        getDebtIn(3, ZERO_ADDRESS, 0, 0),
+        closeVault(0),
+        closeVault(0),
+        createVault(alice.address),
+        repayDebt(9, UNIT_USDC),
+      ];
+      const dataBorrow = await encodeAngleBorrow(
+        USDC.address,
+        agEUR.address,
+        vaultManager.address,
+        bob.address,
+        ZERO_ADDRESS,
+        '0x',
+        callsBorrow,
+      );
+
+      const actions = [ActionType.borrower];
+      const dataMixer = [dataBorrow];
+      await router.connect(alice).mixerVaultManagerPermit([permitParam], permits, transfers, swaps, actions, dataMixer);
+      expect(await vaultManager.operatorApprovals(bob.address, router.address)).to.be.equal(1);
+    });
+    it('success - with repayData.length > 0 and no transfers', async () => {
+      const name = 'testVM';
+      const permitData = await signPermitNFT(
+        bob,
+        0,
+        vaultManager.address,
+        (await latestTime()) + 1000,
+        router.address,
+        true,
+        name,
+      );
+      const permitParam = {
+        vaultManager: permitData.contract,
+        owner: permitData.owner,
+        approved: permitData.approved,
+        deadline: permitData.deadline,
+        v: permitData.v,
+        r: permitData.r,
+        s: permitData.s,
+      };
+      // Balance does not change
+      await (await USDC.connect(governor).mint(router.address, UNIT_USDC)).wait();
+      await vaultManager.connect(alice).setPaymentData(0, 0, 0, 0);
+      await vaultManager.approveSpenderVault(alice.address, 1, true);
+      const permits: TypePermit[] = [];
+      const transfers: TypeTransfer[] = [];
+      const swaps: TypeSwap[] = [];
+      const callsBorrow = [createVault(alice.address)];
+      const dataBorrow = await encodeAngleBorrow(
+        USDC.address,
+        agEUR.address,
+        vaultManager.address,
+        bob.address,
+        ZERO_ADDRESS,
+        '0x',
+        callsBorrow,
+      );
+
+      const actions = [ActionType.borrower];
+      const dataMixer = [dataBorrow];
+      await router.connect(alice).mixerVaultManagerPermit([permitParam], permits, transfers, swaps, actions, dataMixer);
+      expect(await vaultManager.operatorApprovals(bob.address, router.address)).to.be.equal(1);
+      expect(await USDC.balanceOf(router.address)).to.be.equal(UNIT_USDC);
+    });
+    it('reverts - with repayData.length > 0 and collateral transfers from collateral already there', async () => {
+      const name = 'testVM';
+      const permitData = await signPermitNFT(
+        bob,
+        0,
+        vaultManager.address,
+        (await latestTime()) + 1000,
+        router.address,
+        true,
+        name,
+      );
+      const permitParam = {
+        vaultManager: permitData.contract,
+        owner: permitData.owner,
+        approved: permitData.approved,
+        deadline: permitData.deadline,
+        v: permitData.v,
+        r: permitData.r,
+        s: permitData.s,
+      };
+      // Balance does not change
+      await (await USDC.connect(governor).mint(router.address, UNIT_USDC)).wait();
+      await vaultManager.connect(alice).setPaymentData(0, 0, 0, UNIT_USDC);
+      await vaultManager.approveSpenderVault(alice.address, 1, true);
+      const permits: TypePermit[] = [];
+      const transfers: TypeTransfer[] = [];
+      const swaps: TypeSwap[] = [];
+      const callsBorrow = [createVault(alice.address)];
+      const dataBorrow = await encodeAngleBorrow(
+        USDC.address,
+        agEUR.address,
+        vaultManager.address,
+        bob.address,
+        ZERO_ADDRESS,
+        '0x',
+        callsBorrow,
+      );
+
+      const actions = [ActionType.borrower];
+      const dataMixer = [dataBorrow];
+      // Reverts because it does not have the collateral stored in the index
+      await expect(
+        router.connect(alice).mixerVaultManagerPermit([permitParam], permits, transfers, swaps, actions, dataMixer),
+      ).to.be.reverted;
+    });
+    it('success - with repayData.length > 0 and collateral transfers to another address', async () => {
+      const name = 'testVM';
+      const permitData = await signPermitNFT(
+        bob,
+        0,
+        vaultManager.address,
+        (await latestTime()) + 1000,
+        router.address,
+        true,
+        name,
+      );
+      const permitParam = {
+        vaultManager: permitData.contract,
+        owner: permitData.owner,
+        approved: permitData.approved,
+        deadline: permitData.deadline,
+        v: permitData.v,
+        r: permitData.r,
+        s: permitData.s,
+      };
+      // Balance does not change
+      await (await USDC.connect(governor).mint(vaultManager.address, UNIT_USDC)).wait();
+      await vaultManager.connect(alice).setPaymentData(0, 0, UNIT_USDC, 0);
+      await vaultManager.approveSpenderVault(alice.address, 1, true);
+      const permits: TypePermit[] = [];
+      const transfers: TypeTransfer[] = [];
+      const swaps: TypeSwap[] = [];
+      const callsBorrow = [createVault(alice.address)];
+      const dataBorrow = await encodeAngleBorrow(
+        USDC.address,
+        agEUR.address,
+        vaultManager.address,
+        bob.address,
+        ZERO_ADDRESS,
+        '0xe0136b3661826a483734248681e4f59ae66bc6065ceb43fdd469ecb22c21d745',
+        callsBorrow,
+      );
+
+      const actions = [ActionType.borrower];
+      const dataMixer = [dataBorrow];
+      await router.connect(alice).mixerVaultManagerPermit([permitParam], permits, transfers, swaps, actions, dataMixer);
+      // Nothing is transferred to the msg.sender
+      expect(await USDC.balanceOf(bob.address)).to.be.equal(UNIT_USDC);
+    });
+    it('success - with repayData.length > 0 and collateral + stablecoin transfers to the router', async () => {
+      const name = 'testVM';
+      const permitData = await signPermitNFT(
+        bob,
+        0,
+        vaultManager.address,
+        (await latestTime()) + 1000,
+        router.address,
+        true,
+        name,
+      );
+      const permitParam = {
+        vaultManager: permitData.contract,
+        owner: permitData.owner,
+        approved: permitData.approved,
+        deadline: permitData.deadline,
+        v: permitData.v,
+        r: permitData.r,
+        s: permitData.s,
+      };
+      // Balance does not change
+      await (await USDC.connect(governor).mint(vaultManager.address, UNIT_USDC)).wait();
+      await vaultManager.connect(alice).setPaymentData(UNIT_DAI, 0, UNIT_USDC, 0);
+      await vaultManager.approveSpenderVault(alice.address, 1, true);
+      const permits: TypePermit[] = [];
+      const transfers: TypeTransfer[] = [];
+      const swaps: TypeSwap[] = [];
+      const callsBorrow = [createVault(alice.address)];
+      const dataBorrow = await encodeAngleBorrow(
+        USDC.address,
+        agEUR.address,
+        vaultManager.address,
+        router.address,
+        ZERO_ADDRESS,
+        '0xe0136b3661826a483734248681e4f59ae66bc6065ceb43fdd469ecb22c21d745',
+        callsBorrow,
+      );
+      const actions = [ActionType.borrower];
+      const dataMixer = [dataBorrow];
+      await router.connect(alice).mixerVaultManagerPermit([permitParam], permits, transfers, swaps, actions, dataMixer);
+      // Leftover transferred to the msg.sender
+      expect(await USDC.balanceOf(alice.address)).to.be.equal(UNIT_USDC);
+      expect(await agEUR.balanceOf(alice.address)).to.be.equal(UNIT_DAI);
+    });
+    it('success - with stablecoin payment', async () => {
+      const name = 'testVM';
+      const permitData = await signPermitNFT(
+        bob,
+        0,
+        vaultManager.address,
+        (await latestTime()) + 1000,
+        router.address,
+        true,
+        name,
+      );
+      const permitParam = {
+        vaultManager: permitData.contract,
+        owner: permitData.owner,
+        approved: permitData.approved,
+        deadline: permitData.deadline,
+        v: permitData.v,
+        r: permitData.r,
+        s: permitData.s,
+      };
+      // Balance does not change
+      await (await USDC.connect(governor).mint(vaultManager.address, UNIT_USDC)).wait();
+      await (await agEUR.connect(governor).mint(alice.address, UNIT_DAI)).wait();
+      await agEUR.connect(alice).approve(router.address, UNIT_DAI);
+      await vaultManager.connect(alice).setPaymentData(0, UNIT_DAI, UNIT_USDC, 0);
+      await vaultManager.approveSpenderVault(alice.address, 1, true);
+      const permits: TypePermit[] = [];
+      const transfers: TypeTransfer[] = [];
+      const swaps: TypeSwap[] = [];
+      const callsBorrow = [createVault(alice.address)];
+      const dataBorrow = await encodeAngleBorrow(
+        USDC.address,
+        agEUR.address,
+        vaultManager.address,
+        router.address,
+        ZERO_ADDRESS,
+        '0xe0136b3661826a483734248681e4f59ae66bc6065ceb43fdd469ecb22c21d745',
+        callsBorrow,
+      );
+      const actions = [ActionType.borrower];
+      const dataMixer = [dataBorrow];
+      await router.connect(alice).mixerVaultManagerPermit([permitParam], permits, transfers, swaps, actions, dataMixer);
+      // Leftover transferred to the msg.sender
+      expect(await USDC.balanceOf(alice.address)).to.be.equal(UNIT_USDC);
+      expect(await agEUR.balanceOf(alice.address)).to.be.equal(0);
+    });
+    it('success - with collateral payment and stablecoin payment + repayData', async () => {
+      const name = 'testVM';
+      const permitData = await signPermitNFT(
+        bob,
+        0,
+        vaultManager.address,
+        (await latestTime()) + 1000,
+        router.address,
+        true,
+        name,
+      );
+      const permitParam = {
+        vaultManager: permitData.contract,
+        owner: permitData.owner,
+        approved: permitData.approved,
+        deadline: permitData.deadline,
+        v: permitData.v,
+        r: permitData.r,
+        s: permitData.s,
+      };
+      // Balance does not change
+      await (await USDC.connect(governor).mint(alice.address, UNIT_USDC)).wait();
+      await (await agEUR.connect(governor).mint(alice.address, UNIT_DAI)).wait();
+      await agEUR.connect(alice).approve(router.address, UNIT_DAI);
+      await USDC.connect(alice).approve(router.address, UNIT_USDC);
+      await vaultManager.connect(alice).setPaymentData(0, UNIT_DAI, 0, UNIT_USDC);
+      await vaultManager.approveSpenderVault(alice.address, 1, true);
+      const permits: TypePermit[] = [];
+      const transfers: TypeTransfer[] = [{ inToken: USDC.address, amountIn: UNIT_USDC }];
+      const swaps: TypeSwap[] = [];
+      const callsBorrow = [createVault(alice.address)];
+      const dataBorrow = await encodeAngleBorrow(
+        USDC.address,
+        agEUR.address,
+        vaultManager.address,
+        router.address,
+        ZERO_ADDRESS,
+        '0xe0136b3661826a483734248681e4f59ae66bc6065ceb43fdd469ecb22c21d745',
+        callsBorrow,
+      );
+      const actions = [ActionType.borrower];
+      const dataMixer = [dataBorrow];
+      await router.connect(alice).mixerVaultManagerPermit([permitParam], permits, transfers, swaps, actions, dataMixer);
+      // Leftover transferred to the msg.sender
+      expect(await USDC.balanceOf(vaultManager.address)).to.be.equal(UNIT_USDC);
+      expect(await agEUR.balanceOf(alice.address)).to.be.equal(0);
+    });
+    it('success - with collateral payment and stablecoin payment + no repayData -> effect should be the same', async () => {
+      const name = 'testVM';
+      const permitData = await signPermitNFT(
+        bob,
+        0,
+        vaultManager.address,
+        (await latestTime()) + 1000,
+        router.address,
+        true,
+        name,
+      );
+      const permitParam = {
+        vaultManager: permitData.contract,
+        owner: permitData.owner,
+        approved: permitData.approved,
+        deadline: permitData.deadline,
+        v: permitData.v,
+        r: permitData.r,
+        s: permitData.s,
+      };
+      // Balance does not change
+      await (await USDC.connect(governor).mint(alice.address, UNIT_USDC)).wait();
+      await (await agEUR.connect(governor).mint(alice.address, UNIT_DAI)).wait();
+      await agEUR.connect(alice).approve(router.address, UNIT_DAI);
+      await USDC.connect(alice).approve(router.address, UNIT_USDC);
+      await vaultManager.connect(alice).setPaymentData(0, UNIT_DAI, 0, UNIT_USDC);
+      await vaultManager.approveSpenderVault(alice.address, 1, true);
+      const permits: TypePermit[] = [];
+      const transfers: TypeTransfer[] = [{ inToken: USDC.address, amountIn: UNIT_USDC }];
+      const swaps: TypeSwap[] = [];
+      const callsBorrow = [createVault(alice.address)];
+      const dataBorrow = await encodeAngleBorrow(
+        USDC.address,
+        agEUR.address,
+        vaultManager.address,
+        router.address,
+        ZERO_ADDRESS,
+        '0x',
+        callsBorrow,
+      );
+      const actions = [ActionType.borrower];
+      const dataMixer = [dataBorrow];
+      await router.connect(alice).mixerVaultManagerPermit([permitParam], permits, transfers, swaps, actions, dataMixer);
+      // Leftover transferred to the msg.sender
+      expect(await USDC.balanceOf(vaultManager.address)).to.be.equal(UNIT_USDC);
+      expect(await agEUR.balanceOf(alice.address)).to.be.equal(0);
+      expect(await vaultManager.operatorApprovals(bob.address, router.address)).to.be.equal(1);
+    });
+    it('success - with collateral payment and stablecoin receipt + no repayData + to!= address(this) ', async () => {
+      const name = 'testVM';
+      const permitData = await signPermitNFT(
+        bob,
+        0,
+        vaultManager.address,
+        (await latestTime()) + 1000,
+        router.address,
+        true,
+        name,
+      );
+      const permitParam = {
+        vaultManager: permitData.contract,
+        owner: permitData.owner,
+        approved: permitData.approved,
+        deadline: permitData.deadline,
+        v: permitData.v,
+        r: permitData.r,
+        s: permitData.s,
+      };
+      // Balance does not change
+      await (await USDC.connect(governor).mint(alice.address, UNIT_USDC)).wait();
+      await (await USDC.connect(governor).mint(vaultManager.address, UNIT_USDC)).wait();
+      await (await agEUR.connect(governor).mint(alice.address, UNIT_DAI)).wait();
+      await agEUR.connect(alice).approve(router.address, UNIT_DAI);
+      await USDC.connect(alice).approve(router.address, UNIT_USDC);
+      await vaultManager.connect(alice).setPaymentData(UNIT_DAI, 0, UNIT_USDC, 0);
+      await vaultManager.approveSpenderVault(alice.address, 1, true);
+      const permits: TypePermit[] = [];
+      const transfers: TypeTransfer[] = [{ inToken: USDC.address, amountIn: UNIT_USDC }];
+      const swaps: TypeSwap[] = [];
+      const callsBorrow = [createVault(alice.address)];
+      const dataBorrow = await encodeAngleBorrow(
+        USDC.address,
+        agEUR.address,
+        vaultManager.address,
+        bob.address,
+        ZERO_ADDRESS,
+        '0x',
+        callsBorrow,
+      );
+      const actions = [ActionType.borrower];
+      const dataMixer = [dataBorrow];
+      await router.connect(alice).mixerVaultManagerPermit([permitParam], permits, transfers, swaps, actions, dataMixer);
+      // Leftover transferred to the msg.sender
+      expect(await USDC.balanceOf(vaultManager.address)).to.be.equal(0);
+      expect(await agEUR.balanceOf(bob.address)).to.be.equal(UNIT_DAI);
+      expect(await USDC.balanceOf(bob.address)).to.be.equal(UNIT_USDC);
+      expect(await vaultManager.operatorApprovals(bob.address, router.address)).to.be.equal(1);
+    });
+    it('success - with collateral payment and stablecoin receipt + no repayData + to = address(this) ', async () => {
+      const name = 'testVM';
+      const permitData = await signPermitNFT(
+        bob,
+        0,
+        vaultManager.address,
+        (await latestTime()) + 1000,
+        router.address,
+        true,
+        name,
+      );
+      const permitParam = {
+        vaultManager: permitData.contract,
+        owner: permitData.owner,
+        approved: permitData.approved,
+        deadline: permitData.deadline,
+        v: permitData.v,
+        r: permitData.r,
+        s: permitData.s,
+      };
+      // Balance does not change
+      await (await USDC.connect(governor).mint(alice.address, UNIT_USDC)).wait();
+      await (await USDC.connect(governor).mint(vaultManager.address, UNIT_USDC)).wait();
+      await (await agEUR.connect(governor).mint(alice.address, UNIT_DAI)).wait();
+      await agEUR.connect(alice).approve(router.address, UNIT_DAI);
+      await USDC.connect(alice).approve(router.address, UNIT_USDC);
+      await vaultManager.connect(alice).setPaymentData(UNIT_DAI, 0, UNIT_USDC, 0);
+      await vaultManager.approveSpenderVault(alice.address, 1, true);
+      const permits: TypePermit[] = [];
+      const transfers: TypeTransfer[] = [{ inToken: USDC.address, amountIn: UNIT_USDC }];
+      const swaps: TypeSwap[] = [];
+      const callsBorrow = [createVault(alice.address)];
+      const dataBorrow = await encodeAngleBorrow(
+        USDC.address,
+        agEUR.address,
+        vaultManager.address,
+        router.address,
+        ZERO_ADDRESS,
+        '0x',
+        callsBorrow,
+      );
+      const actions = [ActionType.borrower];
+      const dataMixer = [dataBorrow];
+      await router.connect(alice).mixerVaultManagerPermit([permitParam], permits, transfers, swaps, actions, dataMixer);
+      // Leftover transferred to the msg.sender
+      expect(await USDC.balanceOf(vaultManager.address)).to.be.equal(0);
+      expect(await agEUR.balanceOf(alice.address)).to.be.equal(UNIT_DAI.mul(2));
+      expect(await USDC.balanceOf(alice.address)).to.be.equal(UNIT_USDC.mul(2));
+      expect(await vaultManager.operatorApprovals(bob.address, router.address)).to.be.equal(1);
     });
   });
 });

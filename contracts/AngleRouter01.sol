@@ -704,7 +704,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
             } else break;
         }
         mixer(paramsPermit, paramsTransfer, paramsSwap, actions, data);
-        // Storing the index at which starting the iteration for revoking approvals in a variable would make the stack 
+        // Storing the index at which starting the iteration for revoking approvals in a variable would make the stack
         // too deep
         for (uint256 i = 0; i < paramsPermitVaultManager.length; i++) {
             if (!paramsPermitVaultManager[i].approved) {
@@ -1070,8 +1070,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
             if (actionsBorrow[i] == ActionBorrowType.createVault) {
                 createVaultAction = true;
             } else if (
-                actionsBorrow[i] == ActionBorrowType.removeCollateral ||
-                actionsBorrow[i] == ActionBorrowType.borrow
+                actionsBorrow[i] == ActionBorrowType.removeCollateral || actionsBorrow[i] == ActionBorrowType.borrow
             ) {
                 (vaultID, ) = abi.decode(dataBorrow[i], (uint256, uint256));
             } else if (actionsBorrow[i] == ActionBorrowType.closeVault) {
