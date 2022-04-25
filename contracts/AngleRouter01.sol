@@ -141,6 +141,16 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
 
     uint256[50] private __gap;
 
+    struct PermitVaultManagerType {
+        address vaultManager;
+        address owner;
+        bool approved;
+        uint256 deadline;
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+    }
+
     /// @notice StETH contract
     IStETH public constant STETH = IStETH(0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84);
     /// @notice Wrapped StETH contract
@@ -153,6 +163,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
     error InvalidAddress();
     error InvalidCall();
     error InvalidConditions();
+    error InvalidReturnMessage();
     error InvalidToken();
     error NotApprovedOrOwner();
     error NotGovernorOrGuardian();
@@ -181,8 +192,8 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
     /// @dev There can only be one guardian and one governor address in the router
     /// and both need to be different
     function setGovernorOrGuardian(address admin, bool setGovernor) external onlyGovernorOrGuardian {
-        if(admin == address(0)) revert ZeroAddress();
-        if(guardian == admin || governor == admin) revert InvalidAddress();
+        if (admin == address(0)) revert ZeroAddress();
+        if (guardian == admin || governor == admin) revert InvalidAddress();
         if (setGovernor) governor = admin;
         else guardian = admin;
         emit AdminChanged(admin, setGovernor);
@@ -221,7 +232,8 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         IPoolManager[] calldata poolManagers,
         ILiquidityGauge[] calldata liquidityGauges
     ) external onlyGovernorOrGuardian {
-        if(poolManagers.length != stablecoins.length || liquidityGauges.length != stablecoins.length) revert IncompatibleLengths();
+        if (poolManagers.length != stablecoins.length || liquidityGauges.length != stablecoins.length)
+            revert IncompatibleLengths();
         for (uint256 i = 0; i < stablecoins.length; i++) {
             IStableMasterFront stableMaster = mapStableMasters[stablecoins[i]];
             _addPair(stableMaster, poolManagers[i], liquidityGauges[i]);
@@ -240,7 +252,8 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         IERC20[] calldata collaterals,
         IStableMasterFront[] calldata stableMasters
     ) external onlyGovernorOrGuardian {
-        if(collaterals.length != stablecoins.length || stableMasters.length != collaterals.length) revert IncompatibleLengths();
+        if (collaterals.length != stablecoins.length || stableMasters.length != collaterals.length)
+            revert IncompatibleLengths();
         Pairs memory pairs;
         IStableMasterFront stableMaster;
         for (uint256 i = 0; i < stablecoins.length; i++) {
@@ -271,7 +284,8 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         IERC20[] calldata collaterals,
         ILiquidityGauge[] calldata newLiquidityGauges
     ) external onlyGovernorOrGuardian {
-        if(collaterals.length != stablecoins.length || newLiquidityGauges.length != stablecoins.length) revert IncompatibleLengths();
+        if (collaterals.length != stablecoins.length || newLiquidityGauges.length != stablecoins.length)
+            revert IncompatibleLengths();
         for (uint256 i = 0; i < stablecoins.length; i++) {
             IStableMasterFront stableMaster = mapStableMasters[stablecoins[i]];
             Pairs storage pairs = mapPoolManagers[stableMaster][collaterals[i]];
@@ -302,7 +316,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         address[] calldata spenders,
         uint256[] calldata amounts
     ) external onlyGovernorOrGuardian {
-        if(tokens.length != spenders.length || tokens.length != amounts.length) revert IncompatibleLengths();
+        if (tokens.length != spenders.length || tokens.length != amounts.length) revert IncompatibleLengths();
         for (uint256 i = 0; i < tokens.length; i++) {
             _changeAllowance(tokens[i], spenders[i], amounts[i]);
         }
@@ -545,7 +559,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         ParamsSwapType[] memory paramsSwap,
         ActionType[] memory actions,
         bytes[] calldata data
-    ) external payable nonReentrant {
+    ) public payable nonReentrant {
         // Do all the permits once for all: if all tokens have already been approved, there's no need for this step
         for (uint256 i = 0; i < paramsPermit.length; i++) {
             IERC20PermitUpgradeable(paramsPermit[i].token).permit(
@@ -752,7 +766,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                 _changeAllowance(IERC20(collateral), address(vaultManager), type(uint256).max);
                 uint256 stablecoinBalance;
                 uint256 collateralBalance;
-                // In this case, this may mean that the `VaultManager` will engage in some way in a swap of stablecoins 
+                // In this case, this may mean that the `VaultManager` will engage in some way in a swap of stablecoins
                 // or collateral and we should not trust the amounts outputted by the `_angleBorrower` function as the true amounts
                 if (repayData.length > 0) {
                     stablecoinBalance = IERC20(stablecoin).balanceOf(address(this));
@@ -819,6 +833,47 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         }
     }
 
+    /// @notice Wrapper built on top of the mixer function to grant approval to a VaultManager contract before performing
+    /// actions and then revoking this approval after these actions
+    function mixer(
+        PermitVaultManagerType[] memory paramsPermitVaultManager,
+        PermitType[] memory paramsPermit,
+        TransferType[] memory paramsTransfer,
+        ParamsSwapType[] memory paramsSwap,
+        ActionType[] memory actions,
+        bytes[] calldata data
+    ) external payable nonReentrant {
+        // All approvals must be done before disapprovals
+        //uint256 indexUnapproval;
+        for (uint256 i = 0; i < paramsPermitVaultManager.length; i++) {
+            if (paramsPermitVaultManager[i].approved) {
+                IVaultManagerFunctions(paramsPermitVaultManager[i].vaultManager).permit(
+                    paramsPermitVaultManager[i].owner,
+                    address(this),
+                    true,
+                    paramsPermitVaultManager[i].deadline,
+                    paramsPermitVaultManager[i].v,
+                    paramsPermitVaultManager[i].r,
+                    paramsPermitVaultManager[i].s
+                );
+            } else break;
+        }
+        mixer(paramsPermit, paramsTransfer, paramsSwap, actions, data);
+        for (uint256 i = 0; i < paramsPermitVaultManager.length; i++) {
+            if (!paramsPermitVaultManager[i].approved) {
+                IVaultManagerFunctions(paramsPermitVaultManager[i].vaultManager).permit(
+                    paramsPermitVaultManager[i].owner,
+                    address(this),
+                    false,
+                    paramsPermitVaultManager[i].deadline,
+                    paramsPermitVaultManager[i].v,
+                    paramsPermitVaultManager[i].r,
+                    paramsPermitVaultManager[i].s
+                );
+            }
+        }
+    }
+
     receive() external payable {}
 
     // ======================== Internal Utility Functions =========================
@@ -845,9 +900,8 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         address[] memory stablecoins,
         address[] memory collateralsOrPerpetualManagers
     ) internal {
-        if(
-            stablecoins.length != perpetualIDs.length || collateralsOrPerpetualManagers.length != perpetualIDs.length
-        ) revert IncompatibleLengths();
+        if (stablecoins.length != perpetualIDs.length || collateralsOrPerpetualManagers.length != perpetualIDs.length)
+            revert IncompatibleLengths();
 
         for (uint256 i = 0; i < liquidityGauges.length; i++) {
             ILiquidityGauge(liquidityGauges[i]).claim_rewards(gaugeUser);
@@ -1164,8 +1218,9 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
             uint256 vaultID;
             // If there is a createVault action, the router should not worry about looking at
             // next vaultIDs given equal to 0
-            if (actionsBorrow[i] == ActionBorrowType.createVault) createVaultAction = true;
-            // There are different ways depending on the action with which vaultIDs are structured
+            if (actionsBorrow[i] == ActionBorrowType.createVault)
+                createVaultAction = true;
+                // There are different ways depending on the action with which vaultIDs are structured
             else if (
                 actionsBorrow[i] == ActionBorrowType.repayDebt ||
                 actionsBorrow[i] == ActionBorrowType.removeCollateral ||
@@ -1198,7 +1253,8 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
             }
         }
         for (uint256 i = 0; i < vaultIDLength; i++) {
-            if (!IVaultManagerFunctions(vaultManager).isApprovedOrOwner(msg.sender, vaultIDsToCheckOwnershipOf[i])) revert NotApprovedOrOwner();
+            if (!IVaultManagerFunctions(vaultManager).isApprovedOrOwner(msg.sender, vaultIDsToCheckOwnershipOf[i]))
+                revert NotApprovedOrOwner();
         }
     }
 
@@ -1461,6 +1517,6 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                 revert(add(32, errMsg), mload(errMsg))
             }
         }
-        revert("117");
+        revert InvalidReturnMessage();
     }
 }

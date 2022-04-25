@@ -91,6 +91,22 @@ interface IVaultManagerFunctions {
     /// @param vaultID ID of the vault to check
     /// @return Whether the `spender` address owns or is approved for `vaultID`
     function isApprovedOrOwner(address spender, uint256 vaultID) external view returns (bool);
+
+    /// @notice Allows an address to give or revoke approval for all its vaults to another address
+    /// @param owner Address signing the permit and giving (or revoking) its approval for all the controlled vaults
+    /// @param spender Address to give approval to
+    /// @param approved Whether to give or revoke the approval
+    /// @param deadline Deadline parameter for the signature to be valid
+    /// @dev The `v`, `r`, and `s` parameters are used as signature data
+    function permit(
+        address owner,
+        address spender,
+        bool approved,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external;
 }
 
 /// @title IVaultManagerStorage
