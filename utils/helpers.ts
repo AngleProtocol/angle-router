@@ -148,24 +148,24 @@ export async function initAngle(
 }> {
   const initInflationRate = BigNumber.from('5').pow(BigNumber.from('10'));
 
-  const core = (await new Core__factory(governor).deploy(governor.address, guardian.address)) as unknown as Core;
+  const core = ((await new Core__factory(governor).deploy(governor.address, guardian.address)) as unknown) as Core;
   const ANGLE = (await new MockANGLE__factory(governor).deploy('ANGLE', 'ANGLE')) as MockANGLE;
-  const smartWalletChecker = (await new SmartWalletWhitelist__factory(governor).deploy(
+  const smartWalletChecker = ((await new SmartWalletWhitelist__factory(governor).deploy(
     governor.address,
-  )) as unknown as SmartWalletWhitelist;
-  const veANGLE = (await new VeANGLE__factory(governor).deploy()) as unknown as VeANGLE;
+  )) as unknown) as SmartWalletWhitelist;
+  const veANGLE = ((await new VeANGLE__factory(governor).deploy()) as unknown) as VeANGLE;
   await veANGLE.initialize(governor.address, ANGLE.address, smartWalletChecker.address, 'veANGLE', 'veANGLE');
-  const veBoostProxy = (await new VeBoostProxy__factory(governor).deploy(
+  const veBoostProxy = ((await new VeBoostProxy__factory(governor).deploy(
     veANGLE.address,
     ethers.constants.AddressZero,
     governor.address,
-  )) as unknown as VeBoostProxy;
-  const gaugeController = (await new GaugeController__factory(governor).deploy(
+  )) as unknown) as VeBoostProxy;
+  const gaugeController = ((await new GaugeController__factory(governor).deploy(
     ANGLE.address,
     veANGLE.address,
     governor.address,
-  )) as unknown as GaugeController;
-  const angleDistributor = (await new AngleDistributor__factory(governor).deploy()) as unknown as AngleDistributor;
+  )) as unknown) as GaugeController;
+  const angleDistributor = ((await new AngleDistributor__factory(governor).deploy()) as unknown) as AngleDistributor;
   await angleDistributor.initialize(
     ANGLE.address,
     gaugeController.address,
@@ -175,7 +175,7 @@ export async function initAngle(
     guardian.address,
     guardian.address,
   );
-  const stableMaster = (await new StableMasterFront__factory(governor).deploy()) as unknown as StableMasterFront;
+  const stableMaster = ((await new StableMasterFront__factory(governor).deploy()) as unknown) as StableMasterFront;
   await stableMaster.initialize(core.address);
 
   const agToken = (await deployUpgradeable(new MockAgToken__factory(governor))) as MockAgToken;
@@ -211,7 +211,8 @@ export async function initRouter(
   await oneInchRouter.updateExchangeRate(parseAmount.ether(oracle1Inch));
 
   const AngleRouterArtifacts = await ethers.getContractFactory('AngleRouter');
-  const angleRouter = (await AngleRouterArtifacts.deploy()) as unknown as AngleRouter;
+  const angleRouter = ((await AngleRouterArtifacts.deploy()) as unknown) as AngleRouter;
+  /*
   await angleRouter.initialize(
     governor.address,
     guardian.address,
@@ -221,6 +222,7 @@ export async function initRouter(
     poolManagers.map(pool => pool.address),
     gauges.map(gauge => gauge.address),
   );
+  */
 
   return { angleRouter, uniswapRouter, oneInchRouter };
 }
@@ -233,13 +235,13 @@ export async function initFeeDistributor(
   feeDistributor: FeeDistributor;
 }> {
   const curTs = await (await web3.eth.getBlock('latest')).timestamp;
-  const feeDistributor = (await new FeeDistributor__factory(governor).deploy(
+  const feeDistributor = ((await new FeeDistributor__factory(governor).deploy(
     veANGLE.address,
     curTs,
     rewardToken,
     governor.address,
     governor.address,
-  )) as unknown as FeeDistributor;
+  )) as unknown) as FeeDistributor;
   return { feeDistributor };
 }
 
@@ -344,17 +346,17 @@ export async function initCollateral(
     oracleValue.mul(BASE_ORACLE),
     collatBase,
   )) as MockOracle;
-  const manager = (await new PoolManager__factory(governor).deploy()) as unknown as PoolManager;
+  const manager = ((await new PoolManager__factory(governor).deploy()) as unknown) as PoolManager;
 
   await manager.initialize(token.address, stableMaster.address);
   const sanName = `san_${name}`;
-  const sanToken = (await new SanToken__factory(governor).deploy()) as unknown as SanToken;
+  const sanToken = ((await new SanToken__factory(governor).deploy()) as unknown) as SanToken;
   await sanToken.initialize(sanName, sanName, manager.address);
-  const perpetualManager = (await new PerpetualManagerFront__factory(
+  const perpetualManager = ((await new PerpetualManagerFront__factory(
     governor,
-  ).deploy()) as unknown as PerpetualManagerFront;
+  ).deploy()) as unknown) as PerpetualManagerFront;
   await perpetualManager.initialize(manager.address, ANGLE.address);
-  const feeManager = (await new FeeManager__factory(governor).deploy(manager.address)) as unknown as FeeManager;
+  const feeManager = ((await new FeeManager__factory(governor).deploy(manager.address)) as unknown) as FeeManager;
 
   await (
     await stableMaster

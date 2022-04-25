@@ -170,7 +170,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
     error TooSmallAmountOut();
     error ZeroAddress();
 
-    // constructor() initializer {}
+    constructor() initializer {}
 
     // Removed the `initialize` function in this implementation since it has already been called and can not be called again
 
@@ -643,7 +643,6 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                     uint256 index = _searchList(listTokens, collateral);
                     balanceTokens[index] -= paymentData.collateralAmountToReceive - paymentData.collateralAmountToGive;
                 } else if (
-                    // TODO handle case where `repayData` does not correctly specify the repay address
                     paymentData.collateralAmountToReceive < paymentData.collateralAmountToGive &&
                     (to == address(this) || repayData.length > 0)
                 ) {
@@ -654,11 +653,9 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                         paymentData.collateralAmountToGive - paymentData.collateralAmountToReceive
                     );
                 }
-                // Handle stablecoins transfers
-                if (paymentData.stablecoinAmountToReceive > paymentData.stablecoinAmountToGive) {
-                    uint256 index = _searchList(listTokens, stablecoin);
-                    balanceTokens[index] -= paymentData.stablecoinAmountToReceive - paymentData.stablecoinAmountToGive;
-                } else if (
+                // Handle stablecoins transfers: the `VaultManager` is called with the `from` address being the `msg.sender`
+                // so we don't need to update the stablecoin balance if stablecoins are given to it from this operation
+                if (
                     paymentData.stablecoinAmountToReceive < paymentData.stablecoinAmountToGive &&
                     (to == address(this) || repayData.length > 0)
                 ) {
@@ -673,8 +670,8 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         }
 
         // Once all actions have been performed, the router sends back the unused funds from users
-        // If a user sends funds (through a swap) but specifies incorrectly the collateral associated to it, then the mixer will revert
-        // when trying to send the remaining funds back
+        // If a user sends funds (through a swap) but specifies incorrectly the collateral associated to it, then
+        //  the mixer will revert when trying to send the remaining funds back
         for (uint256 i = 0; i < balanceTokens.length; i++) {
             if (balanceTokens[i] > 0) IERC20(listTokens[i]).safeTransfer(msg.sender, balanceTokens[i]);
         }
@@ -682,16 +679,17 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
 
     /// @notice Wrapper built on top of the mixer function to grant approval to a VaultManager contract before performing
     /// actions and then revoking this approval after these actions
-    function mixer(
+    /// @param paramsPermitVaultManager Parameters to sign permit to give allowance to the router for a `VaultManager` contract
+    /// @dev In `paramsPermitVaultManager`, the signatures for granting approvals must be given first before the signatures
+    /// to revoke approvals
+    function mixerVaultManagerPermit(
         PermitVaultManagerType[] memory paramsPermitVaultManager,
         PermitType[] memory paramsPermit,
         TransferType[] memory paramsTransfer,
         ParamsSwapType[] memory paramsSwap,
         ActionType[] memory actions,
         bytes[] calldata data
-    ) external payable nonReentrant {
-        // All approvals must be done before disapprovals
-        //uint256 indexUnapproval;
+    ) external payable {
         for (uint256 i = 0; i < paramsPermitVaultManager.length; i++) {
             if (paramsPermitVaultManager[i].approved) {
                 IVaultManagerFunctions(paramsPermitVaultManager[i].vaultManager).permit(
@@ -706,6 +704,8 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
             } else break;
         }
         mixer(paramsPermit, paramsTransfer, paramsSwap, actions, data);
+        // Storing the index at which starting the iteration for revoking approvals in a variable would make the stack 
+        // too deep
         for (uint256 i = 0; i < paramsPermitVaultManager.length; i++) {
             if (!paramsPermitVaultManager[i].approved) {
                 IVaultManagerFunctions(paramsPermitVaultManager[i].vaultManager).permit(
@@ -1063,13 +1063,13 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         uint256 vaultIDLength;
         for (uint256 i = 0; i < actionsBorrow.length; i++) {
             uint256 vaultID;
+            bool addVaultID = true;
             // If there is a createVault action, the router should not worry about looking at
             // next vaultIDs given equal to 0
-            if (actionsBorrow[i] == ActionBorrowType.createVault)
+            // There are different ways depending on the action with which vaultIDs are structured
+            if (actionsBorrow[i] == ActionBorrowType.createVault) {
                 createVaultAction = true;
-                // There are different ways depending on the action with which vaultIDs are structured
-            else if (
-                actionsBorrow[i] == ActionBorrowType.repayDebt ||
+            } else if (
                 actionsBorrow[i] == ActionBorrowType.removeCollateral ||
                 actionsBorrow[i] == ActionBorrowType.borrow
             ) {
@@ -1078,23 +1078,24 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                 vaultID = abi.decode(dataBorrow[i], (uint256));
             } else if (actionsBorrow[i] == ActionBorrowType.getDebtIn) {
                 (vaultID, , , ) = abi.decode(dataBorrow[i], (uint256, address, uint256, uint256));
-            }
-            if (vaultID == 0 && !createVaultAction) {
+            } else addVaultID = false;
+            // If we need to add a null `vaultID`, we look at the `vaultIDCount` in the `VaultManager`
+            // if there has not been any specific action
+            if (addVaultID && vaultID == 0 && !createVaultAction) {
                 // If we haven't stored the last vaultID, we need to fetch it
                 if (lastVaultID == 0) {
                     lastVaultID = IVaultManagerStorage(vaultManager).vaultIDCount();
                 }
                 vaultID = lastVaultID;
-            }
+            } else if (addVaultID && vaultID == 0) addVaultID = false;
+
             // We keep a list of all vaultIDs to parse and only update it when we see a new vaultID
-            bool add = true;
-            for (uint256 j = 0; j < vaultIDLength; j++) {
+            for (uint256 j = 0; j < vaultIDLength && addVaultID; j++) {
                 if (vaultIDsToCheckOwnershipOf[j] == vaultID) {
-                    add = false;
-                    break;
+                    addVaultID = false;
                 }
             }
-            if (add) {
+            if (addVaultID) {
                 vaultIDsToCheckOwnershipOf[vaultIDLength] = vaultID;
                 vaultIDLength += 1;
             }

@@ -35,7 +35,6 @@ contract MockAgToken is IAgToken, ERC20PermitUpgradeable {
     ) external initializer {
         __ERC20Permit_init(name_);
         __ERC20_init(name_, symbol_);
-        require(stableMaster_ != address(0), "0");
         stableMaster = stableMaster_;
         treasury = _treasury;
         isMinter[stableMaster] = true;
