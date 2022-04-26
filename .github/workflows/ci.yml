@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      workflow_to_run:
+        type: choice
+        description: Which workflow to run?
+        required: true
+        options:
+          - all
+          - unit_tests
+  pull_request:
+    branches:
+      - main
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  run-linters:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
+        with:
+          node-version: 14
+      - uses: actions/cache@v2
+        with:
+          path: node_modules
+          key: yarn-${{ hashFiles('yarn.lock') }}
+          restore-keys: yarn-
+      - name: Install dependencies
+        run: |
+          yarn install --frozen-lockfile
+      - name: Run solhint
+        run: yarn lint:sol
+      - name: Run eslint
+        run: yarn lint:js:fix
+
+      - name: Discord notification
+        if: failure()
+        uses: Ilshidur/action-discord@master
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        with:
+          args: '⛔️ Linter error in project {{EVENT_PAYLOAD.repository.full_name}}. See here: https://github.com/AngleProtocol/angle-router/actions'
+
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
+        with:
+          node-version: 14
+      - uses: actions/cache@v2
+        with:
+          path: node_modules
+          key: yarn-${{ hashFiles('yarn.lock') }}
+          restore-keys: yarn-
+      - name: Install dependencies
+        run: |
+          yarn install --frozen-lockfile
+
+      # This is required separately from yarn test because it generates the typechain definitions
+      - name: Compile
+        run: yarn compile
+      - run: yarn generate-types-from-abis
+      - run: export NODE_OPTIONS=--max_old_space_size=4096
+      - name: Run unit tests
+        run: yarn test
+        env:
+          ENABLE_GAS_REPORT: true
+          CI: true
+      - name: Print gas report
+        run: cat gas-report.txt
+      - name: Discord notification
+        if: failure()
+        uses: Ilshidur/action-discord@master
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        with:
+          args: '⛔️ Unit tests failed in project {{EVENT_PAYLOAD.repository.full_name}}. See here: https://github.com/AngleProtocol/angle-router/actions'
