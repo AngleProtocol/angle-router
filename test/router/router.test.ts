@@ -1,67 +1,51 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
-import { BigNumber, Signer, utils, BytesLike } from 'ethers';
-import { formatBytes32String, parseEther, parseUnits } from 'ethers/lib/utils';
+import { BigNumber, BytesLike, Signer } from 'ethers';
 import hre, { contract, ethers, web3 } from 'hardhat';
 
 import {
-  MockOracle,
-  MockOracle__factory,
-  MockToken,
-  MockToken__factory,
-  MockAgToken,
-  MockAgToken__factory,
   AngleRouter,
   AngleRouter__factory,
+  MockAgToken,
+  MockAgToken__factory,
+  MockTokenPermit,
   MockVaultManagerPermit,
   MockVaultManagerPermit__factory,
-  MockTokenPermit,
 } from '../../typechain';
 import { expect } from '../../utils/chai-setup';
-import { inIndirectReceipt, inReceipt } from '../../utils/expectEvent';
-import { deployUpgradeable, latestTime, ZERO_ADDRESS } from '../utils/helpers';
-import { signPermitNFT, domainSeparator } from '../../utils/sigUtilsNFT';
+import { ActionType, initToken, TypePermit, TypeSwap, TypeTransfer } from '../../utils/helpers';
 import {
   addCollateral,
   borrow,
   closeVault,
   createVault,
   encodeAngleBorrow,
-  repayDebt,
-  removeCollateral,
-  permit,
   getDebtIn,
+  permit,
+  removeCollateral,
+  repayDebt,
 } from '../../utils/helpersEncoding';
-import { ActionType, TypeTransfer, TypeSwap, SwapType, BASE_PARAMS, initToken, TypePermit } from '../../utils/helpers';
 import { signPermit } from '../../utils/sign';
+import { signPermitNFT } from '../../utils/sigUtilsNFT';
+import { deployUpgradeable, latestTime, ZERO_ADDRESS } from '../utils/helpers';
 
 contract('Router - VaultManager New functionalities', () => {
-  const log = true;
-
   let deployer: SignerWithAddress;
   let USDC: MockTokenPermit;
   let agEUR: MockAgToken;
   let governor: SignerWithAddress;
-  let guardian: SignerWithAddress;
   let alice: SignerWithAddress;
   let bob: SignerWithAddress;
-  let collateral: MockToken;
-  let oracle: MockOracle;
-  let name: string;
   let router: AngleRouter;
   let vaultManager: MockVaultManagerPermit;
-  let UNIT_ETH: BigNumber;
   let UNIT_USDC: BigNumber;
-  let UNIT_WBTC: BigNumber;
   let UNIT_DAI: BigNumber;
-  let ETHdecimal: BigNumber;
   let USDCdecimal: BigNumber;
-  let wBTCdecimal: BigNumber;
   let DAIdecimal: BigNumber;
 
   const impersonatedSigners: { [key: string]: Signer } = {};
 
   before(async () => {
-    ({ deployer, alice, bob, governor, guardian } = await ethers.getNamedSigners());
+    ({ deployer, alice, bob, governor } = await ethers.getNamedSigners());
     // add any addresses you want to impersonate here
     const impersonatedAddresses = [{ address: '0xdC4e6DFe07EFCa50a197DF15D9200883eF4Eb1c8', name: 'governor' }];
 
@@ -74,14 +58,10 @@ contract('Router - VaultManager New functionalities', () => {
       await hre.network.provider.send('hardhat_setBalance', [ob.address, '0x10000000000000000000000000000']);
 
       impersonatedSigners[ob.name] = await ethers.getSigner(ob.address);
-      ETHdecimal = BigNumber.from('18');
       USDCdecimal = BigNumber.from('6');
-      wBTCdecimal = BigNumber.from('8');
       DAIdecimal = BigNumber.from('18');
 
-      UNIT_ETH = BigNumber.from(10).pow(ETHdecimal);
       UNIT_USDC = BigNumber.from(10).pow(USDCdecimal);
-      UNIT_WBTC = BigNumber.from(10).pow(wBTCdecimal);
       UNIT_DAI = BigNumber.from(10).pow(DAIdecimal);
     }
   });

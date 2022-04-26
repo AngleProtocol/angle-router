@@ -1,6 +1,5 @@
-import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
-import { BigNumber, BigNumberish, BytesLike, Contract, ContractFactory, Signer } from 'ethers';
-import { formatEther, formatUnits, parseUnits } from 'ethers/lib/utils';
+import { BigNumber, BigNumberish, Contract, ContractFactory, Signer } from 'ethers';
+import { parseUnits } from 'ethers/lib/utils';
 import hre, { ethers } from 'hardhat';
 
 import { TransparentUpgradeableProxy__factory } from '../../typechain';
