@@ -42,13 +42,13 @@ jobs:
       - name: Run eslint
         run: yarn lint:js:fix
 
-      # - name: Discord notification
-      #   if: failure()
-      #   uses: Ilshidur/action-discord@master
-      #   env:
-      #     DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-      #   with:
-      #     args: '⛔️ Error in project {{EVENT_PAYLOAD.repository.full_name}}. See here: https://github.com/AngleProtocol/angle-router/actions'
+      - name: Discord notification
+        if: failure()
+        uses: Ilshidur/action-discord@master
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        with:
+          args: '⛔️ Linter error in project {{EVENT_PAYLOAD.repository.full_name}}. See here: https://github.com/AngleProtocol/angle-router/actions'
 
   unit-tests:
     runs-on: ubuntu-latest
@@ -78,10 +78,10 @@ jobs:
           CI: true
       - name: Print gas report
         run: cat gas-report.txt
-      # - name: Discord notification
-      #   if: failure()
-      #   uses: Ilshidur/action-discord@master
-      #   env:
-      #     DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-      #   with:
-      #     args: '⛔️ Error in project {{EVENT_PAYLOAD.repository.full_name}}. See here: https://github.com/AngleProtocol/angle-borrow/actions'
+      - name: Discord notification
+        if: failure()
+        uses: Ilshidur/action-discord@master
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        with:
+          args: '⛔️ Unit tests failed in project {{EVENT_PAYLOAD.repository.full_name}}. See here: https://github.com/AngleProtocol/angle-router/actions'
