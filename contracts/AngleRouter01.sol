@@ -19,6 +19,8 @@ import "./interfaces/IVaultManager.sol";
 import "./interfaces/external/lido/ISteth.sol";
 import "./interfaces/external/lido/IWStETH.sol";
 
+import "hardhat/console.sol";
+
 /// @title Angle Router
 /// @author Angle Core Team
 /// @notice The `AngleRouter` contract facilitates interactions for users with the protocol. It was built to reduce the number
@@ -692,6 +694,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                     paymentData.stablecoinAmountToReceive < paymentData.stablecoinAmountToGive &&
                     (to == address(this) || repayData.length > 0)
                 ) {
+                    console.log("In branch");
                     _addToList(
                         listTokens,
                         balanceTokens,
@@ -706,6 +709,9 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         // If a user sends funds (through a swap) but specifies incorrectly the collateral associated to it, then
         //  the mixer will revert when trying to send the remaining funds back
         for (uint256 i = 0; i < balanceTokens.length; i++) {
+            console.log("Sending tokens");
+            console.log(msg.sender);
+            console.log("Amount", balanceTokens[i]);
             if (balanceTokens[i] > 0) IERC20(listTokens[i]).safeTransfer(msg.sender, balanceTokens[i]);
         }
     }
