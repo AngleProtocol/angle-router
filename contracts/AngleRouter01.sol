@@ -1102,12 +1102,12 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         uint256 vaultIDLength;
         for (uint256 i = 0; i < actionsBorrow.length; i++) {
             uint256 vaultID;
-            bool addVaultID = true;
             // If there is a createVault action, the router should not worry about looking at
             // next vaultIDs given equal to 0
             // There are different ways depending on the action with which vaultIDs are structured
             if (actionsBorrow[i] == ActionBorrowType.createVault) {
                 createVaultAction = true;
+                continue;
             } else if (
                 actionsBorrow[i] == ActionBorrowType.removeCollateral || actionsBorrow[i] == ActionBorrowType.borrow
             ) {
@@ -1116,31 +1116,33 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                 vaultID = abi.decode(dataBorrow[i], (uint256));
             } else if (actionsBorrow[i] == ActionBorrowType.getDebtIn) {
                 (vaultID, , , ) = abi.decode(dataBorrow[i], (uint256, address, uint256, uint256));
-            } else addVaultID = false;
+            } else continue;
             // If we need to add a null `vaultID`, we look at the `vaultIDCount` in the `VaultManager`
             // if there has not been any specific action
-            if (addVaultID && vaultID == 0 && !createVaultAction) {
-                // If we haven't stored the last vaultID, we need to fetch it
-                if (lastVaultID == 0) {
-                    lastVaultID = IVaultManagerStorage(vaultManager).vaultIDCount();
+            if (vaultID == 0) {
+                if(createVaultAction){
+                    continue;
+                } else{
+                    // If we haven't stored the last vaultID, we need to fetch it
+                    if (lastVaultID == 0) {
+                        lastVaultID = IVaultManagerStorage(vaultManager).vaultIDCount();
+                    }
+                    vaultID = lastVaultID;
                 }
-                vaultID = lastVaultID;
-            } else if (addVaultID && vaultID == 0) addVaultID = false;
+            }
 
-            // We keep a list of all vaultIDs to parse and only update it when we see a new vaultID
-            for (uint256 j = 0; j < vaultIDLength && addVaultID; j++) {
+            // Check if this vaultID has already been verified
+            for (uint256 j = 0; j < vaultIDLength; j++) {
                 if (vaultIDsToCheckOwnershipOf[j] == vaultID) {
-                    addVaultID = false;
+                    continue;
                 }
             }
-            if (addVaultID) {
-                vaultIDsToCheckOwnershipOf[vaultIDLength] = vaultID;
-                vaultIDLength += 1;
-            }
-        }
-        for (uint256 i = 0; i < vaultIDLength; i++) {
-            if (!IVaultManagerFunctions(vaultManager).isApprovedOrOwner(msg.sender, vaultIDsToCheckOwnershipOf[i]))
+            // Verify this new vaultID and add it to the list
+            if (!IVaultManagerFunctions(vaultManager).isApprovedOrOwner(msg.sender, vaultID)){
                 revert NotApprovedOrOwner();
+            }
+            vaultIDsToCheckOwnershipOf[vaultIDLength] = vaultID;
+            vaultIDLength += 1;
         }
     }
 
