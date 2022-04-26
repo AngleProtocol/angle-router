@@ -16,6 +16,7 @@ const func: DeployFunction = async ({ deployments, ethers, network }) => {
   console.log('-----------------------------------------------------------------------');
   console.log('Let us get it started with the upgrade of Angle new router');
   console.log('');
+  console.log(`The address of the router is ${proxyAngleRouterAddress}`);
   console.log('');
   console.log('Now deploying AngleRouter');
   console.log('Starting with the implementation');
@@ -28,7 +29,6 @@ const func: DeployFunction = async ({ deployments, ethers, network }) => {
   const AngleRouterImplementation = (await deployments.get('AngleRouter_NewImplementation')).address;
 
   console.log(`Successfully deployed Angle router implementation at the address ${AngleRouterImplementation}`);
-  console.log(`The address of the router is ${proxyAngleRouterAddress}`);
   console.log('');
 
   if (!network.live) {

@@ -376,6 +376,39 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         _claimRewards(user, liquidityGauges, perpetualIDs, true, new address[](perpetualIDs.length), perpetualManagers);
     }
 
+    /// @notice Wrapper built on top of the `_mint` method to mint stablecoins
+    /// @param user Address to send the stablecoins to
+    /// @param amount Amount of collateral to use for the mint
+    /// @param minStableAmount Minimum stablecoin minted for the tx not to revert
+    /// @param stablecoin Address of the stablecoin to mint
+    /// @param collateral Collateral to mint from
+    function mint(
+        address user,
+        uint256 amount,
+        uint256 minStableAmount,
+        address stablecoin,
+        address collateral
+    ) external nonReentrant {
+        IERC20(collateral).safeTransferFrom(msg.sender, address(this), amount);
+        _mint(user, amount, minStableAmount, false, stablecoin, collateral, IPoolManager(address(0)));
+    }
+
+    /// @notice Wrapper built on top of the `_burn` method to burn stablecoins
+    /// @param dest Address to send the collateral to
+    /// @param amount Amount of stablecoins to use for the burn
+    /// @param minCollatAmount Minimum collateral amount received for the tx not to revert
+    /// @param stablecoin Address of the stablecoin to mint
+    /// @param collateral Collateral to mint from
+    function burn(
+        address dest,
+        uint256 amount,
+        uint256 minCollatAmount,
+        address stablecoin,
+        address collateral
+    ) external nonReentrant {
+        _burn(dest, amount, minCollatAmount, false, stablecoin, collateral, IPoolManager(address(0)));
+    }
+
     /// @notice Allows composable calls to different functions within the protocol
     /// @param paramsPermit Array of params `PermitType` used to do a 1 tx to approve the router on each token (can be done once by
     /// setting high approved amounts) which supports the `permit` standard. Users willing to interact with the contract
