@@ -131,7 +131,7 @@ export async function invariantFundsUser(): Promise<void> {
 }
 
 // Testing Angle Router
-describe('AngleRouter01 - claim and lock', () => {
+describe('AngleRouter - claim and lock', () => {
   before(async () => {
     startTs = await (await ethers.provider.getBlock('latest')).timestamp;
 
@@ -207,22 +207,17 @@ describe('AngleRouter01 - claim and lock', () => {
     } = await initCollateral(
       'wBTC',
       stableMasterEUR,
-      ANGLE as unknown as MockANGLE,
+      (ANGLE as unknown) as MockANGLE,
       governor,
       wBTCdecimal,
       wBTCORACLEUSD,
       0,
       false,
     ));
-    ({
-      token: DAI,
-      manager: managerDAI,
-      sanToken: sanTokenDAI,
-      perpetualManager: perpEURDAI,
-    } = await initCollateral(
+    ({ token: DAI, manager: managerDAI, sanToken: sanTokenDAI, perpetualManager: perpEURDAI } = await initCollateral(
       'DAI',
       stableMasterEUR,
-      ANGLE as unknown as MockANGLE,
+      (ANGLE as unknown) as MockANGLE,
       governor,
       DAIdecimal,
       DAIORACLEUSD,
