@@ -19,8 +19,6 @@ import "./interfaces/IVaultManager.sol";
 import "./interfaces/external/lido/ISteth.sol";
 import "./interfaces/external/lido/IWStETH.sol";
 
-import "hardhat/console.sol";
-
 /// @title Angle Router
 /// @author Angle Core Team
 /// @notice The `AngleRouter` contract facilitates interactions for users with the protocol. It was built to reduce the number
@@ -357,7 +355,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         uint256[] memory perpetualIDs,
         address[] memory stablecoins,
         address[] memory collaterals
-    ) external nonReentrant {
+    ) external {
         _claimRewards(gaugeUser, liquidityGauges, perpetualIDs, false, stablecoins, collaterals);
     }
 
@@ -374,7 +372,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         address[] memory liquidityGauges,
         uint256[] memory perpetualIDs,
         address[] memory perpetualManagers
-    ) external nonReentrant {
+    ) external {
         _claimRewards(user, liquidityGauges, perpetualIDs, true, new address[](perpetualIDs.length), perpetualManagers);
     }
 
@@ -390,7 +388,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         uint256 minStableAmount,
         address stablecoin,
         address collateral
-    ) external nonReentrant {
+    ) external {
         IERC20(collateral).safeTransferFrom(msg.sender, address(this), amount);
         _mint(user, amount, minStableAmount, false, stablecoin, collateral, IPoolManager(address(0)));
     }
@@ -407,7 +405,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         uint256 minCollatAmount,
         address stablecoin,
         address collateral
-    ) external nonReentrant {
+    ) external {
         _burn(dest, amount, minCollatAmount, false, stablecoin, collateral, IPoolManager(address(0)));
     }
 
@@ -441,7 +439,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         ParamsSwapType[] memory paramsSwap,
         ActionType[] memory actions,
         bytes[] calldata data
-    ) public payable nonReentrant {
+    ) public payable {
         // Do all the permits once for all: if all tokens have already been approved, there's no need for this step
         for (uint256 i = 0; i < paramsPermit.length; i++) {
             IERC20PermitUpgradeable(paramsPermit[i].token).permit(
@@ -694,7 +692,6 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                     paymentData.stablecoinAmountToReceive < paymentData.stablecoinAmountToGive &&
                     (to == address(this) || repayData.length > 0)
                 ) {
-                    console.log("In branch");
                     _addToList(
                         listTokens,
                         balanceTokens,
@@ -709,9 +706,6 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         // If a user sends funds (through a swap) but specifies incorrectly the collateral associated to it, then
         //  the mixer will revert when trying to send the remaining funds back
         for (uint256 i = 0; i < balanceTokens.length; i++) {
-            console.log("Sending tokens");
-            console.log(msg.sender);
-            console.log("Amount", balanceTokens[i]);
             if (balanceTokens[i] > 0) IERC20(listTokens[i]).safeTransfer(msg.sender, balanceTokens[i]);
         }
     }
@@ -1120,9 +1114,9 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
             // If we need to add a null `vaultID`, we look at the `vaultIDCount` in the `VaultManager`
             // if there has not been any specific action
             if (vaultID == 0) {
-                if(createVaultAction){
+                if (createVaultAction) {
                     continue;
-                } else{
+                } else {
                     // If we haven't stored the last vaultID, we need to fetch it
                     if (lastVaultID == 0) {
                         lastVaultID = IVaultManagerStorage(vaultManager).vaultIDCount();
@@ -1138,7 +1132,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                 }
             }
             // Verify this new vaultID and add it to the list
-            if (!IVaultManagerFunctions(vaultManager).isApprovedOrOwner(msg.sender, vaultID)){
+            if (!IVaultManagerFunctions(vaultManager).isApprovedOrOwner(msg.sender, vaultID)) {
                 revert NotApprovedOrOwner();
             }
             vaultIDsToCheckOwnershipOf[vaultIDLength] = vaultID;
