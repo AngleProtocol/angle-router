@@ -98,6 +98,11 @@ const config: HardhatUserConfig = {
       gasMultiplier: 1.3,
       chainId: 1,
     },
+    mainnetForkRemote: {
+      live: false,
+      url: 'http://34.78.103.39:11055/',
+      chainId: 1,
+    },
   },
   paths: {
     sources: './contracts',
