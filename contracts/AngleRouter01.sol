@@ -1342,16 +1342,10 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         bytes memory args
     ) internal returns (uint256 amountOut) {
         if (swapType == SwapType.UniswapV3) amountOut = _swapOnUniswapV3(inToken, amount, minAmountOut, args);
-        else if (swapType == SwapType.oneINCH) amountOut = _swapOn1Inch(inToken, minAmountOut, args);
-        else if (swapType == SwapType.WrapStETH) amountOut = _wrapStETH(amount, minAmountOut);
+        else if (swapType == SwapType.oneINCH) amountOut = _swapOn1Inch(inToken, args);
+        else if (swapType == SwapType.WrapStETH) amountOut = WSTETH.wrap(amount);
         else if (swapType == SwapType.None) amountOut = amount;
         else revert InvalidCall();
-
-        return amountOut;
-    }
-
-    function _wrapStETH(uint256 amount, uint256 minAmountOut) internal returns (uint256 amountOut) {
-        amountOut = WSTETH.wrap(amount);
         if (amountOut < minAmountOut) revert TooSmallAmountOut();
     }
 
@@ -1376,12 +1370,11 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         );
     }
 
-    /// @notice Allows to swap any token to an accepted collateral via 1Inch API
-    /// @param minAmountOut Minimum amount accepted for the swap to happen
-    /// @param payload Bytes needed for 1Inch API
+    /// @notice Allows to swap any token to an accepted collateral via 1Inch Router
+    /// @param payload Bytes needed for 1Inch router to process the swap
+    /// @dev The `payload` given is expected to be obtained from 1Inch API
     function _swapOn1Inch(
         IERC20 inToken,
-        uint256 minAmountOut,
         bytes memory payload
     ) internal returns (uint256 amountOut) {
         // Approve transfer to the `oneInch` router if it is the first time the token is used
@@ -1395,7 +1388,6 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         if (!success) _revertBytes(result);
 
         amountOut = abi.decode(result, (uint256));
-        if (amountOut < minAmountOut) revert TooSmallAmountOut();
     }
 
     /// @notice Internal function used for error handling

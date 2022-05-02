@@ -42,12 +42,31 @@ const config: HardhatUserConfig = {
         settings: {
           optimizer: {
             enabled: true,
-            runs: 1,
+            runs: 1000000,
           },
-          // debug: { revertStrings: 'strip' },
         },
       },
     ],
+    overrides: {
+      'contracts/AngleRouter01.sol': {
+        version: '0.8.12',
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 833,
+          },
+        },
+      },
+      'contracts/mock/OldRouter.sol': {
+        version: '0.8.12',
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 825,
+          },
+        },
+      },
+    },
   },
   defaultNetwork: 'hardhat',
   networks: {
