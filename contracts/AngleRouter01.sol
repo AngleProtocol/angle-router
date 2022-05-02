@@ -173,6 +173,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
     constructor() initializer {}
 
     // Removed the `initialize` function in this implementation since it has already been called and can not be called again
+    // You can check it for context at the end of this contract
 
     // ============================== Modifiers ====================================
 
@@ -687,7 +688,8 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                     );
                 }
                 // Handle stablecoins transfers: the `VaultManager` is called with the `from` address being the `msg.sender`
-                // so we don't need to update the stablecoin balance if stablecoins are given to it from this operation
+                // so we don't need to update the stablecoin balance if stablecoins are given to it from this operation as
+                // the `VaultManager` will call `burnFrom` and will just check that the router has allowance for the `msg.sender`
                 if (
                     paymentData.stablecoinAmountToReceive < paymentData.stablecoinAmountToGive &&
                     (to == address(this) || repayData.length > 0)
@@ -710,11 +712,14 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         }
     }
 
-    /// @notice Wrapper built on top of the mixer function to grant approval to a VaultManager contract before performing
+    /// @notice Wrapper built on top of the base `mixer` function to grant approval to a `VaultManager` contract before performing
     /// actions and then revoking this approval after these actions
     /// @param paramsPermitVaultManager Parameters to sign permit to give allowance to the router for a `VaultManager` contract
     /// @dev In `paramsPermitVaultManager`, the signatures for granting approvals must be given first before the signatures
     /// to revoke approvals
+    /// @dev The router contract has been built to be safe to keep approvals as you cannot take an action on a vault you are not
+    /// approved for, but people wary about their approvals may want to grant it before immediately revoking it, although this
+    /// is just an option
     function mixerVaultManagerPermit(
         PermitVaultManagerType[] memory paramsPermitVaultManager,
         PermitType[] memory paramsPermit,
@@ -1089,7 +1094,8 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         address vaultManager
     ) internal view {
         if (actionsBorrow.length >= _MAX_TOKENS) revert IncompatibleLengths();
-        // The amount of vaults to check should be smaller than the amount of actions
+        // The amount of vaults to check cannot be bigger than the maximum amount of tokens
+        // supported
         uint256[_MAX_TOKENS] memory vaultIDsToCheckOwnershipOf;
         bool createVaultAction;
         uint256 lastVaultID;
@@ -1098,10 +1104,10 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
             uint256 vaultID;
             // If there is a createVault action, the router should not worry about looking at
             // next vaultIDs given equal to 0
-            // There are different ways depending on the action with which vaultIDs are structured
             if (actionsBorrow[i] == ActionBorrowType.createVault) {
                 createVaultAction = true;
                 continue;
+            // There are then different ways depending on the action to find the `vaultID`
             } else if (
                 actionsBorrow[i] == ActionBorrowType.removeCollateral || actionsBorrow[i] == ActionBorrowType.borrow
             ) {
@@ -1117,7 +1123,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                 if (createVaultAction) {
                     continue;
                 } else {
-                    // If we haven't stored the last vaultID, we need to fetch it
+                    // If we haven't stored the last `vaultID`, we need to fetch it
                     if (lastVaultID == 0) {
                         lastVaultID = IVaultManagerStorage(vaultManager).vaultIDCount();
                     }
@@ -1125,9 +1131,10 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                 }
             }
 
-            // Check if this vaultID has already been verified
+            // Check if this `vaultID` has already been verified
             for (uint256 j = 0; j < vaultIDLength; j++) {
                 if (vaultIDsToCheckOwnershipOf[j] == vaultID) {
+                    // If yes, we continue to the next iteration
                     continue;
                 }
             }
@@ -1401,4 +1408,53 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         }
         revert InvalidReturnMessage();
     }
+
+    /* For context, we give here the initialize function that was used for this contract in another implementation
+    /// @notice Deploys the `AngleRouter` contract
+    /// @param _governor Governor address
+    /// @param _guardian Guardian address
+    /// @param _uniswapV3Router UniswapV3 router address
+    /// @param _oneInch 1Inch aggregator address
+    /// @param existingStableMaster Address of the existing `StableMaster`
+    /// @param existingPoolManagers Addresses of the associated poolManagers
+    /// @param existingLiquidityGauges Addresses of liquidity gauge contracts associated to sanTokens
+    /// @dev Be cautious with safe approvals, all tokens will have unlimited approvals within the protocol or
+    /// UniswapV3 and 1Inch
+    function initialize(
+        address _governor,
+        address _guardian,
+        IUniswapV3Router _uniswapV3Router,
+        address _oneInch,
+        IStableMasterFront existingStableMaster,
+        IPoolManager[] calldata existingPoolManagers,
+        ILiquidityGauge[] calldata existingLiquidityGauges
+    ) public initializer {
+        // Checking the parameters passed
+        require(
+            address(_uniswapV3Router) != address(0) &&
+                _oneInch != address(0) &&
+                _governor != address(0) &&
+                _guardian != address(0),
+            "0"
+        );
+        require(_governor != _guardian, "49");
+        require(existingPoolManagers.length == existingLiquidityGauges.length, "104");
+        // Fetching the stablecoin and mapping it to the `StableMaster`
+        mapStableMasters[
+            IERC20(address(IStableMaster(address(existingStableMaster)).agToken()))
+        ] = existingStableMaster;
+        // Setting roles
+        governor = _governor;
+        guardian = _guardian;
+        uniswapV3Router = _uniswapV3Router;
+        oneInch = _oneInch;
+
+        // for veANGLEDeposit action
+        ANGLE.safeApprove(address(VEANGLE), type(uint256).max);
+
+        for (uint256 i = 0; i < existingPoolManagers.length; i++) {
+            _addPair(existingStableMaster, existingPoolManagers[i], existingLiquidityGauges[i]);
+        }
+    }
+    */
 }
