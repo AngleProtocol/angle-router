@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
-pragma solidity ^0.8.7;
+pragma solidity 0.8.12;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
@@ -53,6 +53,10 @@ contract Mock1Inch {
             uint256 gasLeft
         )
     {
+        caller;
+        data;
+        spentAmount;
+        gasLeft;
         tokenA.transferFrom(msg.sender, address(this), desc.amount);
         returnAmount = (((desc.amount * exchangeRate) / 1 ether) * 10**decimalsB) / 10**decimalsA;
         tokenB.transfer(msg.sender, returnAmount);

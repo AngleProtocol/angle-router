@@ -37,6 +37,7 @@ yarn-error.log
 
 # deployments
 deployments/localhost
+deployments/mainnetForkRemote
 
 # bin
 bin

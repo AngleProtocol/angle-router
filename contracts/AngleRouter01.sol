@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
-pragma solidity ^0.8.7;
+pragma solidity 0.8.12;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/draft-IERC20PermitUpgradeable.sol";
@@ -16,7 +16,7 @@ import "./interfaces/IVeANGLE.sol";
 import "./interfaces/external/IWETH9.sol";
 import "./interfaces/external/uniswap/IUniswapRouter.sol";
 import "./interfaces/IVaultManager.sol";
-import "./interfaces/external/lido/IStETH.sol";
+import "./interfaces/external/lido/ISteth.sol";
 import "./interfaces/external/lido/IWStETH.sol";
 
 /// @title Angle Router
@@ -141,59 +141,39 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
 
     uint256[50] private __gap;
 
+    struct PermitVaultManagerType {
+        address vaultManager;
+        address owner;
+        bool approved;
+        uint256 deadline;
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+    }
+
     /// @notice StETH contract
     IStETH public constant STETH = IStETH(0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84);
     /// @notice Wrapped StETH contract
     IWStETH public constant WSTETH = IWStETH(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0);
 
-    // constructor() initializer {}
+    // ============================= Error Messages ================================
 
-    /// @notice Deploys the `AngleRouter` contract
-    /// @param _governor Governor address
-    /// @param _guardian Guardian address
-    /// @param _uniswapV3Router UniswapV3 router address
-    /// @param _oneInch 1Inch aggregator address
-    /// @param existingStableMaster Address of the existing `StableMaster`
-    /// @param existingPoolManagers Addresses of the associated poolManagers
-    /// @param existingLiquidityGauges Addresses of liquidity gauge contracts associated to sanTokens
-    /// @dev Be cautious with safe approvals, all tokens will have unlimited approvals within the protocol or
-    /// UniswapV3 and 1Inch
-    function initialize(
-        address _governor,
-        address _guardian,
-        IUniswapV3Router _uniswapV3Router,
-        address _oneInch,
-        IStableMasterFront existingStableMaster,
-        IPoolManager[] calldata existingPoolManagers,
-        ILiquidityGauge[] calldata existingLiquidityGauges
-    ) public initializer {
-        // Checking the parameters passed
-        require(
-            address(_uniswapV3Router) != address(0) &&
-                _oneInch != address(0) &&
-                _governor != address(0) &&
-                _guardian != address(0),
-            "0"
-        );
-        require(_governor != _guardian, "49");
-        require(existingPoolManagers.length == existingLiquidityGauges.length, "104");
-        // Fetching the stablecoin and mapping it to the `StableMaster`
-        mapStableMasters[
-            IERC20(address(IStableMaster(address(existingStableMaster)).agToken()))
-        ] = existingStableMaster;
-        // Setting roles
-        governor = _governor;
-        guardian = _guardian;
-        uniswapV3Router = _uniswapV3Router;
-        oneInch = _oneInch;
+    error AlreadyAdded();
+    error IncompatibleLengths();
+    error InvalidAddress();
+    error InvalidCall();
+    error InvalidConditions();
+    error InvalidReturnMessage();
+    error InvalidToken();
+    error NotApprovedOrOwner();
+    error NotGovernorOrGuardian();
+    error TooSmallAmountOut();
+    error ZeroAddress();
 
-        // for veANGLEDeposit action
-        ANGLE.safeApprove(address(VEANGLE), type(uint256).max);
+    constructor() initializer {}
 
-        for (uint256 i = 0; i < existingPoolManagers.length; i++) {
-            _addPair(existingStableMaster, existingPoolManagers[i], existingLiquidityGauges[i]);
-        }
-    }
+    // Removed the `initialize` function in this implementation since it has already been called and can not be called again
+    // You can check it for context at the end of this contract
 
     // ============================== Modifiers ====================================
 
@@ -201,7 +181,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
     /// @dev There is no Access Control here, because it can be handled cheaply through this modifier
     /// @dev In this contract, the `governor` and the `guardian` address have exactly similar rights
     modifier onlyGovernorOrGuardian() {
-        require(msg.sender == governor || msg.sender == guardian, "115");
+        if (msg.sender != governor && msg.sender != guardian) revert NotGovernorOrGuardian();
         _;
     }
 
@@ -213,8 +193,8 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
     /// @dev There can only be one guardian and one governor address in the router
     /// and both need to be different
     function setGovernorOrGuardian(address admin, bool setGovernor) external onlyGovernorOrGuardian {
-        require(admin != address(0), "0");
-        require(guardian != admin && governor != admin, "49");
+        if (admin == address(0)) revert ZeroAddress();
+        if (guardian == admin || governor == admin) revert InvalidAddress();
         if (setGovernor) governor = admin;
         else guardian = admin;
         emit AdminChanged(admin, setGovernor);
@@ -226,9 +206,9 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
     function addStableMaster(IERC20 stablecoin, IStableMasterFront stableMaster) external onlyGovernorOrGuardian {
         // No need to check if the `stableMaster` address is a zero address as otherwise the call to `stableMaster.agToken()`
         // would revert
-        require(address(stablecoin) != address(0), "0");
-        require(address(mapStableMasters[stablecoin]) == address(0), "114");
-        require(stableMaster.agToken() == address(stablecoin), "20");
+        if (address(stablecoin) == address(0)) revert ZeroAddress();
+        if (address(mapStableMasters[stablecoin]) != address(0)) revert AlreadyAdded();
+        if (stableMaster.agToken() != address(stablecoin)) revert InvalidToken();
         mapStableMasters[stablecoin] = stableMaster;
         emit StablecoinAdded(address(stableMaster));
     }
@@ -253,7 +233,8 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         IPoolManager[] calldata poolManagers,
         ILiquidityGauge[] calldata liquidityGauges
     ) external onlyGovernorOrGuardian {
-        require(poolManagers.length == stablecoins.length && liquidityGauges.length == stablecoins.length, "104");
+        if (poolManagers.length != stablecoins.length || liquidityGauges.length != stablecoins.length)
+            revert IncompatibleLengths();
         for (uint256 i = 0; i < stablecoins.length; i++) {
             IStableMasterFront stableMaster = mapStableMasters[stablecoins[i]];
             _addPair(stableMaster, poolManagers[i], liquidityGauges[i]);
@@ -272,7 +253,8 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         IERC20[] calldata collaterals,
         IStableMasterFront[] calldata stableMasters
     ) external onlyGovernorOrGuardian {
-        require(collaterals.length == stablecoins.length && stableMasters.length == collaterals.length, "104");
+        if (collaterals.length != stablecoins.length || stableMasters.length != collaterals.length)
+            revert IncompatibleLengths();
         Pairs memory pairs;
         IStableMasterFront stableMaster;
         for (uint256 i = 0; i < stablecoins.length; i++) {
@@ -303,20 +285,21 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         IERC20[] calldata collaterals,
         ILiquidityGauge[] calldata newLiquidityGauges
     ) external onlyGovernorOrGuardian {
-        require(collaterals.length == stablecoins.length && newLiquidityGauges.length == stablecoins.length, "104");
+        if (collaterals.length != stablecoins.length || newLiquidityGauges.length != stablecoins.length)
+            revert IncompatibleLengths();
         for (uint256 i = 0; i < stablecoins.length; i++) {
             IStableMasterFront stableMaster = mapStableMasters[stablecoins[i]];
             Pairs storage pairs = mapPoolManagers[stableMaster][collaterals[i]];
             ILiquidityGauge gauge = pairs.gauge;
             ISanToken sanToken = pairs.sanToken;
-            require(address(stableMaster) != address(0) && address(pairs.poolManager) != address(0), "0");
+            if (address(stableMaster) == address(0) || address(pairs.poolManager) == address(0)) revert ZeroAddress();
             pairs.gauge = newLiquidityGauges[i];
             if (address(gauge) != address(0)) {
                 sanToken.approve(address(gauge), 0);
             }
             if (address(newLiquidityGauges[i]) != address(0)) {
                 // Checking compatibility of the staking token: it should be the sanToken
-                require(address(newLiquidityGauges[i].staking_token()) == address(sanToken), "20");
+                if (address(newLiquidityGauges[i].staking_token()) != address(sanToken)) revert InvalidToken();
                 sanToken.approve(address(newLiquidityGauges[i]), type(uint256).max);
             }
             emit SanTokenLiquidityGaugeUpdated(address(sanToken), address(newLiquidityGauges[i]));
@@ -334,7 +317,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         address[] calldata spenders,
         uint256[] calldata amounts
     ) external onlyGovernorOrGuardian {
-        require(tokens.length == spenders.length && tokens.length == amounts.length, "104");
+        if (tokens.length != spenders.length || tokens.length != amounts.length) revert IncompatibleLengths();
         for (uint256 i = 0; i < tokens.length; i++) {
             _changeAllowance(tokens[i], spenders[i], amounts[i]);
         }
@@ -373,7 +356,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         uint256[] memory perpetualIDs,
         address[] memory stablecoins,
         address[] memory collaterals
-    ) external nonReentrant {
+    ) external {
         _claimRewards(gaugeUser, liquidityGauges, perpetualIDs, false, stablecoins, collaterals);
     }
 
@@ -390,26 +373,11 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         address[] memory liquidityGauges,
         uint256[] memory perpetualIDs,
         address[] memory perpetualManagers
-    ) external nonReentrant {
+    ) external {
         _claimRewards(user, liquidityGauges, perpetualIDs, true, new address[](perpetualIDs.length), perpetualManagers);
     }
 
-    /// @notice Wrapper built on top of the `_gaugeDeposit` method to deposit collateral in a gauge
-    /// @param token On top of the parameters of the internal function, users need to specify the token associated
-    /// to the gauge they want to deposit in
-    /// @dev The function will revert if the token does not correspond to the gauge
-    function gaugeDeposit(
-        address user,
-        uint256 amount,
-        ILiquidityGauge gauge,
-        bool shouldClaimRewards,
-        IERC20 token
-    ) external nonReentrant {
-        token.safeTransferFrom(msg.sender, address(this), amount);
-        _gaugeDeposit(user, amount, gauge, shouldClaimRewards);
-    }
-
-    /// @notice Wrapper n°1 built on top of the `_mint` method to mint stablecoins
+    /// @notice Wrapper built on top of the `_mint` method to mint stablecoins
     /// @param user Address to send the stablecoins to
     /// @param amount Amount of collateral to use for the mint
     /// @param minStableAmount Minimum stablecoin minted for the tx not to revert
@@ -421,28 +389,9 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         uint256 minStableAmount,
         address stablecoin,
         address collateral
-    ) external nonReentrant {
+    ) external {
         IERC20(collateral).safeTransferFrom(msg.sender, address(this), amount);
         _mint(user, amount, minStableAmount, false, stablecoin, collateral, IPoolManager(address(0)));
-    }
-
-    /// @notice Wrapper n°2 (a little more gas efficient than n°1) built on top of the `_mint` method to mint stablecoins
-    /// @param user Address to send the stablecoins to
-    /// @param amount Amount of collateral to use for the mint
-    /// @param minStableAmount Minimum stablecoin minted for the tx not to revert
-    /// @param stableMaster Address of the stableMaster managing the stablecoin to mint
-    /// @param collateral Collateral to mint from
-    /// @param poolManager PoolManager associated to the `collateral`
-    function mint(
-        address user,
-        uint256 amount,
-        uint256 minStableAmount,
-        address stableMaster,
-        address collateral,
-        address poolManager
-    ) external nonReentrant {
-        IERC20(collateral).safeTransferFrom(msg.sender, address(this), amount);
-        _mint(user, amount, minStableAmount, true, stableMaster, collateral, IPoolManager(poolManager));
     }
 
     /// @notice Wrapper built on top of the `_burn` method to burn stablecoins
@@ -457,94 +406,8 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         uint256 minCollatAmount,
         address stablecoin,
         address collateral
-    ) external nonReentrant {
+    ) external {
         _burn(dest, amount, minCollatAmount, false, stablecoin, collateral, IPoolManager(address(0)));
-    }
-
-    /// @notice Wrapper n°1 built on top of the `_deposit` method to deposit collateral as a SLP in the protocol
-    /// Allows to deposit a collateral within the protocol
-    /// @param user Address where to send the resulting sanTokens, if this address is the router address then it means
-    /// that the intention is to stake the sanTokens obtained in a subsequent `gaugeDeposit` action
-    /// @param amount Amount of collateral to deposit
-    /// @param stablecoin `StableMaster` associated to the sanToken
-    /// @param collateral Token to deposit
-    /// @dev Contrary to the `mint` action, the `deposit` action can be used in composition with other actions, like
-    /// `deposit` and then `stake
-    function deposit(
-        address user,
-        uint256 amount,
-        address stablecoin,
-        address collateral
-    ) external nonReentrant {
-        IERC20(collateral).safeTransferFrom(msg.sender, address(this), amount);
-        _deposit(user, amount, false, stablecoin, collateral, IPoolManager(address(0)), ISanToken(address(0)));
-    }
-
-    /// @notice Wrapper n°2 (a little more gas efficient than n°1) built on top of the `_deposit` method to deposit collateral as a SLP in the protocol
-    /// Allows to deposit a collateral within the protocol
-    /// @param user Address where to send the resulting sanTokens, if this address is the router address then it means
-    /// that the intention is to stake the sanTokens obtained in a subsequent `gaugeDeposit` action
-    /// @param amount Amount of collateral to deposit
-    /// @param stableMaster `StableMaster` associated to the sanToken
-    /// @param collateral Token to deposit
-    /// @param poolManager PoolManager associated to the sanToken
-    /// @param sanToken SanToken associated to the `collateral` and `stableMaster`
-    /// @dev Contrary to the `mint` action, the `deposit` action can be used in composition with other actions, like
-    /// `deposit` and then `stake`
-    function deposit(
-        address user,
-        uint256 amount,
-        address stableMaster,
-        address collateral,
-        IPoolManager poolManager,
-        ISanToken sanToken
-    ) external nonReentrant {
-        IERC20(collateral).safeTransferFrom(msg.sender, address(this), amount);
-        _deposit(user, amount, true, stableMaster, collateral, poolManager, sanToken);
-    }
-
-    /// @notice Wrapper built on top of the `_openPerpetual` method to open a perpetual with the protocol
-    /// @param collateral Here the collateral should not be null (even if `addressProcessed` is true) for the router
-    /// to be able to know how to deposit collateral
-    /// @dev `stablecoinOrPerpetualManager` should be the address of the agToken (= stablecoin) is `addressProcessed` is false
-    ///  and the associated `perpetualManager` otherwise
-    function openPerpetual(
-        address owner,
-        uint256 margin,
-        uint256 amountCommitted,
-        uint256 maxOracleRate,
-        uint256 minNetMargin,
-        bool addressProcessed,
-        address stablecoinOrPerpetualManager,
-        address collateral
-    ) external nonReentrant {
-        IERC20(collateral).safeTransferFrom(msg.sender, address(this), margin);
-        _openPerpetual(
-            owner,
-            margin,
-            amountCommitted,
-            maxOracleRate,
-            minNetMargin,
-            addressProcessed,
-            stablecoinOrPerpetualManager,
-            collateral
-        );
-    }
-
-    /// @notice Wrapper built on top of the `_addToPerpetual` method to add collateral to a perpetual with the protocol
-    /// @param collateral Here the collateral should not be null (even if `addressProcessed is true) for the router
-    /// to be able to know how to deposit collateral
-    /// @dev `stablecoinOrPerpetualManager` should be the address of the agToken is `addressProcessed` is false and the associated
-    /// `perpetualManager` otherwise
-    function addToPerpetual(
-        uint256 margin,
-        uint256 perpetualID,
-        bool addressProcessed,
-        address stablecoinOrPerpetualManager,
-        address collateral
-    ) external nonReentrant {
-        IERC20(collateral).safeTransferFrom(msg.sender, address(this), margin);
-        _addToPerpetual(margin, perpetualID, addressProcessed, stablecoinOrPerpetualManager, collateral);
     }
 
     /// @notice Allows composable calls to different functions within the protocol
@@ -577,7 +440,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         ParamsSwapType[] memory paramsSwap,
         ActionType[] memory actions,
         bytes[] calldata data
-    ) external payable nonReentrant {
+    ) public payable {
         // Do all the permits once for all: if all tokens have already been approved, there's no need for this step
         for (uint256 i = 0; i < paramsPermit.length; i++) {
             IERC20PermitUpgradeable(paramsPermit[i].token).permit(
@@ -780,7 +643,17 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                         data[i],
                         (address, address, address, address, address, ActionBorrowType[], bytes[], bytes)
                     );
+                _parseVaultIDs(actionsBorrow, dataBorrow, vaultManager);
                 _changeAllowance(IERC20(collateral), address(vaultManager), type(uint256).max);
+                uint256 stablecoinBalance;
+                uint256 collateralBalance;
+                // In this case, this may mean that the `VaultManager` will engage in some way in a swap of stablecoins
+                // or collateral and we should not trust the amounts outputted by the `_angleBorrower` function as the true amounts
+                if (repayData.length > 0) {
+                    stablecoinBalance = IERC20(stablecoin).balanceOf(address(this));
+                    collateralBalance = IERC20(collateral).balanceOf(address(this));
+                }
+
                 PaymentData memory paymentData = _angleBorrower(
                     vaultManager,
                     actionsBorrow,
@@ -789,14 +662,23 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                     who,
                     repayData
                 );
+
                 _changeAllowance(IERC20(collateral), address(vaultManager), 0);
 
-                // handle collateral transfers
+                if (repayData.length > 0) {
+                    paymentData.collateralAmountToGive = IERC20(collateral).balanceOf(address(this));
+                    paymentData.stablecoinAmountToGive = IERC20(stablecoin).balanceOf(address(this));
+                    paymentData.collateralAmountToReceive = collateralBalance;
+                    paymentData.stablecoinAmountToReceive = stablecoinBalance;
+                }
+
+                // Handle collateral transfers
                 if (paymentData.collateralAmountToReceive > paymentData.collateralAmountToGive) {
                     uint256 index = _searchList(listTokens, collateral);
                     balanceTokens[index] -= paymentData.collateralAmountToReceive - paymentData.collateralAmountToGive;
                 } else if (
-                    paymentData.collateralAmountToReceive < paymentData.collateralAmountToGive && to == address(this)
+                    paymentData.collateralAmountToReceive < paymentData.collateralAmountToGive &&
+                    (to == address(this) || repayData.length > 0)
                 ) {
                     _addToList(
                         listTokens,
@@ -805,8 +687,13 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                         paymentData.collateralAmountToGive - paymentData.collateralAmountToReceive
                     );
                 }
-                // handle stablecoins transfers
-                if (paymentData.stablecoinAmountToGive > paymentData.stablecoinAmountToReceive && to == address(this)) {
+                // Handle stablecoins transfers: the `VaultManager` is called with the `from` address being the `msg.sender`
+                // so we don't need to update the stablecoin balance if stablecoins are given to it from this operation as
+                // the `VaultManager` will call `burnFrom` and will just check that the router has allowance for the `msg.sender`
+                if (
+                    paymentData.stablecoinAmountToReceive < paymentData.stablecoinAmountToGive &&
+                    (to == address(this) || repayData.length > 0)
+                ) {
                     _addToList(
                         listTokens,
                         balanceTokens,
@@ -818,10 +705,57 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         }
 
         // Once all actions have been performed, the router sends back the unused funds from users
-        // If a user sends funds (through a swap) but specifies incorrectly the collateral associated to it, then the mixer will revert
-        // When trying to send remaining funds back
+        // If a user sends funds (through a swap) but specifies incorrectly the collateral associated to it, then
+        //  the mixer will revert when trying to send the remaining funds back
         for (uint256 i = 0; i < balanceTokens.length; i++) {
             if (balanceTokens[i] > 0) IERC20(listTokens[i]).safeTransfer(msg.sender, balanceTokens[i]);
+        }
+    }
+
+    /// @notice Wrapper built on top of the base `mixer` function to grant approval to a `VaultManager` contract before performing
+    /// actions and then revoking this approval after these actions
+    /// @param paramsPermitVaultManager Parameters to sign permit to give allowance to the router for a `VaultManager` contract
+    /// @dev In `paramsPermitVaultManager`, the signatures for granting approvals must be given first before the signatures
+    /// to revoke approvals
+    /// @dev The router contract has been built to be safe to keep approvals as you cannot take an action on a vault you are not
+    /// approved for, but people wary about their approvals may want to grant it before immediately revoking it, although this
+    /// is just an option
+    function mixerVaultManagerPermit(
+        PermitVaultManagerType[] memory paramsPermitVaultManager,
+        PermitType[] memory paramsPermit,
+        TransferType[] memory paramsTransfer,
+        ParamsSwapType[] memory paramsSwap,
+        ActionType[] memory actions,
+        bytes[] calldata data
+    ) external payable {
+        for (uint256 i = 0; i < paramsPermitVaultManager.length; i++) {
+            if (paramsPermitVaultManager[i].approved) {
+                IVaultManagerFunctions(paramsPermitVaultManager[i].vaultManager).permit(
+                    paramsPermitVaultManager[i].owner,
+                    address(this),
+                    true,
+                    paramsPermitVaultManager[i].deadline,
+                    paramsPermitVaultManager[i].v,
+                    paramsPermitVaultManager[i].r,
+                    paramsPermitVaultManager[i].s
+                );
+            } else break;
+        }
+        mixer(paramsPermit, paramsTransfer, paramsSwap, actions, data);
+        // Storing the index at which starting the iteration for revoking approvals in a variable would make the stack
+        // too deep
+        for (uint256 i = 0; i < paramsPermitVaultManager.length; i++) {
+            if (!paramsPermitVaultManager[i].approved) {
+                IVaultManagerFunctions(paramsPermitVaultManager[i].vaultManager).permit(
+                    paramsPermitVaultManager[i].owner,
+                    address(this),
+                    false,
+                    paramsPermitVaultManager[i].deadline,
+                    paramsPermitVaultManager[i].v,
+                    paramsPermitVaultManager[i].r,
+                    paramsPermitVaultManager[i].s
+                );
+            }
         }
     }
 
@@ -851,10 +785,8 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         address[] memory stablecoins,
         address[] memory collateralsOrPerpetualManagers
     ) internal {
-        require(
-            stablecoins.length == perpetualIDs.length && collateralsOrPerpetualManagers.length == perpetualIDs.length,
-            "104"
-        );
+        if (stablecoins.length != perpetualIDs.length || collateralsOrPerpetualManagers.length != perpetualIDs.length)
+            revert IncompatibleLengths();
 
         for (uint256 i = 0; i < liquidityGauges.length; i++) {
             ILiquidityGauge(liquidityGauges[i]).claim_rewards(gaugeUser);
@@ -1150,6 +1082,71 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
 
     // ======================== Internal Utility Functions =========================
 
+    /// @notice Parses the actions submitted to the router contract to interact with a `VaultManager` and makes sure that
+    /// the calling address is well approved for all the vaults with which it is interacting
+    /// @dev If such check was not made, we could end up in a situation where an address has given an approval for all its
+    /// vaults to the router contract, and another address takes advantage of this to instruct actions on these other vaults
+    /// to the router: it is hence super important for the router to pay attention to the fact that the addresses interacting
+    /// with a vault are approved for this vault
+    function _parseVaultIDs(
+        ActionBorrowType[] memory actionsBorrow,
+        bytes[] memory dataBorrow,
+        address vaultManager
+    ) internal view {
+        if (actionsBorrow.length >= _MAX_TOKENS) revert IncompatibleLengths();
+        // The amount of vaults to check cannot be bigger than the maximum amount of tokens
+        // supported
+        uint256[_MAX_TOKENS] memory vaultIDsToCheckOwnershipOf;
+        bool createVaultAction;
+        uint256 lastVaultID;
+        uint256 vaultIDLength;
+        for (uint256 i = 0; i < actionsBorrow.length; i++) {
+            uint256 vaultID;
+            // If there is a createVault action, the router should not worry about looking at
+            // next vaultIDs given equal to 0
+            if (actionsBorrow[i] == ActionBorrowType.createVault) {
+                createVaultAction = true;
+                continue;
+            // There are then different ways depending on the action to find the `vaultID`
+            } else if (
+                actionsBorrow[i] == ActionBorrowType.removeCollateral || actionsBorrow[i] == ActionBorrowType.borrow
+            ) {
+                (vaultID, ) = abi.decode(dataBorrow[i], (uint256, uint256));
+            } else if (actionsBorrow[i] == ActionBorrowType.closeVault) {
+                vaultID = abi.decode(dataBorrow[i], (uint256));
+            } else if (actionsBorrow[i] == ActionBorrowType.getDebtIn) {
+                (vaultID, , , ) = abi.decode(dataBorrow[i], (uint256, address, uint256, uint256));
+            } else continue;
+            // If we need to add a null `vaultID`, we look at the `vaultIDCount` in the `VaultManager`
+            // if there has not been any specific action
+            if (vaultID == 0) {
+                if (createVaultAction) {
+                    continue;
+                } else {
+                    // If we haven't stored the last `vaultID`, we need to fetch it
+                    if (lastVaultID == 0) {
+                        lastVaultID = IVaultManagerStorage(vaultManager).vaultIDCount();
+                    }
+                    vaultID = lastVaultID;
+                }
+            }
+
+            // Check if this `vaultID` has already been verified
+            for (uint256 j = 0; j < vaultIDLength; j++) {
+                if (vaultIDsToCheckOwnershipOf[j] == vaultID) {
+                    // If yes, we continue to the next iteration
+                    continue;
+                }
+            }
+            // Verify this new vaultID and add it to the list
+            if (!IVaultManagerFunctions(vaultManager).isApprovedOrOwner(msg.sender, vaultID)) {
+                revert NotApprovedOrOwner();
+            }
+            vaultIDsToCheckOwnershipOf[vaultIDLength] = vaultID;
+            vaultIDLength += 1;
+        }
+    }
+
     /// @notice Checks if collateral in the list
     /// @param list List of addresses
     /// @param searchFor Address of interest
@@ -1197,7 +1194,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         uint256 index = _searchList(list, searchFor);
 
         // Reverts if the index was not found
-        require(list[index] != address(0), "33");
+        if (list[index] == address(0)) revert InvalidConditions();
 
         amount = (proportion * balances[index]) / BASE_PARAMS;
         balances[index] -= amount;
@@ -1220,7 +1217,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         // and `pairs.sanToken` will be zero
         // Last, if any of `pairs.perpetualManager`, `pairs.poolManager` or `pairs.sanToken` is zero, this means
         // that all others should be null from the `addPairs` and `removePairs` functions which keep this invariant
-        require(address(stableMaster) != address(0) && address(pairs.poolManager) != address(0), "0");
+        if (address(stableMaster) == address(0) || address(pairs.poolManager) == address(0)) revert ZeroAddress();
 
         return (stableMaster, pairs);
     }
@@ -1266,14 +1263,14 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         Pairs storage _pairs = mapPoolManagers[stableMaster][collateral];
         // Checking if the pair has not already been initialized: if yes we need to make the function revert
         // otherwise we could end up with still approved `PoolManager` and `PerpetualManager` contracts
-        require(address(_pairs.poolManager) == address(0), "114");
+        if (address(_pairs.poolManager) != address(0)) revert AlreadyAdded();
 
         _pairs.poolManager = poolManager;
         _pairs.perpetualManager = IPerpetualManagerFrontWithClaim(address(perpetualManager));
         _pairs.sanToken = sanToken;
         // In the future, it is possible that sanTokens do not have an associated liquidity gauge
         if (address(liquidityGauge) != address(0)) {
-            require(address(sanToken) == liquidityGauge.staking_token(), "20");
+            if (address(sanToken) != liquidityGauge.staking_token()) revert InvalidToken();
             _pairs.gauge = liquidityGauge;
             sanToken.approve(address(liquidityGauge), type(uint256).max);
         }
@@ -1321,6 +1318,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                 WETH9.deposit{ value: amount }(); // wrap only what is needed to pay
             } else if (address(inToken) == address(WSTETH)) {
                 uint256 amountOut = STETH.getSharesByPooledEth(amount);
+                //solhint-disable-next-line
                 (bool success, bytes memory result) = address(WSTETH).call{ value: amount }("");
                 if (!success) _revertBytes(result);
                 amount = amountOut;
@@ -1344,17 +1342,11 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         bytes memory args
     ) internal returns (uint256 amountOut) {
         if (swapType == SwapType.UniswapV3) amountOut = _swapOnUniswapV3(inToken, amount, minAmountOut, args);
-        else if (swapType == SwapType.oneINCH) amountOut = _swapOn1Inch(inToken, minAmountOut, args);
-        else if (swapType == SwapType.WrapStETH) amountOut = _wrapStETH(amount, minAmountOut);
+        else if (swapType == SwapType.oneINCH) amountOut = _swapOn1Inch(inToken, args);
+        else if (swapType == SwapType.WrapStETH) amountOut = WSTETH.wrap(amount);
         else if (swapType == SwapType.None) amountOut = amount;
-        else require(false, "3");
-
-        return amountOut;
-    }
-
-    function _wrapStETH(uint256 amount, uint256 minAmountOut) internal returns (uint256 amountOut) {
-        amountOut = WSTETH.wrap(amount);
-        require(amountOut >= minAmountOut, "15");
+        else revert InvalidCall();
+        if (amountOut < minAmountOut) revert TooSmallAmountOut();
     }
 
     /// @notice Allows to swap any token to an accepted collateral via UniswapV3 (if there is a path)
@@ -1378,12 +1370,11 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         );
     }
 
-    /// @notice Allows to swap any token to an accepted collateral via 1Inch API
-    /// @param minAmountOut Minimum amount accepted for the swap to happen
-    /// @param payload Bytes needed for 1Inch API
+    /// @notice Allows to swap any token to an accepted collateral via 1Inch Router
+    /// @param payload Bytes needed for 1Inch router to process the swap
+    /// @dev The `payload` given is expected to be obtained from 1Inch API
     function _swapOn1Inch(
         IERC20 inToken,
-        uint256 minAmountOut,
         bytes memory payload
     ) internal returns (uint256 amountOut) {
         // Approve transfer to the `oneInch` router if it is the first time the token is used
@@ -1397,7 +1388,6 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         if (!success) _revertBytes(result);
 
         amountOut = abi.decode(result, (uint256));
-        require(amountOut >= minAmountOut, "15");
     }
 
     /// @notice Internal function used for error handling
@@ -1408,6 +1398,55 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                 revert(add(32, errMsg), mload(errMsg))
             }
         }
-        revert("117");
+        revert InvalidReturnMessage();
     }
+
+    /* For context, we give here the initialize function that was used for this contract in another implementation
+    /// @notice Deploys the `AngleRouter` contract
+    /// @param _governor Governor address
+    /// @param _guardian Guardian address
+    /// @param _uniswapV3Router UniswapV3 router address
+    /// @param _oneInch 1Inch aggregator address
+    /// @param existingStableMaster Address of the existing `StableMaster`
+    /// @param existingPoolManagers Addresses of the associated poolManagers
+    /// @param existingLiquidityGauges Addresses of liquidity gauge contracts associated to sanTokens
+    /// @dev Be cautious with safe approvals, all tokens will have unlimited approvals within the protocol or
+    /// UniswapV3 and 1Inch
+    function initialize(
+        address _governor,
+        address _guardian,
+        IUniswapV3Router _uniswapV3Router,
+        address _oneInch,
+        IStableMasterFront existingStableMaster,
+        IPoolManager[] calldata existingPoolManagers,
+        ILiquidityGauge[] calldata existingLiquidityGauges
+    ) public initializer {
+        // Checking the parameters passed
+        require(
+            address(_uniswapV3Router) != address(0) &&
+                _oneInch != address(0) &&
+                _governor != address(0) &&
+                _guardian != address(0),
+            "0"
+        );
+        require(_governor != _guardian, "49");
+        require(existingPoolManagers.length == existingLiquidityGauges.length, "104");
+        // Fetching the stablecoin and mapping it to the `StableMaster`
+        mapStableMasters[
+            IERC20(address(IStableMaster(address(existingStableMaster)).agToken()))
+        ] = existingStableMaster;
+        // Setting roles
+        governor = _governor;
+        guardian = _guardian;
+        uniswapV3Router = _uniswapV3Router;
+        oneInch = _oneInch;
+
+        // for veANGLEDeposit action
+        ANGLE.safeApprove(address(VEANGLE), type(uint256).max);
+
+        for (uint256 i = 0; i < existingPoolManagers.length; i++) {
+            _addPair(existingStableMaster, existingPoolManagers[i], existingLiquidityGauges[i]);
+        }
+    }
+    */
 }

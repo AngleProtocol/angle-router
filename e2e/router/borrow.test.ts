@@ -64,7 +64,7 @@ let vaultManagerA: MockVaultManager;
 let vaultManagerB: MockVaultManager;
 
 // Testing Angle Router
-describe('AngleRouter01 - borrower', () => {
+describe('AngleRouter - borrower', () => {
   beforeEach(async () => {
     ({ deployer, governor, user, alice: cleanAddress, bob: treasury, user2 } = await ethers.getNamedSigners());
 

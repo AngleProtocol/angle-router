@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
-pragma solidity ^0.8.7;
+pragma solidity 0.8.12;
 
 import "../interfaces/ILiquidityGauge.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -43,16 +43,22 @@ contract MockLiquidityGauge is ILiquidityGauge {
         // solhint-disable-next-line
         bool _claim_rewards
     ) external pure override {
+        _value;
+        _addr;
+        _claim_rewards;
         return;
     }
 
     // solhint-disable-next-line
     function claim_rewards(address _addr) external pure override {
+        _addr;
         return;
     }
 
     // solhint-disable-next-line
     function claim_rewards(address _addr, address _receiver) external pure override {
+        _addr;
+        _receiver;
         return;
     }
 }

@@ -131,7 +131,7 @@ export async function invariantFundsUser(): Promise<void> {
 }
 
 // Testing Angle Router
-describe('AngleRouter01 - functionalities', () => {
+describe('AngleRouter - functionalities', () => {
   before(async () => {
     [deployer, guardian, user, user2, governor, cleanAddress, burner] = await ethers.getSigners();
 
@@ -161,12 +161,15 @@ describe('AngleRouter01 - functionalities', () => {
       sanToken: sanTokenWBTC,
       perpetualManager: perpEURWBTC,
     } = await initCollateral('wBTC', stableMasterEUR, ANGLE, deployer, wBTCdecimal, wBTCORACLEUSD, 0));
-    ({
-      token: DAI,
-      manager: managerDAI,
-      sanToken: sanTokenDAI,
-      perpetualManager: perpEURDAI,
-    } = await initCollateral('DAI', stableMasterEUR, ANGLE, deployer, DAIdecimal, DAIORACLEUSD, 0));
+    ({ token: DAI, manager: managerDAI, sanToken: sanTokenDAI, perpetualManager: perpEURDAI } = await initCollateral(
+      'DAI',
+      stableMasterEUR,
+      ANGLE,
+      deployer,
+      DAIdecimal,
+      DAIORACLEUSD,
+      0,
+    ));
 
     ({ gauge: gaugeSanEURWBTC } = await initGauge(sanTokenWBTC.address, governor, ANGLE, veANGLE, veBoostProxy));
     ({ gauge: gaugeSanEURDAI } = await initGauge(sanTokenDAI.address, governor, ANGLE, veANGLE, veBoostProxy));

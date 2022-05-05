@@ -2,7 +2,7 @@
 
 // Forked from https://github.com/compound-finance/compound-protocol/tree/master/contracts/Governance
 
-pragma solidity ^0.8.7;
+pragma solidity 0.8.12;
 
 interface ITimelock {
     function delay() external view returns (uint256);

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
-pragma solidity ^0.8.7;
+pragma solidity 0.8.12;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./ITreasury.sol";
@@ -85,6 +85,28 @@ interface IVaultManagerFunctions {
         address who,
         bytes memory repayData
     ) external payable returns (PaymentData memory paymentData);
+
+    /// @notice Checks whether a given address is approved for a vault or owns this vault
+    /// @param spender Address for which vault ownership should be checked
+    /// @param vaultID ID of the vault to check
+    /// @return Whether the `spender` address owns or is approved for `vaultID`
+    function isApprovedOrOwner(address spender, uint256 vaultID) external view returns (bool);
+
+    /// @notice Allows an address to give or revoke approval for all its vaults to another address
+    /// @param owner Address signing the permit and giving (or revoking) its approval for all the controlled vaults
+    /// @param spender Address to give approval to
+    /// @param approved Whether to give or revoke the approval
+    /// @param deadline Deadline parameter for the signature to be valid
+    /// @dev The `v`, `r`, and `s` parameters are used as signature data
+    function permit(
+        address owner,
+        address spender,
+        bool approved,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external;
 }
 
 /// @title IVaultManagerStorage
@@ -98,4 +120,8 @@ interface IVaultManagerStorage {
 
     /// @notice Reference to the collateral handled by this `VaultManager`
     function collateral() external view returns (IERC20);
+
+    /// @notice ID of the last vault created. The `vaultIDCount` variables serves as a counter to generate a unique
+    /// `vaultID` for each vault: it is like `tokenID` in basic ERC721 contracts
+    function vaultIDCount() external view returns (uint256);
 }

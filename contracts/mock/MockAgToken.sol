@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
-pragma solidity 0.8.7;
+pragma solidity 0.8.12;
 
 import "../interfaces/IAgToken.sol";
 import "../interfaces/IStableMaster.sol";
@@ -35,7 +35,6 @@ contract MockAgToken is IAgToken, ERC20PermitUpgradeable {
     ) external initializer {
         __ERC20Permit_init(name_);
         __ERC20_init(name_, symbol_);
-        require(stableMaster_ != address(0), "0");
         stableMaster = stableMaster_;
         treasury = _treasury;
         isMinter[stableMaster] = true;

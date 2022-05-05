@@ -128,7 +128,7 @@ export async function invariantFundsUser(): Promise<void> {
 }
 
 // Testing Angle Router
-describe('AngleRouter01 - init & access control', () => {
+describe('AngleRouter - init & access control', () => {
   before(async () => {
     [deployer, guardian, user, user2, cleanAddress] = await ethers.getSigners();
     const governorAddress = '0xdC4e6DFe07EFCa50a197DF15D9200883eF4Eb1c8';
@@ -173,22 +173,17 @@ describe('AngleRouter01 - init & access control', () => {
     } = await initCollateral(
       'wBTC',
       stableMasterEUR,
-      ANGLE as unknown as MockANGLE,
+      (ANGLE as unknown) as MockANGLE,
       governor,
       wBTCdecimal,
       wBTCORACLEUSD,
       0,
       false,
     ));
-    ({
-      token: DAI,
-      manager: managerDAI,
-      sanToken: sanTokenDAI,
-      perpetualManager: perpEURDAI,
-    } = await initCollateral(
+    ({ token: DAI, manager: managerDAI, sanToken: sanTokenDAI, perpetualManager: perpEURDAI } = await initCollateral(
       'DAI',
       stableMasterEUR,
-      ANGLE as unknown as MockANGLE,
+      (ANGLE as unknown) as MockANGLE,
       governor,
       DAIdecimal,
       DAIORACLEUSD,
