@@ -6,8 +6,9 @@
   "scripts": {
     "compile": "hardhat compile",
     "coverage": "hardhat coverage",
+    "deploy:mainnet": "hardhat deploy --network mainnet --tags routerUpgrade",
     "deploy:rinkeby": "hardhat deploy --network rinkeby --tags unpausing",
-    "deploy:rinkeby:router": "hardhat deploy --network rinkeby --tags angleRouter",
+    "deploy:rinkeby:router": "hardhat deploy --network rinkeby --tags routerUpgrade",
     "etherscan:mainnet": "hardhat --network mainnet etherscan-verify",
     "etherscan:rinkeby": "hardhat --network rinkeby etherscan-verify",
     "generate-types-from-abis": "yarn contracts:generate-types-from-abis && yarn core:generate-types-from-abis",
