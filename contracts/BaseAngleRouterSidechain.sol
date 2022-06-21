@@ -100,7 +100,7 @@ abstract contract BaseAngleRouterSidechain is Initializable {
     /// @notice Deploys the `AngleRouter` contract on a chain
     /// @param _core CoreBorrow contract address
     function _initialize(address _core) internal initializer {
-        if (_core != address(0)) revert ZeroAddress();
+        if (_core == address(0)) revert ZeroAddress();
         core = ICoreBorrow(_core);
     }
 
@@ -532,6 +532,9 @@ abstract contract BaseAngleRouterSidechain is Initializable {
             token.safeIncreaseAllowance(spender, amount - currentAllowance);
         } else if (currentAllowance > amount) {
             token.safeDecreaseAllowance(spender, currentAllowance - amount);
+            // Clean mappings if allowance decreases for Uniswap, 1Inch
+            if (spender == address(uniswapV3Router)) delete uniAllowedToken[token];
+            else if (spender == oneInch) delete oneInchAllowedToken[token];
         }
     }
 
