@@ -6,12 +6,11 @@ pragma solidity 0.8.12;
 /// @author Angle Core Team
 /// @notice Interface for the stablecoins `AgToken` contracts in multiple chains
 interface IAgTokenMultiChain {
-
     function swapIn(
         address bridgeToken,
         uint256 amount,
         address to
-    ) external returns(uint256);
+    ) external returns (uint256);
 
     function swapOut(
         address bridgeToken,

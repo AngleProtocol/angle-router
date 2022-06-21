@@ -80,6 +80,27 @@ export function encodeAngleBorrow(
   );
 }
 
+export function encodeAngleBorrowSidechain(
+  collateral: string,
+  vaultManager: string,
+  to: string,
+  who: string,
+  repayData: BytesLike,
+  calls: Call[],
+): BytesLike {
+  const actions: number[] = [];
+  const data: BytesLike[] = [];
+  calls.forEach(o => {
+    actions.push(o.action);
+    data.push(o.data);
+  });
+
+  return ethers.utils.defaultAbiCoder.encode(
+    ['address', 'address', 'address', 'address', 'uint256[]', 'bytes[]', 'bytes'],
+    [collateral, vaultManager, to, who, actions, data, repayData],
+  );
+}
+
 // export async function mixer(
 //   router: AngleRouter,
 //   signer: SignerWithAddress,
