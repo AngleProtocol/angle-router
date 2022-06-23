@@ -368,7 +368,7 @@ abstract contract BaseAngleRouterSidechain is Initializable {
     ) internal returns (uint256 amountOut) {
         // Approve transfer to the `uniswapV3Router`
         // Since this router is supposed to be a trusted contract, we can leave the allowance to the token
-        _changeAllowance(IERC20(inToken), address(uniswapV3Router), type(uint256).max);
+        _checkAllowance(IERC20(inToken), address(uniswapV3Router), amount);
         amountOut = uniswapV3Router.exactInput(
             ExactInputParams(path, address(this), block.timestamp, amount, minAmountOut)
         );
@@ -460,6 +460,19 @@ abstract contract BaseAngleRouterSidechain is Initializable {
         } else if (currentAllowance > amount) {
             token.safeDecreaseAllowance(spender, currentAllowance - amount);
         }
+    }
+
+    /// @notice Checks the allowance for a contract and updates it to the max if it is not big enough
+    /// @param token Token for which allowance should be checked
+    /// @param spender Address to grant allowance to
+    /// @param amount Minimum amount of tokens needed for the allowance
+    function _checkAllowance(
+        IERC20 token,
+        address spender,
+        uint256 amount
+    ) internal {
+        uint256 currentAllowance = token.allowance(address(this), spender);
+        if (currentAllowance < amount) token.safeIncreaseAllowance(spender, type(uint256).max - currentAllowance);
     }
 
     /// @notice Transfer amount of the native token to the `to` address
