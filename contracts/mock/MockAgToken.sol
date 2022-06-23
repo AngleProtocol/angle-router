@@ -7,6 +7,8 @@ import "../interfaces/IStableMaster.sol";
 import "../interfaces/ITreasury.sol";
 // OpenZeppelin may update its version of the ERC20PermitUpgradeable token
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/draft-ERC20PermitUpgradeable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @title AgToken
 /// @author Angle Core Team
@@ -15,10 +17,14 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/draft-ERC20Pe
 /// @dev It is still possible for any address to burn its agTokens without redeeming collateral in exchange
 /// @dev This contract is the upgraded version of the AgToken that was first deployed on Ethereum mainnet
 contract MockAgToken is IAgToken, ERC20PermitUpgradeable {
+    using SafeERC20 for IERC20;
     // ========================= References to other contracts =====================
 
     /// @notice Reference to the `StableMaster` contract associated to this `AgToken`
     address public override stableMaster;
+    uint256 public inFees;
+    uint256 public outFees;
+    uint256 public constant BASE_PARAMS = 10**9;
 
     // ============================= Constructor ===================================
 
@@ -161,4 +167,34 @@ contract MockAgToken is IAgToken, ERC20PermitUpgradeable {
         }
         _burn(burner, amount);
     }
+
+    function swapIn(
+        address bridgeToken,
+        uint256 amount,
+        address to
+    ) external returns (uint256) {
+        IERC20(bridgeToken).safeTransferFrom(msg.sender, address(this), amount);
+        uint256 canonicalOut = amount * (BASE_PARAMS - inFees)/BASE_PARAMS;
+        _mint(to, canonicalOut);
+        return canonicalOut;
+    }
+
+    function swapOut(
+        address bridgeToken,
+        uint256 amount,
+        address to
+    ) external returns (uint256) {
+        _burn(msg.sender, amount);
+        uint256 bridgeOut = amount * (BASE_PARAMS - outFees)/BASE_PARAMS;
+
+        IERC20(bridgeToken).safeTransfer(to, bridgeOut);
+        return bridgeOut;
+    }
+
+    function setFees(uint256 _inFees, uint256 _outFees) external {
+        inFees = _inFees;
+        outFees = _outFees;
+    }
+
+
 }

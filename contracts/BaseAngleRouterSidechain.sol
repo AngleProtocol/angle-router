@@ -77,13 +77,6 @@ abstract contract BaseAngleRouterSidechain is Initializable {
     error TransferFailed();
     error ZeroAddress();
 
-    // =============================== Mappings ====================================
-
-    /// @notice Whether the token was already approved on Uniswap router
-    mapping(IERC20 => bool) public uniAllowedToken;
-    /// @notice Whether the token was already approved on 1Inch
-    mapping(IERC20 => bool) public oneInchAllowedToken;
-
     // =============================== References ==================================
 
     /// @notice Core Borrow address
@@ -93,7 +86,7 @@ abstract contract BaseAngleRouterSidechain is Initializable {
     /// @notice Address of the 1Inch router potentially used for swaps
     address public oneInch;
 
-    uint256[45] private __gap;
+    uint256[47] private __gap;
 
     constructor() initializer {}
 
@@ -346,6 +339,10 @@ abstract contract BaseAngleRouterSidechain is Initializable {
         gauge.deposit(amount, user, shouldClaimRewards);
     }
 
+    /// @notice Sweeps tokens from the router contract
+    /// @param tokenOut Token to sweep
+    /// @param minAmountOut Minimum amount of tokens to recover
+    /// @param to Address to which tokens should be sent
     function _sweep(
         address tokenOut,
         uint256 minAmountOut,
@@ -369,11 +366,9 @@ abstract contract BaseAngleRouterSidechain is Initializable {
         uint256 minAmountOut,
         bytes memory path
     ) internal returns (uint256 amountOut) {
-        // Approve transfer to the `uniswapV3Router` if it is the first time that the token is used
-        if (!uniAllowedToken[inToken]) {
-            inToken.safeApprove(address(uniswapV3Router), type(uint256).max);
-            uniAllowedToken[inToken] = true;
-        }
+        // Approve transfer to the `uniswapV3Router`
+        // Since this router is supposed to be a trusted contract, we can leave the allowance to the token
+        _changeAllowance(IERC20(inToken), address(uniswapV3Router), type(uint256).max);
         amountOut = uniswapV3Router.exactInput(
             ExactInputParams(path, address(this), block.timestamp, amount, minAmountOut)
         );
@@ -387,12 +382,9 @@ abstract contract BaseAngleRouterSidechain is Initializable {
         uint256 minAmountOut,
         bytes memory payload
     ) internal returns (uint256 amountOut) {
-        // Approve transfer to the `oneInch` router if it is the first time the token is used
-        if (!oneInchAllowedToken[inToken]) {
-            inToken.safeApprove(address(oneInch), type(uint256).max);
-            oneInchAllowedToken[inToken] = true;
-        }
-
+        // Approve transfer to the `oneInch` address
+        // Since this router is supposed to be a trusted contract, we can leave the allowance to the token
+        _changeAllowance(IERC20(inToken), oneInch, type(uint256).max);
         //solhint-disable-next-line
         (bool success, bytes memory result) = oneInch.call(payload);
         if (!success) _revertBytes(result);
@@ -452,6 +444,36 @@ abstract contract BaseAngleRouterSidechain is Initializable {
     function _unwrapNative(uint256 minAmountOut, address to) internal virtual returns (uint256);
 
     // ======================== Internal Utility Functions =========================
+
+    /// @notice Changes allowance of this contract for a given token
+    /// @param token Address of the token to change allowance
+    /// @param spender Address to change the allowance of
+    /// @param amount Amount allowed
+    function _changeAllowance(
+        IERC20 token,
+        address spender,
+        uint256 amount
+    ) internal {
+        uint256 currentAllowance = token.allowance(address(this), spender);
+        if (currentAllowance < amount) {
+            token.safeIncreaseAllowance(spender, amount - currentAllowance);
+        } else if (currentAllowance > amount) {
+            token.safeDecreaseAllowance(spender, currentAllowance - amount);
+        }
+    }
+
+    /// @notice Transfer amount of the native token to the `to` address
+    function _safeTransferNative(address to, uint256 amount) internal {
+        bool success;
+
+        //solhint-disable-next-line
+        assembly {
+            // Transfer the ETH and store if it succeeded or not.
+            success := call(gas(), to, amount, 0, 0, 0, 0)
+        }
+
+        if (!success) revert TransferFailed();
+    }
 
     /// @notice Parses the actions submitted to the router contract to interact with a `VaultManager` and makes sure that
     /// the calling address is well approved for all the vaults with which it is interacting
@@ -518,26 +540,6 @@ abstract contract BaseAngleRouterSidechain is Initializable {
         }
     }
 
-    /// @notice Changes allowance of this contract for a given token
-    /// @param token Address of the token to change allowance
-    /// @param spender Address to change the allowance of
-    /// @param amount Amount allowed
-    function _changeAllowance(
-        IERC20 token,
-        address spender,
-        uint256 amount
-    ) internal {
-        uint256 currentAllowance = token.allowance(address(this), spender);
-        if (currentAllowance < amount) {
-            token.safeIncreaseAllowance(spender, amount - currentAllowance);
-        } else if (currentAllowance > amount) {
-            token.safeDecreaseAllowance(spender, currentAllowance - amount);
-            // Clean mappings if allowance decreases for Uniswap, 1Inch
-            if (spender == address(uniswapV3Router)) delete uniAllowedToken[token];
-            else if (spender == oneInch) delete oneInchAllowedToken[token];
-        }
-    }
-
     /// @notice Checks whether the amount obtained during a swap is not too small
     function _slippageCheck(uint256 amount, uint256 minAmountOut) internal pure {
         if (amount < minAmountOut) revert TooSmallAmountOut();
@@ -554,16 +556,4 @@ abstract contract BaseAngleRouterSidechain is Initializable {
         revert InvalidReturnMessage();
     }
 
-    /// @notice Transfer amount of the native token to the `to` address
-    function _safeTransferNative(address to, uint256 amount) internal {
-        bool success;
-
-        //solhint-disable-next-line
-        assembly {
-            // Transfer the ETH and store if it succeeded or not.
-            success := call(gas(), to, amount, 0, 0, 0, 0)
-        }
-
-        if (!success) revert TransferFailed();
-    }
 }
