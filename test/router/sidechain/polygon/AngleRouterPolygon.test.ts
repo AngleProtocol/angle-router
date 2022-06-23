@@ -1,31 +1,29 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
+import { BigNumber, BytesLike } from 'ethers';
 import { parseEther, parseUnits } from 'ethers/lib/utils';
-import { BigNumber, BytesLike, Signer } from 'ethers';
-import hre, { contract, ethers, web3 } from 'hardhat';
+import hre, { contract, ethers } from 'hardhat';
 
 import {
+  AngleRouterPolygon,
+  AngleRouterPolygon__factory,
   ERC20,
   ERC20__factory,
-  MockRouterSidechain,
-  MockRouterSidechain__factory,
+  Mock1Inch,
+  Mock1Inch__factory,
   MockAgToken,
   MockAgToken__factory,
   MockCoreBorrow,
   MockCoreBorrow__factory,
-  AngleRouterPolygon,
-  AngleRouterPolygon__factory,
+  MockRouterSidechain,
+  MockRouterSidechain__factory,
   MockTokenPermit,
   MockTokenPermit__factory,
   MockUniswapV3Router,
   MockUniswapV3Router__factory,
-  Mock1Inch,
-  Mock1Inch__factory,
 } from '../../../../typechain';
 import { expect } from '../../../../utils/chai-setup';
-import { inReceipt } from '../../../../utils/expectEvent';
-import { ActionTypeSidechain, initToken, TypePermit } from '../../../../utils/helpers';
-import { deployUpgradeable, latestTime, ZERO_ADDRESS, MAX_UINT256, expectApprox } from '../../../utils/helpers';
-import { ActionType } from '@angleprotocol/sdk';
+import { ActionTypeSidechain, TypePermit } from '../../../../utils/helpers';
+import { deployUpgradeable, expectApprox, ZERO_ADDRESS } from '../../../utils/helpers';
 
 contract('BaseAngleRouterSidechain', () => {
   // As a proxy for the AngleRouter sidechain we're using a mock Ethereum implementation of it
