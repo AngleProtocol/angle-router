@@ -38,13 +38,19 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
     routerImplementation,
     // eslint-disable-next-line camelcase
     AngleRouterPolygon__factory.createInterface(),
-  ).interface.encodeFunctionData('initialize', [coreBorrow, json.uniswapV3Router, json.oneInchRouter]);
-  await deploy('AngleRouter', {
+  ).interface.encodeFunctionData('initializeRouter', [coreBorrow, json.uniswapV3Router, json.oneInchRouter]);
+  await deploy('AngleRouterPolygon', {
     contract: 'TransparentUpgradeableProxy',
     from: deployer.address,
     args: [routerImplementation, proxyAdmin, dataRouter],
     log: !argv.ci,
   });
+  const router = (await deployments.get('AngleRouterPolygon')).address;
+  console.log(`Successfully deployed AngleRouterPolygon at the address ${router}`);
+
+  console.log(`${router} ${routerImplementation} ${proxyAdmin} ${dataRouter}`);
+  console.log('');
+  console.log('Success');
 };
 
 func.tags = ['angleRouterSidechain'];

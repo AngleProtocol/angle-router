@@ -78,8 +78,12 @@ const config: HardhatUserConfig = {
       hardfork: 'london',
       forking: {
         enabled: argv.fork || false,
-        url: nodeUrl('fork'),
-        blockNumber: 14717097,
+        // For mainnet
+        // url: nodeUrl('fork'),
+        // blockNumber: 14665543,
+        // For Polygon
+        url: nodeUrl('forkpolygon'),
+        blockNumber: 29947186,
       },
       mining: argv.disableAutoMining
         ? {
@@ -121,6 +125,34 @@ const config: HardhatUserConfig = {
       live: false,
       url: 'http://34.78.103.39:11055/',
       chainId: 1,
+    },
+    optimism: {
+      live: true,
+      url: nodeUrl('optimism'),
+      accounts: accounts('optimism'),
+      gas: 'auto',
+      chainId: 10,
+    },
+    arbitrum: {
+      live: true,
+      url: nodeUrl('arbitrum'),
+      accounts: accounts('arbitrum'),
+      gas: 'auto',
+      chainId: 42161,
+    },
+    avalanche: {
+      live: true,
+      url: nodeUrl('avalanche'),
+      accounts: accounts('avalanche'),
+      gas: 'auto',
+      chainId: 43114,
+    },
+    aurora: {
+      live: true,
+      url: nodeUrl('aurora'),
+      accounts: accounts('aurora'),
+      gas: 'auto',
+      chainId: 1313161554,
     },
   },
   paths: {
