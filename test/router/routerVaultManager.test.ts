@@ -26,7 +26,7 @@ import {
 } from '../../utils/helpersEncoding';
 import { signPermit } from '../../utils/sign';
 import { signPermitNFT } from '../../utils/sigUtilsNFT';
-import { deployUpgradeable, latestTime, ZERO_ADDRESS } from '../utils/helpers';
+import { deployUpgradeable, latestTime, MAX_UINT256, ZERO_ADDRESS } from '../utils/helpers';
 
 contract('Router - VaultManager New functionalities', () => {
   let deployer: SignerWithAddress;
@@ -91,6 +91,7 @@ contract('Router - VaultManager New functionalities', () => {
 
   describe('mixer - parseVaultIDs', () => {
     it('success - addCollateral - to 1 vault', async () => {
+      console.log(MAX_UINT256.toString());
       await vaultManager.connect(alice).setPaymentData(ethers.constants.Zero, 0, 0, UNIT_USDC);
       await (await USDC.connect(governor).mint(alice.address, UNIT_USDC)).wait();
       const permits: TypePermit[] = [
