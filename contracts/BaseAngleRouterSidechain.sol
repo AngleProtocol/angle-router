@@ -476,6 +476,7 @@ abstract contract BaseAngleRouterSidechain is Initializable {
     }
 
     /// @notice Transfer amount of the native token to the `to` address
+    /// @dev Forked from Solmate: https://github.com/Rari-Capital/solmate/blob/main/src/utils/SafeTransferLib.sol
     function _safeTransferNative(address to, uint256 amount) internal {
         bool success;
 

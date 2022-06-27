@@ -23,6 +23,7 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
 
   const proxyAdmin = '0xBFca293e17e067e8aBdca30A5D35ADDd0cBaE6D6';
   const coreBorrow = '0x78754109cb73772d70A6560297037657C2AF51b8';
+
   const contractName = 'AngleRouterPolygon';
 
   console.log('Now deploying the implementation');
@@ -39,14 +40,14 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
     // eslint-disable-next-line camelcase
     AngleRouterPolygon__factory.createInterface(),
   ).interface.encodeFunctionData('initializeRouter', [coreBorrow, json.uniswapV3Router, json.oneInchRouter]);
-  await deploy('AngleRouterPolygon', {
+  await deploy(`${contractName}`, {
     contract: 'TransparentUpgradeableProxy',
     from: deployer.address,
     args: [routerImplementation, proxyAdmin, dataRouter],
     log: !argv.ci,
   });
-  const router = (await deployments.get('AngleRouterPolygon')).address;
-  console.log(`Successfully deployed AngleRouterPolygon at the address ${router}`);
+  const router = (await deployments.get(`${contractName}`)).address;
+  console.log(`Successfully deployed ${contractName} at the address ${router}`);
 
   console.log(`${router} ${routerImplementation} ${proxyAdmin} ${dataRouter}`);
   console.log('');
