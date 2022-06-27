@@ -14,17 +14,12 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
   console.log(`Deploying the router on ${network.name}`);
   const json = await import('./networks/' + network.name + '.json');
 
-  /*
   const chainIdNetwork = network.config.chainId as ChainId;
   const proxyAdmin = CONTRACTS_ADDRESSES[chainIdNetwork].ProxyAdmin!;
   const coreBorrow = CONTRACTS_ADDRESSES[chainIdNetwork].CoreBorrow!;
-  const contractName = `AngleRouter${network.name}`;
-  */
 
-  const proxyAdmin = '0xBFca293e17e067e8aBdca30A5D35ADDd0cBaE6D6';
-  const coreBorrow = '0x78754109cb73772d70A6560297037657C2AF51b8';
-
-  const contractName = 'AngleRouterPolygon';
+  const chainName = network.name.charAt(0).toUpperCase() + network.name.substring(1);
+  const contractName = `AngleRouter${chainName}`;
 
   console.log('Now deploying the implementation');
   await deploy(`${contractName}_Implementation`, {
@@ -32,6 +27,7 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
     from: deployer.address,
     log: !argv.ci,
   });
+
   const routerImplementation = (await ethers.getContract(`${contractName}_Implementation`)).address;
   console.log(`Successfully deployed the implementation for the router at ${routerImplementation}`);
   console.log('Now deploying the proxy contract');
