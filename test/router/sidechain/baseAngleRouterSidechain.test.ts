@@ -38,7 +38,6 @@ contract('BaseAngleRouterSidechain', () => {
   let router: MockRouterSidechain;
   let UNIT_USDC: BigNumber;
   let USDCdecimal: BigNumber;
-  let DAIdecimal: BigNumber;
   let governor: string;
   let guardian: string;
   let permits: TypePermit[];
@@ -61,7 +60,6 @@ contract('BaseAngleRouterSidechain', () => {
       impersonatedSigners[address] = await ethers.getSigner(address);
     }
     USDCdecimal = BigNumber.from('6');
-    DAIdecimal = BigNumber.from('18');
 
     UNIT_USDC = BigNumber.from(10).pow(USDCdecimal);
     permits = [];
