@@ -14,11 +14,11 @@ import "./interfaces/IVaultManager.sol";
 
 /// @title BaseAngleRouterSidechain
 /// @author Angle Core Team
-/// @notice The `BaseAngleRouter` contract is a base contract for routing on the Angle Protocol in a given chain
+/// @notice The `BaseAngleRouterSidechain` contract is a base contract for routing on the Angle Protocol in a given chain
 abstract contract BaseAngleRouterSidechain is Initializable {
     using SafeERC20 for IERC20;
 
-    /// @notice Base used for tokens
+    /// @notice How many actions can be performed on a given `VaultManager` contract
     uint256 private constant _MAX_BORROW_ACTIONS = 10;
 
     // =========================== Structs and Enums ===============================
@@ -90,7 +90,7 @@ abstract contract BaseAngleRouterSidechain is Initializable {
 
     constructor() initializer {}
 
-    /// @notice Deploys the `AngleRouter` contract on a chain
+    /// @notice Deploys the router contract on a chain
     /// @param _core CoreBorrow contract address
     function _initialize(address _core) internal initializer {
         if (_core == address(0)) revert ZeroAddress();
@@ -124,12 +124,10 @@ abstract contract BaseAngleRouterSidechain is Initializable {
         emit CoreUpdated(address(_core));
     }
 
-    /// @notice Change allowance for a contract.
+    /// @notice Changes allowances for different tokens
     /// @param tokens Addresses of the tokens to allow
     /// @param spenders Addresses to allow transfer
     /// @param amounts Amounts to allow
-    /// @dev Approvals are normally given in the `addGauges` method, in the initializer and in
-    /// the internal functions to process swaps with Uniswap and 1Inch
     function changeAllowance(
         IERC20[] calldata tokens,
         address[] calldata spenders,
@@ -143,7 +141,7 @@ abstract contract BaseAngleRouterSidechain is Initializable {
 
     // =========================== Router Functionalities =========================
 
-    /// @notice Wrapper built on top of the _claimRewards function. It allows to claim rewards for multiple
+    /// @notice Wrapper built on top of the `_claimRewards` function. It allows to claim rewards for multiple
     /// gauges and perpetuals at once
     /// @param gaugeUser Address for which to fetch the rewards from the gauges
     /// @param liquidityGauges Gauges to claim on
@@ -157,12 +155,13 @@ abstract contract BaseAngleRouterSidechain is Initializable {
     /// @param paramsPermit Array of params `PermitType` used to do a 1 tx to approve the router on each token (can be done once by
     /// setting high approved amounts) which supports the `permit` standard. Users willing to interact with the contract
     /// with tokens that do not support permit should approve the contract for these tokens prior to interacting with it
-    /// @param actions List of actions to be performed by the router (in order of execution): make sure to understand what each action performs
+    /// @param actions List of actions to be performed by the router (in order of execution)
     /// @param data Array of encoded data for each of the actions performed in this mixer. This is where the bytes-encoded parameters
     /// for a given action are stored
     /// @dev With this function, users can specify paths to swap tokens to the desired token of their choice. Yet the protocol
     /// does not verify the payload given and cannot check that the swap performed by users actually gives the desired
-    /// out token: in this case funds may be lost by the user if they don't perform a sweep action on these tokens
+    /// out token: in this case funds may be made accessible to anyone on this contract if the concerned users
+    /// do not perform a sweep action on these tokens
     function mixer(
         PermitType[] memory paramsPermit,
         ActionType[] memory actions,
@@ -310,7 +309,7 @@ abstract contract BaseAngleRouterSidechain is Initializable {
     /// @param actionsBorrow Actions type to perform on the vaultManager
     /// @param dataBorrow Data needed for each actions
     /// @param to Address to send the funds to
-    /// @param who Address Swapper to handle repayments
+    /// @param who Swapper address to handle repayments
     /// @param repayData Bytes to use at the discretion of the `msg.sender`
     function _angleBorrower(
         address vaultManager,
@@ -355,10 +354,10 @@ abstract contract BaseAngleRouterSidechain is Initializable {
         }
     }
 
-    /// @notice Allows to swap any token to an accepted collateral via UniswapV3 (if there is a path)
+    /// @notice Allows to swap between tokens via UniswapV3 (if there is a path)
     /// @param inToken Token used as entrance of the swap
-    /// @param amount Amount of in token to swap for the accepted collateral
-    /// @param minAmountOut Minimum amount accepted for the swap to happen
+    /// @param amount Amount of in token to swap
+    /// @param minAmountOut Minimum amount of outToken accepted for the swap to happen
     /// @param path Bytes representing the path to swap your input token to the accepted collateral
     function _swapOnUniswapV3(
         IERC20 inToken,
@@ -509,7 +508,7 @@ abstract contract BaseAngleRouterSidechain is Initializable {
         uint256 vaultIDLength;
         for (uint256 i = 0; i < actionsBorrow.length; i++) {
             uint256 vaultID;
-            // If there is a createVault action, the router should not worry about looking at
+            // If there is a `createVault` action, the router should not worry about looking at
             // next vaultIDs given equal to 0
             if (actionsBorrow[i] == ActionBorrowType.createVault) {
                 createVaultAction = true;
