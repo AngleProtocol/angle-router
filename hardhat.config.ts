@@ -11,6 +11,7 @@ import 'hardhat-abi-exporter';
 import '@nomiclabs/hardhat-ethers';
 import '@nomiclabs/hardhat-truffle5';
 import '@nomiclabs/hardhat-solhint';
+import '@nomiclabs/hardhat-etherscan';
 import '@openzeppelin/hardhat-upgrades';
 import 'solidity-coverage';
 import '@tenderly/hardhat-tenderly';
@@ -193,6 +194,18 @@ const config: HardhatUserConfig = {
     clear: true,
     flat: true,
     spacing: 2,
+  },
+  etherscan: {
+    // eslint-disable-next-line
+    // @ts-ignore
+    apiKey: {
+      mainnet: process.env.ETHERSCAN_API_KEY,
+      optimisticEthereum: process.env.OPTIMISM_ETHERSCAN_API_KEY,
+      arbitrumOne: process.env.ARBITRUM_ETHERSCAN_API_KEY,
+      avalanche: process.env.AVALANCHE_ETHERSCAN_API_KEY,
+      polygon: process.env.POLYGON_ETHERSCAN_API_KEY,
+    },
+    // apiKey: process.env.ETHERSCAN_API_KEY,
   },
   tenderly: {
     project: process.env.TENDERLY_PROJECT || '',
