@@ -1107,7 +1107,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
             if (actionsBorrow[i] == ActionBorrowType.createVault) {
                 createVaultAction = true;
                 continue;
-            // There are then different ways depending on the action to find the `vaultID`
+                // There are then different ways depending on the action to find the `vaultID`
             } else if (
                 actionsBorrow[i] == ActionBorrowType.removeCollateral || actionsBorrow[i] == ActionBorrowType.borrow
             ) {
@@ -1373,10 +1373,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
     /// @notice Allows to swap any token to an accepted collateral via 1Inch Router
     /// @param payload Bytes needed for 1Inch router to process the swap
     /// @dev The `payload` given is expected to be obtained from 1Inch API
-    function _swapOn1Inch(
-        IERC20 inToken,
-        bytes memory payload
-    ) internal returns (uint256 amountOut) {
+    function _swapOn1Inch(IERC20 inToken, bytes memory payload) internal returns (uint256 amountOut) {
         // Approve transfer to the `oneInch` router if it is the first time the token is used
         if (!oneInchAllowedToken[inToken]) {
             inToken.safeApprove(address(oneInch), type(uint256).max);

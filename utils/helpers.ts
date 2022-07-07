@@ -614,3 +614,20 @@ export enum SwapType {
   WrapStETH,
   None,
 }
+
+export enum ActionTypeSidechain {
+  transfer,
+  wrap,
+  wrapNative,
+  sweep,
+  sweepNative,
+  unwrap,
+  unwrapNative,
+  swapIn,
+  swapOut,
+  uniswapV3,
+  oneInch,
+  claimRewards,
+  gaugeDeposit,
+  borrower,
+}

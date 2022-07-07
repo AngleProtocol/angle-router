@@ -76,6 +76,10 @@ jobs:
         env:
           ENABLE_GAS_REPORT: true
           CI: true
+          ETH_NODE_URI_FORKPOLYGON: ${{secrets.ETH_NODE_URI_FORKPOLYGON}}
+          ETH_NODE_URI_OPTIMISM: ${{secrets.ETH_NODE_URI_OPTIMISM}}
+          ETH_NODE_URI_AVALANCHE: ${{secrets.ETH_NODE_URI_AVALANCHE}}
+          ETH_NODE_URI_ARBITRUM: ${{secrets.ETH_NODE_URI_ARBITRUM}}
       - name: Print gas report
         run: cat gas-report.txt
       - name: Discord notification

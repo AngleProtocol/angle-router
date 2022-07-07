@@ -11,6 +11,7 @@ import 'hardhat-abi-exporter';
 import '@nomiclabs/hardhat-ethers';
 import '@nomiclabs/hardhat-truffle5';
 import '@nomiclabs/hardhat-solhint';
+import '@nomiclabs/hardhat-etherscan';
 import '@openzeppelin/hardhat-upgrades';
 import 'solidity-coverage';
 import '@tenderly/hardhat-tenderly';
@@ -78,8 +79,12 @@ const config: HardhatUserConfig = {
       hardfork: 'london',
       forking: {
         enabled: argv.fork || false,
-        url: nodeUrl('fork'),
-        blockNumber: 14717097,
+        // For mainnet
+        // url: nodeUrl('fork'),
+        // blockNumber: 14665543,
+        // For Polygon
+        url: nodeUrl('forkpolygon'),
+        blockNumber: 29947186,
       },
       mining: argv.disableAutoMining
         ? {
@@ -122,6 +127,34 @@ const config: HardhatUserConfig = {
       url: 'http://34.78.103.39:11055/',
       chainId: 1,
     },
+    optimism: {
+      live: true,
+      url: nodeUrl('optimism'),
+      accounts: accounts('optimism'),
+      gas: 'auto',
+      chainId: 10,
+    },
+    arbitrum: {
+      live: true,
+      url: nodeUrl('arbitrum'),
+      accounts: accounts('arbitrum'),
+      gas: 'auto',
+      chainId: 42161,
+    },
+    avalanche: {
+      live: true,
+      url: nodeUrl('avalanche'),
+      accounts: accounts('avalanche'),
+      gas: 'auto',
+      chainId: 43114,
+    },
+    aurora: {
+      live: true,
+      url: nodeUrl('aurora'),
+      accounts: accounts('aurora'),
+      gas: 'auto',
+      chainId: 1313161554,
+    },
   },
   paths: {
     sources: './contracts',
@@ -161,6 +194,18 @@ const config: HardhatUserConfig = {
     clear: true,
     flat: true,
     spacing: 2,
+  },
+  etherscan: {
+    // eslint-disable-next-line
+    // @ts-ignore
+    apiKey: {
+      mainnet: process.env.ETHERSCAN_API_KEY,
+      optimisticEthereum: process.env.OPTIMISM_ETHERSCAN_API_KEY,
+      arbitrumOne: process.env.ARBITRUM_ETHERSCAN_API_KEY,
+      avalanche: process.env.AVALANCHE_ETHERSCAN_API_KEY,
+      polygon: process.env.POLYGON_ETHERSCAN_API_KEY,
+    },
+    // apiKey: process.env.ETHERSCAN_API_KEY,
   },
   tenderly: {
     project: process.env.TENDERLY_PROJECT || '',
