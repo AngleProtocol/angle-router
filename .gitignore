@@ -9,6 +9,8 @@ node_modules
 tenderly.yaml
 settings.json
 venv
+out
+cache-forge
 
 # Build output
 cache

@@ -18,10 +18,10 @@ import {
   MockTokenPermit__factory,
   MockUniswapV3Router,
   MockUniswapV3Router__factory,
-} from '../../../typechain';
-import { expect } from '../../../utils/chai-setup';
-import { inReceipt } from '../../../utils/expectEvent';
-import { ActionTypeSidechain, TypePermit } from '../../../utils/helpers';
+} from '../../../../typechain';
+import { expect } from '../../../../utils/chai-setup';
+import { inReceipt } from '../../../../utils/expectEvent';
+import { ActionTypeSidechain, TypePermit } from '../../../../utils/helpers';
 import { deployUpgradeable, MAX_UINT256, ZERO_ADDRESS } from '../../utils/helpers';
 
 contract('BaseAngleRouterSidechain', () => {

@@ -4,6 +4,7 @@ pragma solidity 0.8.12;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/draft-IERC20PermitUpgradeable.sol";
+import "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "./interfaces/IAgTokenMultiChain.sol";
@@ -38,7 +39,11 @@ abstract contract BaseAngleRouterSidechain is Initializable {
         oneInch,
         claimRewards,
         gaugeDeposit,
-        borrower
+        borrower,
+        mintSavingsRate,
+        depositSavingsRate,
+        redeemSavingsRate,
+        withdrawSavingsRate
     }
 
     /// @notice Data needed to get permits
@@ -244,6 +249,30 @@ abstract contract BaseAngleRouterSidechain is Initializable {
                 _changeAllowance(IERC20(collateral), address(vaultManager), type(uint256).max);
                 _angleBorrower(vaultManager, actionsBorrow, dataBorrow, to, who, repayData);
                 _changeAllowance(IERC20(collateral), address(vaultManager), 0);
+            } else if (actions[i] == ActionType.mintSavingsRate) {
+                (IERC4626 savingsRate, uint256 shares, address to, uint256 maxAmountIn) = abi.decode(
+                    data[i],
+                    (IERC4626, uint256, address, uint256)
+                );
+                _mintSavingsRate(savingsRate, shares, to, maxAmountIn);
+            } else if (actions[i] == ActionType.depositSavingsRate) {
+                (IERC4626 savingsRate, uint256 amount, address to, uint256 minSharesOut) = abi.decode(
+                    data[i],
+                    (IERC4626, uint256, address, uint256)
+                );
+                _depositSavingsRate(savingsRate, amount, to, minSharesOut);
+            } else if (actions[i] == ActionType.redeemSavingsRate) {
+                (IERC4626 savingsRate, uint256 shares, address to, uint256 minAmountOut) = abi.decode(
+                    data[i],
+                    (IERC4626, uint256, address, uint256)
+                );
+                _redeemSavingsRate(savingsRate, shares, to, minAmountOut);
+            } else if (actions[i] == ActionType.withdrawSavingsRate) {
+                (IERC4626 savingsRate, uint256 amount, address to, uint256 maxSharesOut) = abi.decode(
+                    data[i],
+                    (IERC4626, uint256, address, uint256)
+                );
+                _withdrawSavingsRate(savingsRate, amount, to, maxSharesOut);
             }
         }
     }
@@ -553,9 +582,69 @@ abstract contract BaseAngleRouterSidechain is Initializable {
         }
     }
 
+    //  @notice mint `shares` from an ERC4626 savings rate.
+    //  @param savingsRate The ERC4626 savingsRate to mint shares from.
+    //  @param shares The amount of shares to mint from `savingsRate`.
+    //  @param to The destination of ownership shares.
+    //  @param maxAmountIn The max amount of assets used to mint.
+    //  @return amountIn the amount of assets used to mint by `to`.
+    function _mintSavingsRate(
+        IERC4626 savingsRate,
+        uint256 shares,
+        address to,
+        uint256 maxAmountIn
+    ) internal returns (uint256 amountIn) {
+        _slippageCheck(maxAmountIn, (amountIn = savingsRate.mint(shares, to)));
+    }
+
+    //  @notice deposit `amount` to an ERC4626 savingsRate.
+    //  @param savingsRate The ERC4626 savingsRate to deposit assets to.
+    //  @param amount The amount of assets to deposit to `savingsRate`.
+    //  @param to The destination of ownership shares.
+    //  @param minSharesOut The min amount of `savingsRate` shares received by `to`.
+    //  @return sharesOut the amount of shares received by `to`.
+    function _depositSavingsRate(
+        IERC4626 savingsRate,
+        uint256 amount,
+        address to,
+        uint256 minSharesOut
+    ) internal returns (uint256 sharesOut) {
+        _slippageCheck(sharesOut = savingsRate.deposit(amount, to), minSharesOut);
+    }
+
+    //  @notice withdraw `amount` from an ERC4626 savingsRate.
+    //  @param savingsRate The ERC4626 savingsRate to withdraw assets from.
+    //  @param amount The amount of assets to withdraw from savingsRate.
+    //  @param to The destination of assets.
+    //  @param minSharesOut The min amount of shares received by `to`.
+    //  @return sharesOut the amount of shares received by `to`.
+    function _withdrawSavingsRate(
+        IERC4626 savingsRate,
+        uint256 amount,
+        address to,
+        uint256 maxSharesOut
+    ) internal returns (uint256 sharesOut) {
+        _slippageCheck(maxSharesOut, sharesOut = savingsRate.withdraw(amount, to, msg.sender));
+    }
+
+    //  @notice redeem `shares` shares from an ERC4626 savingsRate.
+    //  @param savingsRate The ERC4626 savingsRate to redeem shares from.
+    //  @param shares The amount of shares to redeem from the savingsRate.
+    //  @param to The destination of assets.
+    //  @param minAmountOut The min amount of assets received by `to`.
+    //  @return amountOut the amount of assets received by `to`.
+    function _redeemSavingsRate(
+        IERC4626 savingsRate,
+        uint256 shares,
+        address to,
+        uint256 minAmountOut
+    ) internal returns (uint256 amountOut) {
+        _slippageCheck(amountOut = savingsRate.redeem(shares, to, msg.sender), minAmountOut);
+    }
+
     /// @notice Checks whether the amount obtained during a swap is not too small
-    function _slippageCheck(uint256 amount, uint256 minAmountOut) internal pure {
-        if (amount < minAmountOut) revert TooSmallAmountOut();
+    function _slippageCheck(uint256 amount, uint256 thresholdAmount) internal pure {
+        if (amount < thresholdAmount) revert TooSmallAmountOut();
     }
 
     /// @notice Internal function used for error handling
@@ -568,5 +657,4 @@ abstract contract BaseAngleRouterSidechain is Initializable {
         }
         revert InvalidReturnMessage();
     }
-
 }
