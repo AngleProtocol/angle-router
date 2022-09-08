@@ -13,6 +13,51 @@ import "./interfaces/ILiquidityGauge.sol";
 import "./interfaces/external/uniswap/IUniswapRouter.sol";
 import "./interfaces/IVaultManager.sol";
 
+// =========================== Structs and Enums ===============================
+
+struct PermitVaultManagerType {
+    address vaultManager;
+    address owner;
+    bool approved;
+    uint256 deadline;
+    uint8 v;
+    bytes32 r;
+    bytes32 s;
+}
+
+/// @notice Action types
+enum ActionType {
+    transfer,
+    wrap,
+    wrapNative,
+    sweep,
+    sweepNative,
+    unwrap,
+    unwrapNative,
+    swapIn,
+    swapOut,
+    uniswapV3,
+    oneInch,
+    claimRewards,
+    gaugeDeposit,
+    borrower,
+    mintSavingsRate,
+    depositSavingsRate,
+    redeemSavingsRate,
+    withdrawSavingsRate
+}
+
+/// @notice Data needed to get permits
+struct PermitType {
+    address token;
+    address owner;
+    uint256 value;
+    uint256 deadline;
+    uint8 v;
+    bytes32 r;
+    bytes32 s;
+}
+
 /// @title BaseAngleRouterSidechain
 /// @author Angle Core Team
 /// @notice The `BaseAngleRouterSidechain` contract is a base contract for routing on the Angle Protocol in a given chain
@@ -21,51 +66,6 @@ abstract contract BaseAngleRouterSidechain is Initializable {
 
     /// @notice How many actions can be performed on a given `VaultManager` contract
     uint256 private constant _MAX_BORROW_ACTIONS = 10;
-
-    // =========================== Structs and Enums ===============================
-
-    /// @notice Action types
-    enum ActionType {
-        transfer,
-        wrap,
-        wrapNative,
-        sweep,
-        sweepNative,
-        unwrap,
-        unwrapNative,
-        swapIn,
-        swapOut,
-        uniswapV3,
-        oneInch,
-        claimRewards,
-        gaugeDeposit,
-        borrower,
-        mintSavingsRate,
-        depositSavingsRate,
-        redeemSavingsRate,
-        withdrawSavingsRate
-    }
-
-    /// @notice Data needed to get permits
-    struct PermitType {
-        address token;
-        address owner;
-        uint256 value;
-        uint256 deadline;
-        uint8 v;
-        bytes32 r;
-        bytes32 s;
-    }
-
-    struct PermitVaultManagerType {
-        address vaultManager;
-        address owner;
-        bool approved;
-        uint256 deadline;
-        uint8 v;
-        bytes32 r;
-        bytes32 s;
-    }
 
     // =============================== Event =======================================
 
@@ -250,16 +250,19 @@ abstract contract BaseAngleRouterSidechain is Initializable {
                 _angleBorrower(vaultManager, actionsBorrow, dataBorrow, to, who, repayData);
                 _changeAllowance(IERC20(collateral), address(vaultManager), 0);
             } else if (actions[i] == ActionType.mintSavingsRate) {
-                (IERC4626 savingsRate, uint256 shares, address to, uint256 maxAmountIn) = abi.decode(
+                (IERC20 token, IERC4626 savingsRate, uint256 shares, address to, uint256 maxAmountIn) = abi.decode(
                     data[i],
-                    (IERC4626, uint256, address, uint256)
+                    (IERC20, IERC4626, uint256, address, uint256)
                 );
+                token.approve(address(savingsRate), maxAmountIn);
                 _mintSavingsRate(savingsRate, shares, to, maxAmountIn);
+                token.approve(address(savingsRate), 0);
             } else if (actions[i] == ActionType.depositSavingsRate) {
-                (IERC4626 savingsRate, uint256 amount, address to, uint256 minSharesOut) = abi.decode(
+                (IERC20 token, IERC4626 savingsRate, uint256 amount, address to, uint256 minSharesOut) = abi.decode(
                     data[i],
-                    (IERC4626, uint256, address, uint256)
+                    (IERC20, IERC4626, uint256, address, uint256)
                 );
+                token.approve(address(savingsRate), amount);
                 _depositSavingsRate(savingsRate, amount, to, minSharesOut);
             } else if (actions[i] == ActionType.redeemSavingsRate) {
                 (IERC4626 savingsRate, uint256 shares, address to, uint256 minAmountOut) = abi.decode(
@@ -594,6 +597,8 @@ abstract contract BaseAngleRouterSidechain is Initializable {
         address to,
         uint256 maxAmountIn
     ) internal returns (uint256 amountIn) {
+        // The check is useless as the contract need to approve an amount
+        // We let it just in case we call this function outside of the mixer
         _slippageCheck(maxAmountIn, (amountIn = savingsRate.mint(shares, to)));
     }
 
