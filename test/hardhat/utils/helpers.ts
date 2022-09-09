@@ -2,8 +2,8 @@ import { BigNumber, BigNumberish, Contract, ContractFactory, Signer } from 'ethe
 import { parseUnits } from 'ethers/lib/utils';
 import hre, { ethers } from 'hardhat';
 
-import { TransparentUpgradeableProxy__factory } from '../../typechain';
-import { expect } from '../../utils/chai-setup';
+import { TransparentUpgradeableProxy__factory } from '../../../typechain';
+import { expect } from '../../../utils/chai-setup';
 
 const BASE_PARAMS = parseUnits('1', 'gwei');
 
