@@ -20,8 +20,6 @@ import "./interfaces/IVaultManager.sol";
 import "./interfaces/external/lido/ISteth.sol";
 import "./interfaces/external/lido/IWStETH.sol";
 
-import "hardhat/console.sol";
-
 // =========================== Structs and Enums ===============================
 
 /// @notice Action types
@@ -348,75 +346,6 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
 
     // =========================== Router Functionalities =========================
 
-    /// @notice Wrapper n°1 built on top of the _claimRewards function
-    /// Allows to claim rewards for multiple gauges and perpetuals at once
-    /// @param gaugeUser Address for which to fetch the rewards from the gauges
-    /// @param liquidityGauges Gauges to claim on
-    /// @param perpetualIDs Perpetual IDs to claim rewards for
-    /// @param stablecoins Stablecoin contracts linked to the perpetualsIDs
-    /// @param collaterals Collateral contracts linked to the perpetualsIDs or `perpetualManager`
-    /// @dev If the caller wants to send the rewards to another account it first needs to
-    /// call `set_rewards_receiver(otherAccount)` on each `liquidityGauge`
-    function claimRewards(
-        address gaugeUser,
-        address[] memory liquidityGauges,
-        uint256[] memory perpetualIDs,
-        address[] memory stablecoins,
-        address[] memory collaterals
-    ) external {
-        _claimRewards(gaugeUser, liquidityGauges, perpetualIDs, false, stablecoins, collaterals);
-    }
-
-    /// @notice Wrapper n°2 (a little more gas efficient than n°1) built on top of the _claimRewards function
-    /// Allows to claim rewards for multiple gauges and perpetuals at once
-    /// @param user Address to which the contract should send the rewards from gauges (not perpetuals)
-    /// @param liquidityGauges Contracts to claim for
-    /// @param perpetualIDs Perpetual IDs to claim rewards for
-    /// @param perpetualManagers `perpetualManager` contracts for every perp to claim
-    /// @dev If the caller wants to send the rewards to another account it first needs to
-    /// call `set_rewards_receiver(otherAccount)` on each `liquidityGauge`
-    function claimRewards(
-        address user,
-        address[] memory liquidityGauges,
-        uint256[] memory perpetualIDs,
-        address[] memory perpetualManagers
-    ) external {
-        _claimRewards(user, liquidityGauges, perpetualIDs, true, new address[](perpetualIDs.length), perpetualManagers);
-    }
-
-    /// @notice Wrapper built on top of the `_mint` method to mint stablecoins
-    /// @param user Address to send the stablecoins to
-    /// @param amount Amount of collateral to use for the mint
-    /// @param minStableAmount Minimum stablecoin minted for the tx not to revert
-    /// @param stablecoin Address of the stablecoin to mint
-    /// @param collateral Collateral to mint from
-    function mint(
-        address user,
-        uint256 amount,
-        uint256 minStableAmount,
-        address stablecoin,
-        address collateral
-    ) external {
-        IERC20(collateral).safeTransferFrom(msg.sender, address(this), amount);
-        _mint(user, amount, minStableAmount, false, stablecoin, collateral, IPoolManager(address(0)));
-    }
-
-    /// @notice Wrapper built on top of the `_burn` method to burn stablecoins
-    /// @param dest Address to send the collateral to
-    /// @param amount Amount of stablecoins to use for the burn
-    /// @param minCollatAmount Minimum collateral amount received for the tx not to revert
-    /// @param stablecoin Address of the stablecoin to mint
-    /// @param collateral Collateral to mint from
-    function burn(
-        address dest,
-        uint256 amount,
-        uint256 minCollatAmount,
-        address stablecoin,
-        address collateral
-    ) external {
-        _burn(dest, amount, minCollatAmount, false, stablecoin, collateral, IPoolManager(address(0)));
-    }
-
     /// @notice Allows composable calls to different functions within the protocol
     /// @param paramsPermit Array of params `PermitType` used to do a 1 tx to approve the router on each token (can be done once by
     /// setting high approved amounts) which supports the `permit` standard. Users willing to interact with the contract
@@ -713,9 +642,9 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                     data[i],
                     (IERC20, IERC4626, uint256, address, uint256)
                 );
-                token.approve(address(savingsRate), maxAmountIn);
+                _changeAllowance(token, address(savingsRate), maxAmountIn);
                 uint256 amountSpent = _mintSavingsRate(savingsRate, shares, to, maxAmountIn);
-                token.approve(address(savingsRate), 0);
+                _changeAllowance(token, address(savingsRate), 0);
 
                 // update the internal balances
                 _computeProportion(amountSpent, listTokens, balanceTokens, address(token), false);
@@ -727,7 +656,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                 );
                 amount = _computeProportion(amount, listTokens, balanceTokens, address(token), true);
 
-                token.approve(address(savingsRate), amount);
+                _changeAllowance(token, address(savingsRate), amount);
                 uint256 shares = _depositSavingsRate(savingsRate, amount, to, minSharesOut);
 
                 if (to == address(this)) _addToList(listTokens, balanceTokens, address(savingsRate), shares);

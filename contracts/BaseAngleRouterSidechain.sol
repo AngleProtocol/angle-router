@@ -15,16 +15,6 @@ import "./interfaces/IVaultManager.sol";
 
 // =========================== Structs and Enums ===============================
 
-struct PermitVaultManagerType {
-    address vaultManager;
-    address owner;
-    bool approved;
-    uint256 deadline;
-    uint8 v;
-    bytes32 r;
-    bytes32 s;
-}
-
 /// @notice Action types
 enum ActionType {
     transfer,
@@ -52,6 +42,16 @@ struct PermitType {
     address token;
     address owner;
     uint256 value;
+    uint256 deadline;
+    uint8 v;
+    bytes32 r;
+    bytes32 s;
+}
+
+struct PermitVaultManagerType {
+    address vaultManager;
+    address owner;
+    bool approved;
     uint256 deadline;
     uint8 v;
     bytes32 r;
