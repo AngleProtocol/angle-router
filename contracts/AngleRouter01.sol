@@ -5,6 +5,7 @@ pragma solidity 0.8.12;
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/draft-IERC20PermitUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "./interfaces/IFeeDistributor.sol";
@@ -18,6 +19,79 @@ import "./interfaces/external/uniswap/IUniswapRouter.sol";
 import "./interfaces/IVaultManager.sol";
 import "./interfaces/external/lido/ISteth.sol";
 import "./interfaces/external/lido/IWStETH.sol";
+
+import "hardhat/console.sol";
+
+// =========================== Structs and Enums ===============================
+
+/// @notice Action types
+enum ActionType {
+    claimRewards,
+    claimWeeklyInterest,
+    gaugeDeposit,
+    withdraw,
+    mint,
+    deposit,
+    openPerpetual,
+    addToPerpetual,
+    veANGLEDeposit,
+    borrower,
+    mintSavingsRate,
+    depositSavingsRate,
+    redeemSavingsRate,
+    withdrawSavingsRate
+}
+
+/// @notice All possible swaps
+enum SwapType {
+    UniswapV3,
+    oneINCH,
+    WrapStETH,
+    None
+}
+
+/// @notice Params for swaps
+/// @param inToken Token to swap
+/// @param collateral Token to swap for
+/// @param amountIn Amount of token to sell
+/// @param minAmountOut Minimum amount of collateral to receive for the swap to not revert
+/// @param args Either the path for Uniswap or the payload for 1Inch
+/// @param swapType Which swap route to take
+struct ParamsSwapType {
+    IERC20 inToken;
+    address collateral;
+    uint256 amountIn;
+    uint256 minAmountOut;
+    bytes args;
+    SwapType swapType;
+}
+
+/// @notice Params for direct collateral transfer
+/// @param inToken Token to transfer
+/// @param amountIn Amount of token transfer
+struct TransferType {
+    IERC20 inToken;
+    uint256 amountIn;
+}
+
+/// @notice References to the contracts associated to a collateral for a stablecoin
+struct Pairs {
+    IPoolManager poolManager;
+    IPerpetualManagerFrontWithClaim perpetualManager;
+    ISanToken sanToken;
+    ILiquidityGauge gauge;
+}
+
+/// @notice Data needed to get permits
+struct PermitType {
+    address token;
+    address owner;
+    uint256 value;
+    uint256 deadline;
+    uint8 v;
+    bytes32 r;
+    bytes32 s;
+}
 
 /// @title Angle Router
 /// @author Angle Core Team
@@ -40,73 +114,6 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
     IERC20 public constant ANGLE = IERC20(0x31429d1856aD1377A8A0079410B297e1a9e214c2);
     // @notice veANGLE contract
     IVeANGLE public constant VEANGLE = IVeANGLE(0x0C462Dbb9EC8cD1630f1728B2CFD2769d09f0dd5);
-
-    // =========================== Structs and Enums ===============================
-
-    /// @notice Action types
-    enum ActionType {
-        claimRewards,
-        claimWeeklyInterest,
-        gaugeDeposit,
-        withdraw,
-        mint,
-        deposit,
-        openPerpetual,
-        addToPerpetual,
-        veANGLEDeposit,
-        borrower
-    }
-
-    /// @notice All possible swaps
-    enum SwapType {
-        UniswapV3,
-        oneINCH,
-        WrapStETH,
-        None
-    }
-
-    /// @notice Params for swaps
-    /// @param inToken Token to swap
-    /// @param collateral Token to swap for
-    /// @param amountIn Amount of token to sell
-    /// @param minAmountOut Minimum amount of collateral to receive for the swap to not revert
-    /// @param args Either the path for Uniswap or the payload for 1Inch
-    /// @param swapType Which swap route to take
-    struct ParamsSwapType {
-        IERC20 inToken;
-        address collateral;
-        uint256 amountIn;
-        uint256 minAmountOut;
-        bytes args;
-        SwapType swapType;
-    }
-
-    /// @notice Params for direct collateral transfer
-    /// @param inToken Token to transfer
-    /// @param amountIn Amount of token transfer
-    struct TransferType {
-        IERC20 inToken;
-        uint256 amountIn;
-    }
-
-    /// @notice References to the contracts associated to a collateral for a stablecoin
-    struct Pairs {
-        IPoolManager poolManager;
-        IPerpetualManagerFrontWithClaim perpetualManager;
-        ISanToken sanToken;
-        ILiquidityGauge gauge;
-    }
-
-    /// @notice Data needed to get permits
-    struct PermitType {
-        address token;
-        address owner;
-        uint256 value;
-        uint256 deadline;
-        uint8 v;
-        bytes32 r;
-        bytes32 s;
-    }
 
     // =============================== Events ======================================
 
@@ -524,13 +531,13 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
             } else if (actions[i] == ActionType.veANGLEDeposit) {
                 (address user, uint256 amount) = abi.decode(data[i], (address, uint256));
 
-                amount = _computeProportion(amount, listTokens, balanceTokens, address(ANGLE));
+                amount = _computeProportion(amount, listTokens, balanceTokens, address(ANGLE), true);
                 _depositOnLocker(user, amount);
             } else if (actions[i] == ActionType.gaugeDeposit) {
                 (address user, uint256 amount, address stakedToken, address gauge, bool shouldClaimRewards) = abi
                     .decode(data[i], (address, uint256, address, address, bool));
 
-                amount = _computeProportion(amount, listTokens, balanceTokens, stakedToken);
+                amount = _computeProportion(amount, listTokens, balanceTokens, stakedToken, true);
                 _gaugeDeposit(user, amount, ILiquidityGauge(gauge), shouldClaimRewards);
             } else if (actions[i] == ActionType.deposit) {
                 (
@@ -543,7 +550,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                     address sanToken
                 ) = abi.decode(data[i], (address, uint256, bool, address, address, address, address));
 
-                amount = _computeProportion(amount, listTokens, balanceTokens, collateral);
+                amount = _computeProportion(amount, listTokens, balanceTokens, collateral, true);
                 (amount, sanToken) = _deposit(
                     user,
                     amount,
@@ -564,7 +571,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                     address sanToken
                 ) = abi.decode(data[i], (uint256, bool, address, address, address));
 
-                amount = _computeProportion(amount, listTokens, balanceTokens, sanToken);
+                amount = _computeProportion(amount, listTokens, balanceTokens, sanToken, true);
                 // Reusing the `collateralOrPoolManager` variable to save some variable declarations
                 (amount, collateralOrPoolManager) = _withdraw(
                     amount,
@@ -584,7 +591,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                     address poolManager
                 ) = abi.decode(data[i], (address, uint256, uint256, bool, address, address, address));
 
-                amount = _computeProportion(amount, listTokens, balanceTokens, collateral);
+                amount = _computeProportion(amount, listTokens, balanceTokens, collateral, true);
                 _mint(
                     user,
                     amount,
@@ -606,7 +613,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                     address collateral
                 ) = abi.decode(data[i], (address, uint256, uint256, uint256, uint256, bool, address, address));
 
-                amount = _computeProportion(amount, listTokens, balanceTokens, collateral);
+                amount = _computeProportion(amount, listTokens, balanceTokens, collateral, true);
 
                 _openPerpetual(
                     user,
@@ -627,7 +634,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                     address collateral
                 ) = abi.decode(data[i], (uint256, uint256, bool, address, address));
 
-                amount = _computeProportion(amount, listTokens, balanceTokens, collateral);
+                amount = _computeProportion(amount, listTokens, balanceTokens, collateral, true);
                 _addToPerpetual(amount, perpetualID, addressProcessed, stablecoinOrPerpetualManager, collateral);
             } else if (actions[i] == ActionType.borrower) {
                 (
@@ -701,6 +708,43 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                         paymentData.stablecoinAmountToGive - paymentData.stablecoinAmountToReceive
                     );
                 }
+            } else if (actions[i] == ActionType.mintSavingsRate) {
+                (IERC20 token, IERC4626 savingsRate, uint256 shares, address to, uint256 maxAmountIn) = abi.decode(
+                    data[i],
+                    (IERC20, IERC4626, uint256, address, uint256)
+                );
+                token.approve(address(savingsRate), maxAmountIn);
+                uint256 amountSpent = _mintSavingsRate(savingsRate, shares, to, maxAmountIn);
+                token.approve(address(savingsRate), 0);
+
+                // update the internal balances
+                _computeProportion(amountSpent, listTokens, balanceTokens, address(token), false);
+                if (to == address(this)) _addToList(listTokens, balanceTokens, address(savingsRate), shares);
+            } else if (actions[i] == ActionType.depositSavingsRate) {
+                (IERC20 token, IERC4626 savingsRate, uint256 amount, address to, uint256 minSharesOut) = abi.decode(
+                    data[i],
+                    (IERC20, IERC4626, uint256, address, uint256)
+                );
+                amount = _computeProportion(amount, listTokens, balanceTokens, address(token), true);
+
+                token.approve(address(savingsRate), amount);
+                uint256 shares = _depositSavingsRate(savingsRate, amount, to, minSharesOut);
+
+                if (to == address(this)) _addToList(listTokens, balanceTokens, address(savingsRate), shares);
+            } else if (actions[i] == ActionType.redeemSavingsRate) {
+                (address token, IERC4626 savingsRate, uint256 shares, address to, uint256 minAmountOut) = abi.decode(
+                    data[i],
+                    (address, IERC4626, uint256, address, uint256)
+                );
+                uint256 amount = _redeemSavingsRate(savingsRate, shares, to, minAmountOut);
+                if (to == address(this)) _addToList(listTokens, balanceTokens, token, amount);
+            } else if (actions[i] == ActionType.withdrawSavingsRate) {
+                (address token, IERC4626 savingsRate, uint256 amount, address to, uint256 maxSharesOut) = abi.decode(
+                    data[i],
+                    (address, IERC4626, uint256, address, uint256)
+                );
+                _withdrawSavingsRate(savingsRate, amount, to, maxSharesOut);
+                if (to == address(this)) _addToList(listTokens, balanceTokens, token, amount);
             }
         }
 
@@ -1080,6 +1124,66 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         IPerpetualManagerFrontWithClaim(stablecoinOrPerpetualManager).addToPerpetual(perpetualID, margin);
     }
 
+    //  @notice mint `shares` from an ERC4626 savings rate.
+    //  @param savingsRate The ERC4626 savingsRate to mint shares from.
+    //  @param shares The amount of shares to mint from `savingsRate`.
+    //  @param to The destination of ownership shares.
+    //  @param maxAmountIn The max amount of assets used to mint.
+    //  @return amountIn the amount of assets used to mint by `to`.
+    function _mintSavingsRate(
+        IERC4626 savingsRate,
+        uint256 shares,
+        address to,
+        uint256 maxAmountIn
+    ) internal returns (uint256 amountIn) {
+        if (maxAmountIn < (amountIn = savingsRate.mint(shares, to))) revert TooSmallAmountOut();
+    }
+
+    //  @notice deposit `amount` to an ERC4626 savingsRate.
+    //  @param savingsRate The ERC4626 savingsRate to deposit assets to.
+    //  @param amount The amount of assets to deposit to `savingsRate`.
+    //  @param to The destination of ownership shares.
+    //  @param minSharesOut The min amount of `savingsRate` shares received by `to`.
+    //  @return sharesOut the amount of shares received by `to`.
+    function _depositSavingsRate(
+        IERC4626 savingsRate,
+        uint256 amount,
+        address to,
+        uint256 minSharesOut
+    ) internal returns (uint256 sharesOut) {
+        if ((sharesOut = savingsRate.deposit(amount, to)) < minSharesOut) revert TooSmallAmountOut();
+    }
+
+    //  @notice withdraw `amount` from an ERC4626 savingsRate.
+    //  @param savingsRate The ERC4626 savingsRate to withdraw assets from.
+    //  @param amount The amount of assets to withdraw from savingsRate.
+    //  @param to The destination of assets.
+    //  @param minSharesOut The min amount of shares received by `to`.
+    //  @return sharesOut the amount of shares received by `to`.
+    function _withdrawSavingsRate(
+        IERC4626 savingsRate,
+        uint256 amount,
+        address to,
+        uint256 maxSharesOut
+    ) internal returns (uint256 sharesOut) {
+        if (maxSharesOut < (sharesOut = savingsRate.withdraw(amount, to, msg.sender))) revert TooSmallAmountOut();
+    }
+
+    //  @notice redeem `shares` shares from an ERC4626 savingsRate.
+    //  @param savingsRate The ERC4626 savingsRate to redeem shares from.
+    //  @param shares The amount of shares to redeem from the savingsRate.
+    //  @param to The destination of assets.
+    //  @param minAmountOut The min amount of assets received by `to`.
+    //  @return amountOut the amount of assets received by `to`.
+    function _redeemSavingsRate(
+        IERC4626 savingsRate,
+        uint256 shares,
+        address to,
+        uint256 minAmountOut
+    ) internal returns (uint256 amountOut) {
+        if ((amountOut = savingsRate.redeem(shares, to, msg.sender)) < minAmountOut) revert TooSmallAmountOut();
+    }
+
     // ======================== Internal Utility Functions =========================
 
     /// @notice Parses the actions submitted to the router contract to interact with a `VaultManager` and makes sure that
@@ -1189,14 +1293,16 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         uint256 proportion,
         address[_MAX_TOKENS] memory list,
         uint256[_MAX_TOKENS] memory balances,
-        address searchFor
+        address searchFor,
+        bool isProportion
     ) internal pure returns (uint256 amount) {
         uint256 index = _searchList(list, searchFor);
 
         // Reverts if the index was not found
         if (list[index] == address(0)) revert InvalidConditions();
 
-        amount = (proportion * balances[index]) / BASE_PARAMS;
+        if (isProportion) amount = (proportion * balances[index]) / BASE_PARAMS;
+        else amount = proportion;
         balances[index] -= amount;
     }
 
@@ -1398,7 +1504,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         revert InvalidReturnMessage();
     }
 
-    /* For context, we give here the initialize function that was used for this contract in another implementation
+    // /// For context, we give here the initialize function that was used for this contract in another implementation
     /// @notice Deploys the `AngleRouter` contract
     /// @param _governor Governor address
     /// @param _guardian Guardian address
@@ -1445,5 +1551,4 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
             _addPair(existingStableMaster, existingPoolManagers[i], existingLiquidityGauges[i]);
         }
     }
-    */
 }

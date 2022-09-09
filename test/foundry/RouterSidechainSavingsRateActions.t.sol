@@ -20,7 +20,7 @@ contract RouterSidechainSavingsRateActionsTest is BaseTest {
     MockSavingsRate public savingsRate;
 
     // can be played with to test for different decimal tokens
-    uint8 TOKEN_DECIMAL = 18;
+    uint8 public TOKEN_DECIMAL = 18;
 
     function setUp() public virtual override {
         super.setUp();
