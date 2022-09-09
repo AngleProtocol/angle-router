@@ -1505,50 +1505,50 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
     }
 
     // /// For context, we give here the initialize function that was used for this contract in another implementation
-    /// @notice Deploys the `AngleRouter` contract
-    /// @param _governor Governor address
-    /// @param _guardian Guardian address
-    /// @param _uniswapV3Router UniswapV3 router address
-    /// @param _oneInch 1Inch aggregator address
-    /// @param existingStableMaster Address of the existing `StableMaster`
-    /// @param existingPoolManagers Addresses of the associated poolManagers
-    /// @param existingLiquidityGauges Addresses of liquidity gauge contracts associated to sanTokens
-    /// @dev Be cautious with safe approvals, all tokens will have unlimited approvals within the protocol or
-    /// UniswapV3 and 1Inch
-    function initialize(
-        address _governor,
-        address _guardian,
-        IUniswapV3Router _uniswapV3Router,
-        address _oneInch,
-        IStableMasterFront existingStableMaster,
-        IPoolManager[] calldata existingPoolManagers,
-        ILiquidityGauge[] calldata existingLiquidityGauges
-    ) public initializer {
-        // Checking the parameters passed
-        require(
-            address(_uniswapV3Router) != address(0) &&
-                _oneInch != address(0) &&
-                _governor != address(0) &&
-                _guardian != address(0),
-            "0"
-        );
-        require(_governor != _guardian, "49");
-        require(existingPoolManagers.length == existingLiquidityGauges.length, "104");
-        // Fetching the stablecoin and mapping it to the `StableMaster`
-        mapStableMasters[
-            IERC20(address(IStableMaster(address(existingStableMaster)).agToken()))
-        ] = existingStableMaster;
-        // Setting roles
-        governor = _governor;
-        guardian = _guardian;
-        uniswapV3Router = _uniswapV3Router;
-        oneInch = _oneInch;
+    // /// @notice Deploys the `AngleRouter` contract
+    // /// @param _governor Governor address
+    // /// @param _guardian Guardian address
+    // /// @param _uniswapV3Router UniswapV3 router address
+    // /// @param _oneInch 1Inch aggregator address
+    // /// @param existingStableMaster Address of the existing `StableMaster`
+    // /// @param existingPoolManagers Addresses of the associated poolManagers
+    // /// @param existingLiquidityGauges Addresses of liquidity gauge contracts associated to sanTokens
+    // /// @dev Be cautious with safe approvals, all tokens will have unlimited approvals within the protocol or
+    // /// UniswapV3 and 1Inch
+    // function initialize(
+    //     address _governor,
+    //     address _guardian,
+    //     IUniswapV3Router _uniswapV3Router,
+    //     address _oneInch,
+    //     IStableMasterFront existingStableMaster,
+    //     IPoolManager[] calldata existingPoolManagers,
+    //     ILiquidityGauge[] calldata existingLiquidityGauges
+    // ) public initializer {
+    //     // Checking the parameters passed
+    //     require(
+    //         address(_uniswapV3Router) != address(0) &&
+    //             _oneInch != address(0) &&
+    //             _governor != address(0) &&
+    //             _guardian != address(0),
+    //         "0"
+    //     );
+    //     require(_governor != _guardian, "49");
+    //     require(existingPoolManagers.length == existingLiquidityGauges.length, "104");
+    //     // Fetching the stablecoin and mapping it to the `StableMaster`
+    //     mapStableMasters[
+    //         IERC20(address(IStableMaster(address(existingStableMaster)).agToken()))
+    //     ] = existingStableMaster;
+    //     // Setting roles
+    //     governor = _governor;
+    //     guardian = _guardian;
+    //     uniswapV3Router = _uniswapV3Router;
+    //     oneInch = _oneInch;
 
-        // for veANGLEDeposit action
-        ANGLE.safeApprove(address(VEANGLE), type(uint256).max);
+    //     // for veANGLEDeposit action
+    //     ANGLE.safeApprove(address(VEANGLE), type(uint256).max);
 
-        for (uint256 i = 0; i < existingPoolManagers.length; i++) {
-            _addPair(existingStableMaster, existingPoolManagers[i], existingLiquidityGauges[i]);
-        }
-    }
+    //     for (uint256 i = 0; i < existingPoolManagers.length; i++) {
+    //         _addPair(existingStableMaster, existingPoolManagers[i], existingLiquidityGauges[i]);
+    //     }
+    // }
 }

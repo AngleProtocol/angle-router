@@ -20,8 +20,9 @@ contract AngleRouter01Test is BaseTest {
     uint64 public constant BASE_PARAMS = 1e9;
     uint256 public constant BASE_TOKENS = 1 ether;
 
-    AngleRouter public implementationRouter;
-    AngleRouter public router;
+    ProxyAdmin public proxyAdminRouter = ProxyAdmin(0x1D941EF0D3Bba4ad67DBfBCeE5262F4CEE53A32b);
+    AngleRouter public newImplementationRouter;
+    AngleRouter public routerProxy = AngleRouter(payable(address(0xBB755240596530be0c1DE5DFD77ec6398471561d)));
     MockStableMaster public stableMaster;
     MockTokenPermit public token;
     MockSavingsRate public savingsRate;
@@ -37,25 +38,11 @@ contract AngleRouter01Test is BaseTest {
 
         token = new MockTokenPermit("token", "token", TOKEN_DECIMAL);
         stableMaster = new MockStableMaster(address(token));
-        implementationRouter = new AngleRouter();
-        router = AngleRouter(
-            payable(
-                address(
-                    deployUpgradeable(
-                        address(implementationRouter),
-                        abi.encodeWithSelector(
-                            implementationRouter.initialize.selector,
-                            _GOVERNOR,
-                            _GUARDIAN,
-                            uniswapV3Router,
-                            oneInch,
-                            IStableMasterFront(address(stableMaster)),
-                            new IPoolManager[](0),
-                            new ILiquidityGauge[](0)
-                        )
-                    )
-                )
-            )
+        newImplementationRouter = new AngleRouter();
+        vm.prank(_GOVERNOR);
+        proxyAdminRouter.upgrade(
+            TransparentUpgradeableProxy(payable(address(routerProxy))),
+            address(newImplementationRouter)
         );
         savingsRate = new MockSavingsRate(IERC20Metadata(address(token)));
     }
@@ -83,7 +70,7 @@ contract AngleRouter01Test is BaseTest {
         address to,
         uint256 gainOrLoss
     ) public {
-        vm.assume(to != address(0) && to != address(router));
+        vm.assume(to != address(0) && to != address(routerProxy));
         uint256 balanceUsers = BASE_TOKENS * 1 ether;
         deal(address(token), address(_alice), balanceUsers);
 
@@ -106,22 +93,22 @@ contract AngleRouter01Test is BaseTest {
         data[0] = abi.encode(token, savingsRate, shares, to, maxAmount);
 
         vm.startPrank(_alice);
-        token.approve(address(router), type(uint256).max);
+        token.approve(address(routerProxy), type(uint256).max);
         // as this is a mock vault, previewMint is exactly what is needed to mint
         if (maxAmount < previewMint) {
             vm.expectRevert(bytes("ERC20: insufficient allowance"));
-            router.mixer(paramsPermit, transfers, swaps, actionType, data);
+            routerProxy.mixer(paramsPermit, transfers, swaps, actionType, data);
             return;
         } else {
-            router.mixer(paramsPermit, transfers, swaps, actionType, data);
+            routerProxy.mixer(paramsPermit, transfers, swaps, actionType, data);
         }
         vm.stopPrank();
 
-        assertEq(savingsRate.balanceOf(address(router)), 0);
+        assertEq(savingsRate.balanceOf(address(routerProxy)), 0);
         assertEq(savingsRate.balanceOf(address(_alice)), 0);
         assertEq(savingsRate.balanceOf(address(to)), shares);
 
-        assertEq(token.balanceOf(address(router)), 0);
+        assertEq(token.balanceOf(address(routerProxy)), 0);
         assertEq(token.balanceOf(address(_alice)), balanceUsers - previewMint);
         assertEq(token.balanceOf(address(to)), 0);
     }
@@ -132,7 +119,7 @@ contract AngleRouter01Test is BaseTest {
         uint256 maxAmount,
         uint256 gainOrLoss
     ) public {
-        address to = address(router);
+        address to = address(routerProxy);
         uint256 balanceUsers = BASE_TOKENS * 1 ether;
         deal(address(token), address(_alice), balanceUsers);
 
@@ -155,21 +142,21 @@ contract AngleRouter01Test is BaseTest {
         data[0] = abi.encode(token, savingsRate, shares, to, maxAmount);
 
         vm.startPrank(_alice);
-        token.approve(address(router), type(uint256).max);
+        token.approve(address(routerProxy), type(uint256).max);
         // as this is a mock vault, previewMint is exactly what is needed to mint
         if (maxAmount < previewMint) {
             vm.expectRevert(bytes("ERC20: insufficient allowance"));
-            router.mixer(paramsPermit, transfers, swaps, actionType, data);
+            routerProxy.mixer(paramsPermit, transfers, swaps, actionType, data);
             return;
         } else {
-            router.mixer(paramsPermit, transfers, swaps, actionType, data);
+            routerProxy.mixer(paramsPermit, transfers, swaps, actionType, data);
         }
         vm.stopPrank();
 
-        assertEq(savingsRate.balanceOf(address(router)), 0);
+        assertEq(savingsRate.balanceOf(address(routerProxy)), 0);
         assertEq(savingsRate.balanceOf(address(_alice)), shares);
 
-        assertEq(token.balanceOf(address(router)), 0);
+        assertEq(token.balanceOf(address(routerProxy)), 0);
         assertEq(token.balanceOf(address(_alice)), balanceUsers - previewMint);
     }
 
@@ -180,7 +167,7 @@ contract AngleRouter01Test is BaseTest {
         address to,
         uint256 gainOrLoss
     ) public {
-        vm.assume(to != address(0) && to != address(router));
+        vm.assume(to != address(0) && to != address(routerProxy));
 
         uint256 balanceUsers = BASE_TOKENS * 1 ether;
         deal(address(token), address(_alice), balanceUsers);
@@ -201,22 +188,22 @@ contract AngleRouter01Test is BaseTest {
         data[0] = abi.encode(token, savingsRate, BASE_PARAMS, to, minSharesOut);
 
         vm.startPrank(_alice);
-        token.approve(address(router), type(uint256).max);
+        token.approve(address(routerProxy), type(uint256).max);
         // as this is a mock vault, previewMint is exactly what is needed to mint
         if (previewDeposit < minSharesOut) {
             vm.expectRevert(AngleRouter.TooSmallAmountOut.selector);
-            router.mixer(paramsPermit, transfers, swaps, actionType, data);
+            routerProxy.mixer(paramsPermit, transfers, swaps, actionType, data);
             return;
         } else {
-            router.mixer(paramsPermit, transfers, swaps, actionType, data);
+            routerProxy.mixer(paramsPermit, transfers, swaps, actionType, data);
         }
         vm.stopPrank();
 
-        assertEq(savingsRate.balanceOf(address(router)), 0);
+        assertEq(savingsRate.balanceOf(address(routerProxy)), 0);
         assertEq(savingsRate.balanceOf(address(_alice)), 0);
         assertEq(savingsRate.balanceOf(address(to)), previewDeposit);
 
-        assertEq(token.balanceOf(address(router)), 0);
+        assertEq(token.balanceOf(address(routerProxy)), 0);
         assertEq(token.balanceOf(address(_alice)), balanceUsers - amount);
         assertEq(token.balanceOf(address(to)), 0);
     }
@@ -227,7 +214,7 @@ contract AngleRouter01Test is BaseTest {
         uint256 minSharesOut,
         uint256 gainOrLoss
     ) public {
-        address to = address(router);
+        address to = address(routerProxy);
 
         uint256 balanceUsers = BASE_TOKENS * 1 ether;
         deal(address(token), address(_alice), balanceUsers);
@@ -248,21 +235,21 @@ contract AngleRouter01Test is BaseTest {
         data[0] = abi.encode(token, savingsRate, BASE_PARAMS, to, minSharesOut);
 
         vm.startPrank(_alice);
-        token.approve(address(router), type(uint256).max);
+        token.approve(address(routerProxy), type(uint256).max);
         // as this is a mock vault, previewMint is exactly what is needed to mint
         if (previewDeposit < minSharesOut) {
             vm.expectRevert(AngleRouter.TooSmallAmountOut.selector);
-            router.mixer(paramsPermit, transfers, swaps, actionType, data);
+            routerProxy.mixer(paramsPermit, transfers, swaps, actionType, data);
             return;
         } else {
-            router.mixer(paramsPermit, transfers, swaps, actionType, data);
+            routerProxy.mixer(paramsPermit, transfers, swaps, actionType, data);
         }
         vm.stopPrank();
 
-        assertEq(savingsRate.balanceOf(address(router)), 0);
+        assertEq(savingsRate.balanceOf(address(routerProxy)), 0);
         assertEq(savingsRate.balanceOf(address(_alice)), previewDeposit);
 
-        assertEq(token.balanceOf(address(router)), 0);
+        assertEq(token.balanceOf(address(routerProxy)), 0);
         assertEq(token.balanceOf(address(_alice)), balanceUsers - amount);
     }
 
@@ -275,7 +262,7 @@ contract AngleRouter01Test is BaseTest {
         uint256 gainOrLoss,
         uint256 gainOrLoss2
     ) public {
-        vm.assume(to != address(0) && to != address(router));
+        vm.assume(to != address(0) && to != address(routerProxy));
         uint256 balanceUsers = BASE_TOKENS * 1 ether;
         deal(address(token), address(_alice), balanceUsers);
 
@@ -300,14 +287,14 @@ contract AngleRouter01Test is BaseTest {
             data[0] = abi.encode(token, savingsRate, BASE_PARAMS, _alice, previewDeposit);
 
             vm.startPrank(_alice);
-            token.approve(address(router), type(uint256).max);
-            router.mixer(paramsPermit, transfers, swaps, actionType, data);
+            token.approve(address(routerProxy), type(uint256).max);
+            routerProxy.mixer(paramsPermit, transfers, swaps, actionType, data);
             vm.stopPrank();
 
-            assertEq(savingsRate.balanceOf(address(router)), 0);
+            assertEq(savingsRate.balanceOf(address(routerProxy)), 0);
             assertEq(savingsRate.balanceOf(address(_alice)), previewDeposit);
             assertEq(savingsRate.balanceOf(address(to)), 0);
-            assertEq(token.balanceOf(address(router)), 0);
+            assertEq(token.balanceOf(address(routerProxy)), 0);
             assertEq(token.balanceOf(address(_alice)), balanceUsers - aliceAmount);
             assertEq(token.balanceOf(address(to)), 0);
 
@@ -328,25 +315,25 @@ contract AngleRouter01Test is BaseTest {
 
             uint256 previewRedeem = savingsRate.previewRedeem(sharesToBurn);
             vm.startPrank(_alice);
-            savingsRate.approve(address(router), type(uint256).max);
+            savingsRate.approve(address(routerProxy), type(uint256).max);
             // as this is a mock vault, previewRedeem is exactly what should be received
             if (previewRedeem < minAmount) {
                 vm.expectRevert(AngleRouter.TooSmallAmountOut.selector);
-                router.mixer(paramsPermit, transfers, swaps, actionType, data);
+                routerProxy.mixer(paramsPermit, transfers, swaps, actionType, data);
                 return;
             } else {
-                router.mixer(paramsPermit, transfers, swaps, actionType, data);
+                routerProxy.mixer(paramsPermit, transfers, swaps, actionType, data);
             }
             vm.stopPrank();
 
             assertEq(token.balanceOf(address(to)), previewRedeem);
         }
 
-        assertEq(savingsRate.balanceOf(address(router)), 0);
+        assertEq(savingsRate.balanceOf(address(routerProxy)), 0);
         assertEq(savingsRate.balanceOf(address(_alice)), previewDeposit - sharesToBurn);
         assertEq(savingsRate.balanceOf(address(to)), 0);
 
-        assertEq(token.balanceOf(address(router)), 0);
+        assertEq(token.balanceOf(address(routerProxy)), 0);
         assertEq(token.balanceOf(address(_alice)), balanceUsers - aliceAmount);
     }
 
@@ -382,13 +369,13 @@ contract AngleRouter01Test is BaseTest {
             data[0] = abi.encode(token, savingsRate, BASE_PARAMS, _alice, previewDeposit);
 
             vm.startPrank(_alice);
-            token.approve(address(router), type(uint256).max);
-            router.mixer(paramsPermit, transfers, swaps, actionType, data);
+            token.approve(address(routerProxy), type(uint256).max);
+            routerProxy.mixer(paramsPermit, transfers, swaps, actionType, data);
             vm.stopPrank();
 
-            assertEq(savingsRate.balanceOf(address(router)), 0);
+            assertEq(savingsRate.balanceOf(address(routerProxy)), 0);
             assertEq(savingsRate.balanceOf(address(_alice)), previewDeposit);
-            assertEq(token.balanceOf(address(router)), 0);
+            assertEq(token.balanceOf(address(routerProxy)), 0);
             assertEq(token.balanceOf(address(_alice)), balanceUsers - aliceAmount);
 
             // make the savings rate have a loss / gain
@@ -404,25 +391,25 @@ contract AngleRouter01Test is BaseTest {
             data = new bytes[](1);
 
             actionType[0] = ActionType.redeemSavingsRate;
-            data[0] = abi.encode(IERC20(address(token)), savingsRate, sharesToBurn, address(router), minAmount);
+            data[0] = abi.encode(IERC20(address(token)), savingsRate, sharesToBurn, address(routerProxy), minAmount);
 
             previewRedeem = savingsRate.previewRedeem(sharesToBurn);
             vm.startPrank(_alice);
-            savingsRate.approve(address(router), type(uint256).max);
+            savingsRate.approve(address(routerProxy), type(uint256).max);
             // as this is a mock vault, previewRedeem is exactly what should be received
             if (previewRedeem < minAmount) {
                 vm.expectRevert(AngleRouter.TooSmallAmountOut.selector);
-                router.mixer(paramsPermit, transfers, swaps, actionType, data);
+                routerProxy.mixer(paramsPermit, transfers, swaps, actionType, data);
                 return;
             } else {
-                router.mixer(paramsPermit, transfers, swaps, actionType, data);
+                routerProxy.mixer(paramsPermit, transfers, swaps, actionType, data);
             }
             vm.stopPrank();
             assertEq(savingsRate.balanceOf(address(_alice)), previewDeposit - sharesToBurn);
         }
 
-        assertEq(savingsRate.balanceOf(address(router)), 0);
-        assertEq(token.balanceOf(address(router)), 0);
+        assertEq(savingsRate.balanceOf(address(routerProxy)), 0);
+        assertEq(token.balanceOf(address(routerProxy)), 0);
         assertEq(token.balanceOf(address(_alice)), balanceUsers - aliceAmount + previewRedeem);
     }
 
@@ -435,7 +422,7 @@ contract AngleRouter01Test is BaseTest {
         uint256 gainOrLoss,
         uint256 gainOrLoss2
     ) public {
-        vm.assume(to != address(0) && to != address(router));
+        vm.assume(to != address(0) && to != address(routerProxy));
         uint256 balanceUsers = BASE_TOKENS * 1 ether;
         deal(address(token), address(_alice), balanceUsers);
 
@@ -459,8 +446,8 @@ contract AngleRouter01Test is BaseTest {
             data[0] = abi.encode(token, savingsRate, BASE_PARAMS, _alice, previewDeposit);
 
             vm.startPrank(_alice);
-            token.approve(address(router), type(uint256).max);
-            router.mixer(paramsPermit, transfers, swaps, actionType, data);
+            token.approve(address(routerProxy), type(uint256).max);
+            routerProxy.mixer(paramsPermit, transfers, swaps, actionType, data);
             vm.stopPrank();
 
             // make the savings rate have a loss / gain
@@ -481,17 +468,17 @@ contract AngleRouter01Test is BaseTest {
             uint256 previewWithdraw = savingsRate.previewWithdraw(withdraw);
 
             vm.startPrank(_alice);
-            savingsRate.approve(address(router), type(uint256).max);
+            savingsRate.approve(address(routerProxy), type(uint256).max);
             if (withdraw > savingsRate.maxWithdraw(_alice)) {
                 vm.expectRevert(bytes("ERC4626: withdraw more than max"));
-                router.mixer(paramsPermit, transfers, swaps, actionType, data);
+                routerProxy.mixer(paramsPermit, transfers, swaps, actionType, data);
                 return;
             } else if (previewWithdraw > maxAmountBurn) {
                 vm.expectRevert(AngleRouter.TooSmallAmountOut.selector);
-                router.mixer(paramsPermit, transfers, swaps, actionType, data);
+                routerProxy.mixer(paramsPermit, transfers, swaps, actionType, data);
                 return;
             } else {
-                router.mixer(paramsPermit, transfers, swaps, actionType, data);
+                routerProxy.mixer(paramsPermit, transfers, swaps, actionType, data);
             }
             vm.stopPrank();
 
@@ -499,10 +486,10 @@ contract AngleRouter01Test is BaseTest {
             assertEq(token.balanceOf(address(to)), withdraw);
         }
 
-        assertEq(savingsRate.balanceOf(address(router)), 0);
+        assertEq(savingsRate.balanceOf(address(routerProxy)), 0);
         assertEq(savingsRate.balanceOf(address(to)), 0);
 
-        assertEq(token.balanceOf(address(router)), 0);
+        assertEq(token.balanceOf(address(routerProxy)), 0);
         assertEq(token.balanceOf(address(_alice)), balanceUsers - aliceAmount);
     }
 
@@ -537,8 +524,8 @@ contract AngleRouter01Test is BaseTest {
             data[0] = abi.encode(token, savingsRate, BASE_PARAMS, _alice, previewDeposit);
 
             vm.startPrank(_alice);
-            token.approve(address(router), type(uint256).max);
-            router.mixer(paramsPermit, transfers, swaps, actionType, data);
+            token.approve(address(routerProxy), type(uint256).max);
+            routerProxy.mixer(paramsPermit, transfers, swaps, actionType, data);
             vm.stopPrank();
 
             // make the savings rate have a loss / gain
@@ -554,23 +541,23 @@ contract AngleRouter01Test is BaseTest {
 
             transfers = new TransferType[](0);
             actionType[0] = ActionType.withdrawSavingsRate;
-            data[0] = abi.encode(IERC20(address(token)), savingsRate, withdraw, address(router), maxAmountBurn);
+            data[0] = abi.encode(IERC20(address(token)), savingsRate, withdraw, address(routerProxy), maxAmountBurn);
 
             {
                 uint256 previewWithdraw = savingsRate.previewWithdraw(withdraw);
 
                 vm.startPrank(_alice);
-                savingsRate.approve(address(router), type(uint256).max);
+                savingsRate.approve(address(routerProxy), type(uint256).max);
                 if (withdraw > savingsRate.maxWithdraw(_alice)) {
                     vm.expectRevert(bytes("ERC4626: withdraw more than max"));
-                    router.mixer(paramsPermit, transfers, swaps, actionType, data);
+                    routerProxy.mixer(paramsPermit, transfers, swaps, actionType, data);
                     return;
                 } else if (previewWithdraw > maxAmountBurn) {
                     vm.expectRevert(AngleRouter.TooSmallAmountOut.selector);
-                    router.mixer(paramsPermit, transfers, swaps, actionType, data);
+                    routerProxy.mixer(paramsPermit, transfers, swaps, actionType, data);
                     return;
                 } else {
-                    router.mixer(paramsPermit, transfers, swaps, actionType, data);
+                    routerProxy.mixer(paramsPermit, transfers, swaps, actionType, data);
                 }
                 vm.stopPrank();
 
@@ -579,7 +566,7 @@ contract AngleRouter01Test is BaseTest {
             assertEq(token.balanceOf(address(_alice)), balanceUsers - aliceAmount + withdraw);
         }
 
-        assertEq(savingsRate.balanceOf(address(router)), 0);
-        assertEq(token.balanceOf(address(router)), 0);
+        assertEq(savingsRate.balanceOf(address(routerProxy)), 0);
+        assertEq(token.balanceOf(address(routerProxy)), 0);
     }
 }
