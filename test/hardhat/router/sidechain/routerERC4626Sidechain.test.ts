@@ -1,22 +1,22 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
-import { BigNumber, BytesLike, Signer } from 'ethers';
+import { BigNumber, Signer } from 'ethers';
 import { parseEther, parseUnits } from 'ethers/lib/utils';
 import hre, { contract, ethers, web3 } from 'hardhat';
 
 import {
+  Mock1Inch,
+  Mock1Inch__factory,
+  MockERC4626,
+  MockERC4626__factory,
   MockRouterSidechain,
   MockRouterSidechain__factory,
   MockTokenPermit,
   MockTokenPermit__factory,
-  MockERC4626,
-  MockERC4626__factory,
-  Mock1Inch,
-  Mock1Inch__factory,
 } from '../../../../typechain';
 import { expect } from '../../../../utils/chai-setup';
 import { ActionTypeSidechain, initToken, TypePermit } from '../../../../utils/helpers';
 import { signPermit } from '../../../../utils/sign';
-import { deployUpgradeable, latestTime, MAX_UINT256, ZERO_ADDRESS } from '../../utils/helpers';
+import { deployUpgradeable } from '../../utils/helpers';
 
 contract('BaseAngleRouterSidechain - ERC4626 functionalities', () => {
   // As a proxy for the AngleRouter sidechain we're using the Polygon implementation of it
@@ -527,6 +527,4 @@ contract('BaseAngleRouterSidechain - ERC4626 functionalities', () => {
       expect(await strat2.allowance(alice.address, router.address)).to.be.equal(parseEther('1299'));
     });
   });
-
-  // TODO deposit from swap and see if works normal and redeem then swap
 });
