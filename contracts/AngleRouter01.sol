@@ -1053,12 +1053,12 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         IPerpetualManagerFrontWithClaim(stablecoinOrPerpetualManager).addToPerpetual(perpetualID, margin);
     }
 
-    //  @notice mint `shares` from an ERC4626 savings rate.
-    //  @param savingsRate The ERC4626 savingsRate to mint shares from.
-    //  @param shares The amount of shares to mint from `savingsRate`.
-    //  @param to The destination of ownership shares.
-    //  @param maxAmountIn The max amount of assets used to mint.
-    //  @return amountIn the amount of assets used to mint by `to`.
+    /// @notice Mints `shares` from an ERC4626 Savings Rate contract
+    /// @param savingsRate The ERC4626 savingsRate to mint shares from
+    /// @param shares Amount of shares to mint from `savingsRate`
+    /// @param to Address to which the minted shares should be sent
+    /// @param maxAmountIn Max amount of assets used to mint
+    /// @return amountIn Amount of assets used to mint by `to`
     function _mintSavingsRate(
         IERC4626 savingsRate,
         uint256 shares,
@@ -1068,12 +1068,12 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         if (maxAmountIn < (amountIn = savingsRate.mint(shares, to))) revert TooSmallAmountOut();
     }
 
-    //  @notice deposit `amount` to an ERC4626 savingsRate.
-    //  @param savingsRate The ERC4626 savingsRate to deposit assets to.
-    //  @param amount The amount of assets to deposit to `savingsRate`.
-    //  @param to The destination of ownership shares.
-    //  @param minSharesOut The min amount of `savingsRate` shares received by `to`.
-    //  @return sharesOut the amount of shares received by `to`.
+    /// @notice Deposits `amount` to an ERC4626 Savings Rate contract
+    /// @param savingsRate The ERC4626 savingsRate to deposit assets to
+    /// @param amount Amount of assets to deposit to `savingsRate`.
+    /// @param to Address to which the minted shares should be sent
+    /// @param minSharesOut Minimum amount of `savingsRate` shares the `to` address should receive
+    /// @return sharesOut Amount of shares received by `to`
     function _depositSavingsRate(
         IERC4626 savingsRate,
         uint256 amount,
@@ -1083,12 +1083,12 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         if ((sharesOut = savingsRate.deposit(amount, to)) < minSharesOut) revert TooSmallAmountOut();
     }
 
-    //  @notice withdraw `amount` from an ERC4626 savingsRate.
-    //  @param savingsRate The ERC4626 savingsRate to withdraw assets from.
-    //  @param amount The amount of assets to withdraw from savingsRate.
-    //  @param to The destination of assets.
-    //  @param minSharesOut The min amount of shares received by `to`.
-    //  @return sharesOut the amount of shares received by `to`.
+    /// @notice Withdraws `amount` of assets from an ERC4626 Savings Rate contract
+    /// @param savingsRate The ERC4626 savingsRate to withdraw assets from
+    /// @param amount Amount of assets to withdraw from the savingsRate contract
+    /// @param to Address to which the withdrawn assets should be sent
+    /// @param maxSharesOut Maximum amount of shares that should be burnt in this withdrawal operation
+    /// @return sharesOut Amount of shares received by the `to` address
     function _withdrawSavingsRate(
         IERC4626 savingsRate,
         uint256 amount,
@@ -1098,12 +1098,12 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         if (maxSharesOut < (sharesOut = savingsRate.withdraw(amount, to, msg.sender))) revert TooSmallAmountOut();
     }
 
-    //  @notice redeem `shares` shares from an ERC4626 savingsRate.
-    //  @param savingsRate The ERC4626 savingsRate to redeem shares from.
-    //  @param shares The amount of shares to redeem from the savingsRate.
-    //  @param to The destination of assets.
-    //  @param minAmountOut The min amount of assets received by `to`.
-    //  @return amountOut the amount of assets received by `to`.
+    /// @notice Redeems `shares` shares from an ERC4626 savingsRate.
+    /// @param savingsRate The ERC4626 savingsRate to redeem shares from.
+    /// @param shares Amount of shares to redeem from the savingsRate contract
+    /// @param to Address to which the withdrawn assets should be sent
+    /// @param minAmountOut Minimum amount of assets that the `to` address should receive
+    /// @return amountOut Amount of assets received by the `to` address
     function _redeemSavingsRate(
         IERC4626 savingsRate,
         uint256 shares,
@@ -1215,6 +1215,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
     /// @param list Collateral list
     /// @param balances Balances of each collateral asset in the collateral list
     /// @param searchFor Collateral to look for
+    /// @param isProportion Whether the `proportion` parameter is to be seen as an actual proportion or as a full amount
     /// @return amount Amount to use for the action (based on the proportion given)
     /// @dev To use all the collateral balance available for an action, users should give `proportion` a value of
     /// `BASE_PARAMS`

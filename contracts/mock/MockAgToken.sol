@@ -174,7 +174,7 @@ contract MockAgToken is IAgToken, ERC20PermitUpgradeable {
         address to
     ) external returns (uint256) {
         IERC20(bridgeToken).safeTransferFrom(msg.sender, address(this), amount);
-        uint256 canonicalOut = amount * (BASE_PARAMS - inFees)/BASE_PARAMS;
+        uint256 canonicalOut = (amount * (BASE_PARAMS - inFees)) / BASE_PARAMS;
         _mint(to, canonicalOut);
         return canonicalOut;
     }
@@ -185,7 +185,7 @@ contract MockAgToken is IAgToken, ERC20PermitUpgradeable {
         address to
     ) external returns (uint256) {
         _burn(msg.sender, amount);
-        uint256 bridgeOut = amount * (BASE_PARAMS - outFees)/BASE_PARAMS;
+        uint256 bridgeOut = (amount * (BASE_PARAMS - outFees)) / BASE_PARAMS;
 
         IERC20(bridgeToken).safeTransfer(to, bridgeOut);
         return bridgeOut;
@@ -195,6 +195,4 @@ contract MockAgToken is IAgToken, ERC20PermitUpgradeable {
         inFees = _inFees;
         outFees = _outFees;
     }
-
-
 }
