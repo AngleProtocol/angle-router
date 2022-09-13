@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.12;
 
-
 contract MockCoreBorrow {
     mapping(address => bool) public flashLoaners;
     mapping(address => bool) public governors;
@@ -12,7 +11,7 @@ contract MockCoreBorrow {
         return flashLoaners[treasury];
     }
 
-    function isGovernor(address admin) external view  returns (bool) {
+    function isGovernor(address admin) external view returns (bool) {
         return governors[admin];
     }
 
@@ -31,5 +30,4 @@ contract MockCoreBorrow {
     function toggleFlashLoaners(address admin) external {
         flashLoaners[admin] = !flashLoaners[admin];
     }
-
 }

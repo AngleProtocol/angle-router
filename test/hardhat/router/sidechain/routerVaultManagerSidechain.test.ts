@@ -28,7 +28,7 @@ import { signPermit } from '../../../../utils/sign';
 import { signPermitNFT } from '../../../../utils/sigUtilsNFT';
 import { deployUpgradeable, latestTime, ZERO_ADDRESS } from '../../utils/helpers';
 
-contract('BaseAngleRouterSidechain - VaultManager New functionalities', () => {
+contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
   // As a proxy for the AngleRouter sidechain we're using the Polygon implementation of it
   let deployer: SignerWithAddress;
   let USDC: MockTokenPermit;

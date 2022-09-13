@@ -28,7 +28,7 @@ import { signPermit } from '../../../utils/sign';
 import { signPermitNFT } from '../../../utils/sigUtilsNFT';
 import { deployUpgradeable, latestTime, MAX_UINT256, ZERO_ADDRESS } from '../utils/helpers';
 
-contract('Router - VaultManager New functionalities', () => {
+contract('Router - VaultManager Functionalities', () => {
   let deployer: SignerWithAddress;
   let USDC: MockTokenPermit;
   let agEUR: MockAgToken;

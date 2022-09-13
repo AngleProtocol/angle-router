@@ -21,7 +21,7 @@ import { TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS } from 'hardhat/builtin-tasks/ta
 import { HardhatUserConfig, subtask } from 'hardhat/config';
 import yargs from 'yargs';
 
-import { accounts, nodeUrl } from './utils/network';
+import { accounts, etherscanKey, nodeUrl } from './utils/network';
 
 // Otherwise, ".sol" files from "test" are picked up during compilation and throw an error
 subtask(TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS).setAction(async (_, __, runSuper) => {
@@ -120,6 +120,11 @@ const config: HardhatUserConfig = {
       url: nodeUrl('polygon'),
       accounts: accounts('polygon'),
       gas: 'auto',
+      verify: {
+        etherscan: {
+          apiKey: etherscanKey('polygon'),
+        },
+      },
     },
     mainnet: {
       live: true,
@@ -128,6 +133,11 @@ const config: HardhatUserConfig = {
       gas: 'auto',
       gasMultiplier: 1.3,
       chainId: 1,
+      verify: {
+        etherscan: {
+          apiKey: etherscanKey('mainnet'),
+        },
+      },
     },
     mainnetForkRemote: {
       live: false,
@@ -140,6 +150,11 @@ const config: HardhatUserConfig = {
       accounts: accounts('optimism'),
       gas: 'auto',
       chainId: 10,
+      verify: {
+        etherscan: {
+          apiKey: etherscanKey('optimism'),
+        },
+      },
     },
     arbitrum: {
       live: true,
@@ -147,6 +162,11 @@ const config: HardhatUserConfig = {
       accounts: accounts('arbitrum'),
       gas: 'auto',
       chainId: 42161,
+      verify: {
+        etherscan: {
+          apiKey: etherscanKey('arbitrum'),
+        },
+      },
     },
     avalanche: {
       live: true,
@@ -203,6 +223,7 @@ const config: HardhatUserConfig = {
     spacing: 2,
   },
   etherscan: {
+    /*
     // eslint-disable-next-line
     // @ts-ignore
     apiKey: {
@@ -212,7 +233,8 @@ const config: HardhatUserConfig = {
       avalanche: process.env.AVALANCHE_ETHERSCAN_API_KEY,
       polygon: process.env.POLYGON_ETHERSCAN_API_KEY,
     },
-    // apiKey: process.env.ETHERSCAN_API_KEY,
+    */
+    apiKey: process.env.ETHERSCAN_API_KEY,
   },
   tenderly: {
     project: process.env.TENDERLY_PROJECT || '',
