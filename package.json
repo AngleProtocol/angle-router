@@ -28,7 +28,7 @@
     "prettier": "yarn prettier:js && yarn prettier:sol",
     "prettier:sol": "prettier --write 'contracts/**/*.sol'",
     "prettier:js": "prettier --write 'test/**/*.{js,ts}' '*.{js,ts}'",
-    "size": "hardhat size-contracts",
+    "size": "yarn compile && hardhat size-contracts",
     "test": "hardhat test",
     "test:e2e": "FORK=true hardhat test e2e/**/*.ts",
     "test:router:local": "FORK=true hardhat test e2e/router/functionalitiesETH.test.ts",
