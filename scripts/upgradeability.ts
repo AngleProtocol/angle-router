@@ -21,14 +21,19 @@ const testStorage = async (name: string, file: string, nameUpgrade: string, file
   );
   console.log('Upgrade Testing');
   console.log(baseContract.getStorageUpgradeReport(upgradeContract).explain());
-  console.log('');
+  console.log('Done');
 };
 
 async function main() {
   // testUpgradeability('AngleRouter', 'contracts/AngleRouter01.sol');
-  // testUpgradeability('OldRouter', 'contracts/mock/OldRouter.sol');
+  // testUpgradeability('OldRouter2', 'contracts/mock/OldRouter2.sol');
 
-  testStorage('OldRouter', 'contracts/mock/OldRouter.sol', 'AngleRouter', 'contracts/AngleRouter01.sol');
+  testStorage(
+    'OldRouterOptimism',
+    'contracts/mock/OldRouterOptimism.sol',
+    'AngleRouterOptimism',
+    'contracts/sidechains/optimism/AngleRouterOptimism.sol',
+  );
 }
 
 main().catch(error => {

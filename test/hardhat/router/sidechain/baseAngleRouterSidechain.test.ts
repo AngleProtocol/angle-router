@@ -18,10 +18,10 @@ import {
   MockTokenPermit__factory,
   MockUniswapV3Router,
   MockUniswapV3Router__factory,
-} from '../../../typechain';
-import { expect } from '../../../utils/chai-setup';
-import { inReceipt } from '../../../utils/expectEvent';
-import { ActionTypeSidechain, TypePermit } from '../../../utils/helpers';
+} from '../../../../typechain';
+import { expect } from '../../../../utils/chai-setup';
+import { inReceipt } from '../../../../utils/expectEvent';
+import { ActionTypeSidechain, TypePermit } from '../../../../utils/helpers';
 import { deployUpgradeable, MAX_UINT256, ZERO_ADDRESS } from '../../utils/helpers';
 
 contract('BaseAngleRouterSidechain', () => {
@@ -657,9 +657,7 @@ contract('BaseAngleRouterSidechain', () => {
         await router.connect(alice).mixer(permits, actions, dataMixer);
         expect(await USDC.balanceOf(uniswap.address)).to.be.equal(parseUnits('1', USDCdecimal));
         expect(await agEUR.balanceOf(router.address)).to.be.equal(parseEther('1'));
-        expect(await USDC.allowance(router.address, uniswap.address)).to.be.equal(
-          MAX_UINT256.sub(parseUnits('1', USDCdecimal)),
-        );
+        expect(await USDC.allowance(router.address, uniswap.address)).to.be.equal(MAX_UINT256);
       });
       it('success - swap performed and then swept', async () => {
         await USDC.mint(alice.address, parseUnits('1', USDCdecimal));
@@ -682,9 +680,7 @@ contract('BaseAngleRouterSidechain', () => {
         await router.connect(alice).mixer(permits, actions, dataMixer);
         expect(await USDC.balanceOf(uniswap.address)).to.be.equal(parseUnits('1', USDCdecimal));
         expect(await agEUR.balanceOf(bob.address)).to.be.equal(parseEther('1'));
-        expect(await USDC.allowance(router.address, uniswap.address)).to.be.equal(
-          MAX_UINT256.sub(parseUnits('1', USDCdecimal)),
-        );
+        expect(await USDC.allowance(router.address, uniswap.address)).to.be.equal(MAX_UINT256);
       });
       it('success - swap performed and then swept with a nice exchange rate', async () => {
         await USDC.mint(alice.address, parseUnits('1', USDCdecimal));
@@ -708,9 +704,7 @@ contract('BaseAngleRouterSidechain', () => {
         await router.connect(alice).mixer(permits, actions, dataMixer);
         expect(await USDC.balanceOf(uniswap.address)).to.be.equal(parseUnits('1', USDCdecimal));
         expect(await agEUR.balanceOf(bob.address)).to.be.equal(parseEther('0.3'));
-        expect(await USDC.allowance(router.address, uniswap.address)).to.be.equal(
-          MAX_UINT256.sub(parseUnits('1', USDCdecimal)),
-        );
+        expect(await USDC.allowance(router.address, uniswap.address)).to.be.equal(MAX_UINT256);
       });
     });
     describe('oneInch', () => {
@@ -745,9 +739,7 @@ contract('BaseAngleRouterSidechain', () => {
         await router.connect(alice).mixer(permits, actions, dataMixer);
         expect(await USDC.balanceOf(oneInch.address)).to.be.equal(parseUnits('1', USDCdecimal));
         expect(await agEUR.balanceOf(router.address)).to.be.equal(parseEther('1'));
-        expect(await USDC.allowance(router.address, oneInch.address)).to.be.equal(
-          MAX_UINT256.sub(parseUnits('1', USDCdecimal)),
-        );
+        expect(await USDC.allowance(router.address, oneInch.address)).to.be.equal(MAX_UINT256);
       });
       it('success - swap successfully performed with exchange rate and sweep', async () => {
         await USDC.mint(alice.address, parseUnits('1', USDCdecimal));
@@ -785,9 +777,7 @@ contract('BaseAngleRouterSidechain', () => {
         await router.connect(alice).mixer(permits, actions, dataMixer);
         expect(await USDC.balanceOf(oneInch.address)).to.be.equal(parseUnits('1', USDCdecimal));
         expect(await agEUR.balanceOf(bob.address)).to.be.equal(parseEther('0.3'));
-        expect(await USDC.allowance(router.address, oneInch.address)).to.be.equal(
-          MAX_UINT256.sub(parseUnits('1', USDCdecimal)),
-        );
+        expect(await USDC.allowance(router.address, oneInch.address)).to.be.equal(MAX_UINT256);
       });
       it('success - swap successfully performed with just exchange rate', async () => {
         await USDC.mint(alice.address, parseUnits('1', USDCdecimal));
@@ -821,9 +811,7 @@ contract('BaseAngleRouterSidechain', () => {
         await router.connect(alice).mixer(permits, actions, dataMixer);
         expect(await USDC.balanceOf(oneInch.address)).to.be.equal(parseUnits('1', USDCdecimal));
         expect(await agEUR.balanceOf(router.address)).to.be.equal(parseEther('0.3'));
-        expect(await USDC.allowance(router.address, oneInch.address)).to.be.equal(
-          MAX_UINT256.sub(parseUnits('1', USDCdecimal)),
-        );
+        expect(await USDC.allowance(router.address, oneInch.address)).to.be.equal(MAX_UINT256);
       });
       it('reverts - swap successfully performed with just exchange rate but slippage', async () => {
         await USDC.mint(alice.address, parseUnits('1', USDCdecimal));

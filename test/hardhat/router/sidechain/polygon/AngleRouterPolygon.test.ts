@@ -4,8 +4,8 @@ import { parseEther, parseUnits } from 'ethers/lib/utils';
 import hre, { contract, ethers } from 'hardhat';
 
 import {
-  AngleRouterAvalanche,
-  AngleRouterAvalanche__factory,
+  AngleRouterPolygon,
+  AngleRouterPolygon__factory,
   ERC20,
   ERC20__factory,
   Mock1Inch,
@@ -20,29 +20,29 @@ import {
   MockTokenPermit__factory,
   MockUniswapV3Router,
   MockUniswapV3Router__factory,
-} from '../../../../typechain';
-import { expect } from '../../../../utils/chai-setup';
-import { ActionTypeSidechain, TypePermit } from '../../../../utils/helpers';
+} from '../../../../../typechain';
+import { expect } from '../../../../../utils/chai-setup';
+import { ActionTypeSidechain, TypePermit } from '../../../../../utils/helpers';
 import { deployUpgradeable, expectApprox, ZERO_ADDRESS } from '../../../utils/helpers';
 
-contract('AngleRouterAvalanche', () => {
+contract('AngleRouterPolygon', () => {
   let deployer: SignerWithAddress;
   let USDC: MockTokenPermit;
   let agEUR: MockAgToken;
-  let wAVAX: ERC20;
+  let wMATIC: ERC20;
   let core: MockCoreBorrow;
   let alice: SignerWithAddress;
   let bob: SignerWithAddress;
   let uniswap: MockUniswapV3Router;
   let oneInch: Mock1Inch;
-  let router: AngleRouterAvalanche;
+  let router: AngleRouterPolygon;
   let USDCdecimal: BigNumber;
   let permits: TypePermit[];
 
   before(async () => {
     ({ deployer, alice, bob } = await ethers.getNamedSigners());
     USDCdecimal = BigNumber.from('6');
-    wAVAX = (await ethers.getContractAt(ERC20__factory.abi, '0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7')) as ERC20;
+    wMATIC = (await ethers.getContractAt(ERC20__factory.abi, '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270')) as ERC20;
 
     permits = [];
   });
@@ -53,16 +53,16 @@ contract('AngleRouterAvalanche', () => {
       params: [
         {
           forking: {
-            jsonRpcUrl: process.env.ETH_NODE_URI_AVALANCHE,
-            // Changing Avalanche fork block breaks some tests
-            blockNumber: 16576114,
+            jsonRpcUrl: process.env.ETH_NODE_URI_FORKPOLYGON,
+            // Changing Polygon fork block breaks some tests
+            blockNumber: 29902016,
           },
         },
       ],
     });
     await hre.network.provider.send('hardhat_setBalance', [alice.address, '0x10000000000000000000000000000']);
     // If the forked-network state needs to be reset between each test, run this
-    router = (await deployUpgradeable(new AngleRouterAvalanche__factory(deployer))) as AngleRouterAvalanche;
+    router = (await deployUpgradeable(new AngleRouterPolygon__factory(deployer))) as AngleRouterPolygon;
     USDC = (await new MockTokenPermit__factory(deployer).deploy('USDC', 'USDC', USDCdecimal)) as MockTokenPermit;
     agEUR = (await deployUpgradeable(new MockAgToken__factory(deployer))) as MockAgToken;
     await agEUR.initialize('agEUR', 'agEUR', ZERO_ADDRESS, ZERO_ADDRESS);
@@ -168,35 +168,35 @@ contract('AngleRouterAvalanche', () => {
         const actions = [ActionTypeSidechain.wrapNative];
         const dataMixer: BytesLike[] = [];
         await router.connect(alice).mixer(permits, actions, dataMixer, { value: parseEther('1') });
-        expect(await wAVAX.balanceOf(router.address)).to.be.equal(parseEther('1'));
+        expect(await wMATIC.balanceOf(router.address)).to.be.equal(parseEther('1'));
       });
     });
     describe('unwrapNative', () => {
-      it('success - when there are no wAVAX', async () => {
+      it('success - when there are no wMATIC', async () => {
         const actions = [ActionTypeSidechain.unwrapNative];
         const unwrapData = ethers.utils.defaultAbiCoder.encode(['uint256', 'address'], [0, bob.address]);
         await router.connect(alice).mixer(permits, actions, [unwrapData]);
-        expect(await wAVAX.balanceOf(router.address)).to.be.equal(parseEther('0'));
-        expect(await wAVAX.balanceOf(bob.address)).to.be.equal(parseEther('0'));
+        expect(await wMATIC.balanceOf(router.address)).to.be.equal(parseEther('0'));
+        expect(await wMATIC.balanceOf(bob.address)).to.be.equal(parseEther('0'));
       });
-      it('reverts - because of slippage wAVAX', async () => {
+      it('reverts - because of slippage wMATIC', async () => {
         const actions = [ActionTypeSidechain.unwrapNative];
         const unwrapData = ethers.utils.defaultAbiCoder.encode(['uint256', 'address'], [parseEther('1'), bob.address]);
         await expect(router.connect(alice).mixer(permits, actions, [unwrapData])).to.be.revertedWith(
           'TooSmallAmountOut',
         );
       });
-      it('success - when there are some wAVAX', async () => {
+      it('success - when there are some wMATIC', async () => {
         const actions = [ActionTypeSidechain.wrapNative];
         const dataMixer: BytesLike[] = [];
         await router.connect(alice).mixer(permits, actions, dataMixer, { value: parseEther('1') });
-        expect(await wAVAX.balanceOf(router.address)).to.be.equal(parseEther('1'));
+        expect(await wMATIC.balanceOf(router.address)).to.be.equal(parseEther('1'));
         const actions2 = [ActionTypeSidechain.unwrapNative];
         const unwrapData = ethers.utils.defaultAbiCoder.encode(['uint256', 'address'], [0, bob.address]);
         const balance = await ethers.provider.getBalance(bob.address);
         await router.connect(alice).mixer(permits, actions2, [unwrapData]);
-        expect(await wAVAX.balanceOf(router.address)).to.be.equal(parseEther('0'));
-        expect(await wAVAX.balanceOf(bob.address)).to.be.equal(parseEther('0'));
+        expect(await wMATIC.balanceOf(router.address)).to.be.equal(parseEther('0'));
+        expect(await wMATIC.balanceOf(bob.address)).to.be.equal(parseEther('0'));
         expect(await ethers.provider.getBalance(bob.address)).to.be.equal(parseEther('1').add(balance));
       });
     });
