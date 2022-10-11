@@ -209,8 +209,8 @@ contract('BaseAngleRouterSidechain', () => {
         await USDC.connect(alice).approve(router.address, parseUnits('1', USDCdecimal));
 
         const transferData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'uint256'],
-          [USDC.address, parseUnits('0.3', USDCdecimal)],
+          ['address', 'address', 'uint256'],
+          [USDC.address, router.address, parseUnits('0.3', USDCdecimal)],
         );
         const actions = [ActionTypeSidechain.transfer];
         const dataMixer = [transferData];
@@ -224,9 +224,10 @@ contract('BaseAngleRouterSidechain', () => {
         await USDC.connect(alice).approve(router.address, parseUnits('1', USDCdecimal));
 
         const transferData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'uint256'],
-          [USDC.address, parseUnits('0.3', USDCdecimal)],
+          ['address', 'address', 'uint256'],
+          [USDC.address, router.address, parseUnits('0.3', USDCdecimal)],
         );
+
         const sweepData = ethers.utils.defaultAbiCoder.encode(
           ['address', 'uint256', 'address'],
           [USDC.address, parseUnits('0', USDCdecimal), bob.address],
@@ -259,8 +260,8 @@ contract('BaseAngleRouterSidechain', () => {
         await USDC.connect(alice).approve(router.address, parseUnits('1', USDCdecimal));
 
         const transferData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'uint256'],
-          [USDC.address, parseUnits('0.3', USDCdecimal)],
+          ['address', 'address', 'uint256'],
+          [USDC.address, router.address, parseUnits('0.3', USDCdecimal)],
         );
         const actions = [ActionTypeSidechain.transfer];
         const dataMixer = [transferData];
@@ -284,8 +285,8 @@ contract('BaseAngleRouterSidechain', () => {
         await USDC.connect(alice).approve(router.address, parseUnits('1', USDCdecimal));
 
         const transferData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'uint256'],
-          [USDC.address, parseUnits('0.3', USDCdecimal)],
+          ['address', 'address', 'uint256'],
+          [USDC.address, router.address, parseUnits('0.3', USDCdecimal)],
         );
         const actions = [ActionTypeSidechain.transfer];
         const dataMixer = [transferData];
@@ -367,8 +368,8 @@ contract('BaseAngleRouterSidechain', () => {
       it('reverts - without approval from the contract', async () => {
         const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.swapIn];
         const transferData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'uint256'],
-          [lzAgEUR.address, parseEther('1')],
+          ['address', 'address', 'uint256'],
+          [lzAgEUR.address, router.address, parseEther('1')],
         );
 
         const swapInData = ethers.utils.defaultAbiCoder.encode(
@@ -385,8 +386,8 @@ contract('BaseAngleRouterSidechain', () => {
       it('success - with approval from the contract', async () => {
         const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.swapIn];
         const transferData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'uint256'],
-          [lzAgEUR.address, parseEther('1')],
+          ['address', 'address', 'uint256'],
+          [lzAgEUR.address, router.address, parseEther('1')],
         );
 
         const swapInData = ethers.utils.defaultAbiCoder.encode(
@@ -408,8 +409,8 @@ contract('BaseAngleRouterSidechain', () => {
       it('success - with approval from the contract and fees', async () => {
         const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.swapIn];
         const transferData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'uint256'],
-          [lzAgEUR.address, parseEther('1')],
+          ['address', 'address', 'uint256'],
+          [lzAgEUR.address, router.address, parseEther('1')],
         );
 
         await agEUR.setFees(parseUnits('0.5', 9), parseUnits('1', 9));
@@ -433,8 +434,8 @@ contract('BaseAngleRouterSidechain', () => {
       it('reverts - when slippage from the contract and fees', async () => {
         const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.swapIn];
         const transferData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'uint256'],
-          [lzAgEUR.address, parseEther('1')],
+          ['address', 'address', 'uint256'],
+          [lzAgEUR.address, router.address, parseEther('1')],
         );
         await agEUR.setFees(parseUnits('0.5', 9), parseUnits('1', 9));
 
@@ -455,8 +456,8 @@ contract('BaseAngleRouterSidechain', () => {
       it('reverts - when slippage', async () => {
         const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.swapIn];
         const transferData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'uint256'],
-          [lzAgEUR.address, parseEther('1')],
+          ['address', 'address', 'uint256'],
+          [lzAgEUR.address, router.address, parseEther('1')],
         );
 
         const swapInData = ethers.utils.defaultAbiCoder.encode(
@@ -478,8 +479,8 @@ contract('BaseAngleRouterSidechain', () => {
       it('reverts - when there are no bridge tokens in the contract', async () => {
         const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.swapOut];
         const transferData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'uint256'],
-          [agEUR.address, parseEther('1')],
+          ['address', 'address', 'uint256'],
+          [agEUR.address, router.address, parseEther('1')],
         );
 
         const swapInData = ethers.utils.defaultAbiCoder.encode(
@@ -496,8 +497,8 @@ contract('BaseAngleRouterSidechain', () => {
       it('success - with bridge tokens on the contract', async () => {
         const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.swapOut];
         const transferData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'uint256'],
-          [agEUR.address, parseEther('1')],
+          ['address', 'address', 'uint256'],
+          [agEUR.address, router.address, parseEther('1')],
         );
 
         const swapInData = ethers.utils.defaultAbiCoder.encode(
@@ -517,8 +518,8 @@ contract('BaseAngleRouterSidechain', () => {
       it('success - with approval from the contract and fees', async () => {
         const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.swapOut];
         const transferData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'uint256'],
-          [agEUR.address, parseEther('1')],
+          ['address', 'address', 'uint256'],
+          [agEUR.address, router.address, parseEther('1')],
         );
         await agEUR.setFees(parseUnits('1', 9), parseUnits('0.5', 9));
 
@@ -538,8 +539,8 @@ contract('BaseAngleRouterSidechain', () => {
       it('reverts - when slippage from the contract and fees', async () => {
         const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.swapOut];
         const transferData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'uint256'],
-          [agEUR.address, parseEther('1')],
+          ['address', 'address', 'uint256'],
+          [agEUR.address, router.address, parseEther('1')],
         );
         await agEUR.setFees(parseUnits('1', 9), parseUnits('0.5', 9));
 
@@ -557,8 +558,8 @@ contract('BaseAngleRouterSidechain', () => {
       it('reverts - when slippage', async () => {
         const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.swapOut];
         const transferData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'uint256'],
-          [agEUR.address, parseEther('1')],
+          ['address', 'address', 'uint256'],
+          [agEUR.address, router.address, parseEther('1')],
         );
 
         const swapInData = ethers.utils.defaultAbiCoder.encode(
@@ -645,8 +646,8 @@ contract('BaseAngleRouterSidechain', () => {
         await USDC.connect(alice).approve(router.address, parseUnits('1', USDCdecimal));
 
         const transferData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'uint256'],
-          [USDC.address, parseUnits('1', USDCdecimal)],
+          ['address', 'address', 'uint256'],
+          [USDC.address, router.address, parseUnits('1', USDCdecimal)],
         );
         const swapData = ethers.utils.defaultAbiCoder.encode(
           ['address', 'uint256', 'uint256', 'bytes'],
@@ -664,8 +665,8 @@ contract('BaseAngleRouterSidechain', () => {
         await USDC.connect(alice).approve(router.address, parseUnits('1', USDCdecimal));
 
         const transferData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'uint256'],
-          [USDC.address, parseUnits('1', USDCdecimal)],
+          ['address', 'address', 'uint256'],
+          [USDC.address, router.address, parseUnits('1', USDCdecimal)],
         );
         const swapData = ethers.utils.defaultAbiCoder.encode(
           ['address', 'uint256', 'uint256', 'bytes'],
@@ -688,8 +689,8 @@ contract('BaseAngleRouterSidechain', () => {
         await uniswap.updateExchangeRate(parseEther('0.3'));
 
         const transferData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'uint256'],
-          [USDC.address, parseUnits('1', USDCdecimal)],
+          ['address', 'address', 'uint256'],
+          [USDC.address, router.address, parseUnits('1', USDCdecimal)],
         );
         const swapData = ethers.utils.defaultAbiCoder.encode(
           ['address', 'uint256', 'uint256', 'bytes'],
@@ -713,8 +714,8 @@ contract('BaseAngleRouterSidechain', () => {
         await USDC.connect(alice).approve(router.address, parseUnits('1', USDCdecimal));
 
         const transferData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'uint256'],
-          [USDC.address, parseUnits('1', USDCdecimal)],
+          ['address', 'address', 'uint256'],
+          [USDC.address, router.address, parseUnits('1', USDCdecimal)],
         );
         const payload1inch = oneInch.interface.encodeFunctionData('swap', [
           ethers.constants.AddressZero,
@@ -746,8 +747,8 @@ contract('BaseAngleRouterSidechain', () => {
         await USDC.connect(alice).approve(router.address, parseUnits('1', USDCdecimal));
 
         const transferData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'uint256'],
-          [USDC.address, parseUnits('1', USDCdecimal)],
+          ['address', 'address', 'uint256'],
+          [USDC.address, router.address, parseUnits('1', USDCdecimal)],
         );
         const payload1inch = oneInch.interface.encodeFunctionData('swap', [
           ethers.constants.AddressZero,
@@ -784,8 +785,8 @@ contract('BaseAngleRouterSidechain', () => {
         await USDC.connect(alice).approve(router.address, parseUnits('1', USDCdecimal));
 
         const transferData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'uint256'],
-          [USDC.address, parseUnits('1', USDCdecimal)],
+          ['address', 'address', 'uint256'],
+          [USDC.address, router.address, parseUnits('1', USDCdecimal)],
         );
         const payload1inch = oneInch.interface.encodeFunctionData('swap', [
           ethers.constants.AddressZero,
@@ -818,8 +819,8 @@ contract('BaseAngleRouterSidechain', () => {
         await USDC.connect(alice).approve(router.address, parseUnits('1', USDCdecimal));
 
         const transferData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'uint256'],
-          [USDC.address, parseUnits('1', USDCdecimal)],
+          ['address', 'address', 'uint256'],
+          [USDC.address, router.address, parseUnits('1', USDCdecimal)],
         );
         const payload1inch = oneInch.interface.encodeFunctionData('swap', [
           ethers.constants.AddressZero,

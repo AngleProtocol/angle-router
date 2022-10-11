@@ -175,15 +175,12 @@ describe('AngleRouter - functionalities ETH', () => {
       sanToken: sanTokenWBTC,
       perpetualManager: perpEURWBTC,
     } = await initCollateral('wBTC', stableMasterEUR, ANGLE, deployer, wBTCdecimal, wBTCORACLEUSD, 0));
-    ({ token: DAI, manager: managerDAI, sanToken: sanTokenDAI, perpetualManager: perpEURDAI } = await initCollateral(
-      'DAI',
-      stableMasterEUR,
-      ANGLE,
-      deployer,
-      DAIdecimal,
-      DAIORACLEUSD,
-      0,
-    ));
+    ({
+      token: DAI,
+      manager: managerDAI,
+      sanToken: sanTokenDAI,
+      perpetualManager: perpEURDAI,
+    } = await initCollateral('DAI', stableMasterEUR, ANGLE, deployer, DAIdecimal, DAIORACLEUSD, 0));
 
     ({ gauge: gaugeSanEURWBTC } = await initGauge(sanTokenWBTC.address, governor, ANGLE, veANGLE, veBoostProxy));
     ({ gauge: gaugeSanEURDAI } = await initGauge(sanTokenDAI.address, governor, ANGLE, veANGLE, veBoostProxy));
@@ -452,7 +449,11 @@ describe('AngleRouter - functionalities ETH', () => {
     describe('addToPerpetual', () => {
       it('success - swap', async () => {
         const transfers: TypeTransfer[] = [
-          { inToken: DAI.address, amountIn: parseAmount.ether(ETHORACLEUSD).div(BigNumber.from(4)) },
+          {
+            inToken: DAI.address,
+            receiver: angleRouter.address,
+            amountIn: parseAmount.ether(ETHORACLEUSD).div(BigNumber.from(4)),
+          },
         ];
         const swaps: TypeSwap[] = [
           {
@@ -740,7 +741,9 @@ describe('AngleRouter - functionalities ETH', () => {
             'USDC',
           ),
         ];
-        const transfers: TypeTransfer[] = [{ inToken: USDC.address, amountIn: UNIT_USDC }];
+        const transfers: TypeTransfer[] = [
+          { inToken: USDC.address, receiver: angleRouter.address, amountIn: UNIT_USDC },
+        ];
         const swaps: TypeSwap[] = [];
         const callsBorrow = [createVault(user.address), addCollateral(1, UNIT_DAI)];
         const dataBorrow = await encodeAngleBorrow(
@@ -878,7 +881,9 @@ describe('AngleRouter - functionalities ETH', () => {
             'USDC',
           ),
         ];
-        const transfers: TypeTransfer[] = [{ inToken: USDC.address, amountIn: UNIT_USDC }];
+        const transfers: TypeTransfer[] = [
+          { inToken: USDC.address, receiver: angleRouter.address, amountIn: UNIT_USDC },
+        ];
         const swaps: TypeSwap[] = [];
         const callsBorrow = [createVault(user.address), addCollateral(1, UNIT_DAI)];
         const dataBorrow = await encodeAngleBorrow(

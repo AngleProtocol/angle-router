@@ -74,7 +74,9 @@ contract('Router - ERC4626 Functionalities', () => {
           'USDC',
         ),
       ];
-      const transfers: TypeTransfer[] = [{ inToken: USDC.address, amountIn: UNIT_USDC.mul(1) }];
+      const transfers: TypeTransfer[] = [
+        { inToken: USDC.address, receiver: router.address, amountIn: UNIT_USDC.mul(1) },
+      ];
       const swaps: TypeSwap[] = [];
 
       const mintData = ethers.utils.defaultAbiCoder.encode(
@@ -104,7 +106,9 @@ contract('Router - ERC4626 Functionalities', () => {
           'USDC',
         ),
       ];
-      const transfers: TypeTransfer[] = [{ inToken: USDC.address, amountIn: UNIT_USDC.mul(1) }];
+      const transfers: TypeTransfer[] = [
+        { inToken: USDC.address, receiver: router.address, amountIn: UNIT_USDC.mul(1) },
+      ];
       const swaps: TypeSwap[] = [];
 
       const mintData = ethers.utils.defaultAbiCoder.encode(
@@ -133,7 +137,9 @@ contract('Router - ERC4626 Functionalities', () => {
           'USDC',
         ),
       ];
-      const transfers: TypeTransfer[] = [{ inToken: USDC.address, amountIn: UNIT_USDC.mul(1) }];
+      const transfers: TypeTransfer[] = [
+        { inToken: USDC.address, receiver: router.address, amountIn: UNIT_USDC.mul(1) },
+      ];
       const swaps: TypeSwap[] = [];
 
       const mintData = ethers.utils.defaultAbiCoder.encode(
@@ -159,7 +165,9 @@ contract('Router - ERC4626 Functionalities', () => {
           'USDC',
         ),
       ];
-      const transfers: TypeTransfer[] = [{ inToken: USDC.address, amountIn: UNIT_USDC.mul(1) }];
+      const transfers: TypeTransfer[] = [
+        { inToken: USDC.address, receiver: router.address, amountIn: UNIT_USDC.mul(1) },
+      ];
       const swaps: TypeSwap[] = [];
       // Specifying a full proportion
       const mintData = ethers.utils.defaultAbiCoder.encode(
@@ -189,7 +197,9 @@ contract('Router - ERC4626 Functionalities', () => {
           'USDC',
         ),
       ];
-      const transfers: TypeTransfer[] = [{ inToken: USDC.address, amountIn: UNIT_USDC.mul(1) }];
+      const transfers: TypeTransfer[] = [
+        { inToken: USDC.address, receiver: router.address, amountIn: UNIT_USDC.mul(1) },
+      ];
       const swaps: TypeSwap[] = [];
 
       const mintData = ethers.utils.defaultAbiCoder.encode(
@@ -218,7 +228,9 @@ contract('Router - ERC4626 Functionalities', () => {
           'USDC',
         ),
       ];
-      const transfers: TypeTransfer[] = [{ inToken: USDC.address, amountIn: UNIT_USDC.mul(1) }];
+      const transfers: TypeTransfer[] = [
+        { inToken: USDC.address, receiver: router.address, amountIn: UNIT_USDC.mul(1) },
+      ];
       const swaps: TypeSwap[] = [];
 
       const mintData = ethers.utils.defaultAbiCoder.encode(

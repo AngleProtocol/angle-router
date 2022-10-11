@@ -103,8 +103,8 @@ contract('AngleRouterAvalanche', () => {
         await USDC.connect(alice).approve(router.address, parseUnits('1', USDCdecimal));
 
         const transferData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'uint256'],
-          [USDC.address, parseUnits('0.3', USDCdecimal)],
+          ['address', 'address', 'uint256'],
+          [USDC.address, router.address, parseUnits('0.3', USDCdecimal)],
         );
         const actions = [ActionTypeSidechain.transfer];
         const dataMixer = [transferData];

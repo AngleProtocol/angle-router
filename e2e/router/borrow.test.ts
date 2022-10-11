@@ -19,8 +19,6 @@ import {
   ERC20,
   IWStETH__factory,
   IStETH__factory,
-  ProxyAdmin__factory,
-  ProxyAdmin,
   MockTokenPermit,
   MockAgToken,
   MockAgToken__factory,
@@ -384,7 +382,9 @@ describe('AngleRouter - borrower', () => {
             'USDC',
           ),
         ];
-        const transfers: TypeTransfer[] = [{ inToken: USDC.address, amountIn: UNIT_USDC }];
+        const transfers: TypeTransfer[] = [
+          { inToken: USDC.address, receiver: angleRouter.address, amountIn: UNIT_USDC },
+        ];
         const swaps: TypeSwap[] = [];
         const callsBorrow = [createVault(user.address), addCollateral(1, UNIT_DAI)];
         const dataBorrow = await encodeAngleBorrow(
@@ -522,7 +522,9 @@ describe('AngleRouter - borrower', () => {
             'USDC',
           ),
         ];
-        const transfers: TypeTransfer[] = [{ inToken: USDC.address, amountIn: UNIT_USDC }];
+        const transfers: TypeTransfer[] = [
+          { inToken: USDC.address, receiver: angleRouter.address, amountIn: UNIT_USDC },
+        ];
         const swaps: TypeSwap[] = [];
         const callsBorrow = [createVault(user.address), addCollateral(1, UNIT_DAI)];
         const dataBorrow = await encodeAngleBorrow(
