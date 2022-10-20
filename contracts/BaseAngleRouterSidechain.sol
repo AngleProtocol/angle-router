@@ -7,10 +7,11 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/draft-IERC20P
 import "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+import "./interfaces/external/uniswap/IUniswapRouter.sol";
 import "./interfaces/IAgTokenMultiChain.sol";
 import "./interfaces/ICoreBorrow.sol";
 import "./interfaces/ILiquidityGauge.sol";
-import "./interfaces/external/uniswap/IUniswapRouter.sol";
+import "./interfaces/ISwapper.sol";
 import "./interfaces/IVaultManager.sol";
 
 // =========================== Structs and Enums ===============================
@@ -34,7 +35,8 @@ enum ActionType {
     mintSavingsRate,
     depositSavingsRate,
     redeemSavingsRate,
-    withdrawSavingsRate
+    withdrawSavingsRate,
+    swapper
 }
 
 /// @notice Data needed to get permits
@@ -188,8 +190,8 @@ abstract contract BaseAngleRouterSidechain is Initializable {
         // Performing actions one after the others
         for (uint256 i = 0; i < actions.length; i++) {
             if (actions[i] == ActionType.transfer) {
-                (address inToken, uint256 amount) = abi.decode(data[i], (address, uint256));
-                IERC20(inToken).safeTransferFrom(msg.sender, address(this), amount);
+                (address inToken, address receiver, uint256 amount) = abi.decode(data[i], (address, address, uint256));
+                IERC20(inToken).safeTransferFrom(msg.sender, receiver, amount);
             } else if (actions[i] == ActionType.wrap) {
                 (uint256 amount, uint256 minAmountOut) = abi.decode(data[i], (uint256, uint256));
                 _wrap(amount, minAmountOut);
@@ -226,6 +228,17 @@ abstract contract BaseAngleRouterSidechain is Initializable {
                     (address, uint256, bytes)
                 );
                 _swapOn1Inch(IERC20(inToken), minAmountOut, payload);
+            } else if (actions[i] == ActionType.swapper) {
+                (
+                    ISwapper swapperContract,
+                    IERC20 inToken,
+                    IERC20 outToken,
+                    address outTokenRecipient,
+                    uint256 outTokenOwed,
+                    uint256 inTokenObtained,
+                    bytes memory payload
+                ) = abi.decode(data[i], (ISwapper, IERC20, IERC20, address, uint256, uint256, bytes));
+                _swapper(swapperContract, inToken, outToken, outTokenRecipient, outTokenOwed, inTokenObtained, payload);
             } else if (actions[i] == ActionType.claimRewards) {
                 (address user, address[] memory claimLiquidityGauges) = abi.decode(data[i], (address, address[]));
                 _claimRewards(user, claimLiquidityGauges);
@@ -645,6 +658,26 @@ abstract contract BaseAngleRouterSidechain is Initializable {
         uint256 minAmountOut
     ) internal returns (uint256 amountOut) {
         _slippageCheck(amountOut = savingsRate.redeem(shares, to, msg.sender), minAmountOut);
+    }
+
+    //  @notice Use an external swapper
+    //  @param swapper Contracts implementing the logic of the swap.
+    //  @param inToken Token used to do the swap.
+    //  @param outToken The token wanted.
+    //  @param outTokenRecipient Address who should have at the end of the swap at least `outTokenOwed`.
+    //  @param outTokenOwed Minimal amount for the `outTokenRecipient`.
+    //  @param inTokenObtained Amount of `inToken` used for the swap.
+    //  @param data Additional info for the specific swapper.
+    function _swapper(
+        ISwapper swapper,
+        IERC20 inToken,
+        IERC20 outToken,
+        address outTokenRecipient,
+        uint256 outTokenOwed,
+        uint256 inTokenObtained,
+        bytes memory data
+    ) internal {
+        swapper.swap(inToken, outToken, outTokenRecipient, outTokenOwed, inTokenObtained, data);
     }
 
     /// @notice Checks whether the amount obtained during a swap is not too small

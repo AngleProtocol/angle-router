@@ -93,6 +93,7 @@ export type TypeSwap = {
 
 export type TypeTransfer = {
   inToken: string;
+  receiver: string;
   amountIn: BigNumber;
 };
 
@@ -611,6 +612,7 @@ export enum ActionType {
   depositSavingsRate,
   redeemSavingsRate,
   withdrawSavingsRate,
+  swapper,
 }
 export enum SwapType {
   UniswapV3,
@@ -638,4 +640,5 @@ export enum ActionTypeSidechain {
   depositSavingsRate,
   redeemSavingsRate,
   withdrawSavingsRate,
+  swapper,
 }

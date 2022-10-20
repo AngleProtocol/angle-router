@@ -83,7 +83,10 @@ contract('BaseAngleRouterSidechain - ERC4626 functionalities', () => {
         ),
       ];
 
-      const transferData = ethers.utils.defaultAbiCoder.encode(['address', 'uint256'], [USDC.address, UNIT_USDC]);
+      const transferData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256'],
+        [USDC.address, router.address, UNIT_USDC],
+      );
 
       const mintData = ethers.utils.defaultAbiCoder.encode(
         ['address', 'address', 'uint256', 'address', 'uint256'],
@@ -113,7 +116,10 @@ contract('BaseAngleRouterSidechain - ERC4626 functionalities', () => {
         ),
       ];
 
-      const transferData = ethers.utils.defaultAbiCoder.encode(['address', 'uint256'], [USDC.address, UNIT_USDC]);
+      const transferData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256'],
+        [USDC.address, router.address, UNIT_USDC],
+      );
 
       const mintData = ethers.utils.defaultAbiCoder.encode(
         ['address', 'address', 'uint256', 'address', 'uint256'],
@@ -126,8 +132,8 @@ contract('BaseAngleRouterSidechain - ERC4626 functionalities', () => {
 
       await USDC.mint(deployer.address, parseUnits('300', 6));
       const transferData2 = ethers.utils.defaultAbiCoder.encode(
-        ['address', 'uint256'],
-        [USDC.address, parseUnits('300', 6)],
+        ['address', 'address', 'uint256'],
+        [USDC.address, router.address, parseUnits('300', 6)],
       );
       const mintData2 = ethers.utils.defaultAbiCoder.encode(
         ['address', 'address', 'uint256', 'address', 'uint256'],
@@ -159,7 +165,10 @@ contract('BaseAngleRouterSidechain - ERC4626 functionalities', () => {
           'USDC',
         ),
       ];
-      const transferData = ethers.utils.defaultAbiCoder.encode(['address', 'uint256'], [USDC.address, UNIT_USDC]);
+      const transferData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256'],
+        [USDC.address, router.address, UNIT_USDC],
+      );
       const mintData = ethers.utils.defaultAbiCoder.encode(
         ['address', 'address', 'uint256', 'address', 'uint256'],
         [USDC.address, strat.address, parseEther('1'), bob.address, parseEther('0')],
@@ -183,7 +192,10 @@ contract('BaseAngleRouterSidechain - ERC4626 functionalities', () => {
         ),
       ];
 
-      const transferData = ethers.utils.defaultAbiCoder.encode(['address', 'uint256'], [USDC.address, UNIT_USDC]);
+      const transferData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256'],
+        [USDC.address, router.address, UNIT_USDC],
+      );
 
       const mintData = ethers.utils.defaultAbiCoder.encode(
         ['address', 'address', 'uint256', 'address', 'uint256'],
@@ -213,7 +225,10 @@ contract('BaseAngleRouterSidechain - ERC4626 functionalities', () => {
         ),
       ];
 
-      const transferData = ethers.utils.defaultAbiCoder.encode(['address', 'uint256'], [USDC.address, UNIT_USDC]);
+      const transferData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256'],
+        [USDC.address, router.address, UNIT_USDC],
+      );
 
       const mintData = ethers.utils.defaultAbiCoder.encode(
         ['address', 'address', 'uint256', 'address', 'uint256'],
@@ -227,8 +242,8 @@ contract('BaseAngleRouterSidechain - ERC4626 functionalities', () => {
 
       await USDC.mint(deployer.address, parseUnits('300', 6));
       const transferData2 = ethers.utils.defaultAbiCoder.encode(
-        ['address', 'uint256'],
-        [USDC.address, parseUnits('300', 6)],
+        ['address', 'address', 'uint256'],
+        [USDC.address, router.address, parseUnits('300', 6)],
       );
       const mintData2 = ethers.utils.defaultAbiCoder.encode(
         ['address', 'address', 'uint256', 'address', 'uint256'],
@@ -260,7 +275,10 @@ contract('BaseAngleRouterSidechain - ERC4626 functionalities', () => {
           'USDC',
         ),
       ];
-      const transferData = ethers.utils.defaultAbiCoder.encode(['address', 'uint256'], [USDC.address, UNIT_USDC]);
+      const transferData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256'],
+        [USDC.address, router.address, UNIT_USDC],
+      );
 
       const mintData = ethers.utils.defaultAbiCoder.encode(
         ['address', 'address', 'uint256', 'address', 'uint256'],
@@ -276,7 +294,10 @@ contract('BaseAngleRouterSidechain - ERC4626 functionalities', () => {
       await DAI.mint(alice.address, parseEther('10'));
       await DAI.connect(alice).approve(router.address, parseUnits('100', DAIdecimal));
 
-      const transferData = ethers.utils.defaultAbiCoder.encode(['address', 'uint256'], [DAI.address, UNIT_DAI]);
+      const transferData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256'],
+        [DAI.address, router.address, UNIT_DAI],
+      );
       const payload1inch = oneInch.interface.encodeFunctionData('swap', [
         ethers.constants.AddressZero,
         {
@@ -331,7 +352,10 @@ contract('BaseAngleRouterSidechain - ERC4626 functionalities', () => {
         ),
       ];
 
-      const transferData = ethers.utils.defaultAbiCoder.encode(['address', 'uint256'], [USDC.address, UNIT_USDC]);
+      const transferData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256'],
+        [USDC.address, router.address, UNIT_USDC],
+      );
 
       const mintData = ethers.utils.defaultAbiCoder.encode(
         ['address', 'address', 'uint256', 'address', 'uint256'],
@@ -414,7 +438,10 @@ contract('BaseAngleRouterSidechain - ERC4626 functionalities', () => {
         ),
       ];
 
-      const transferData = ethers.utils.defaultAbiCoder.encode(['address', 'uint256'], [USDC.address, UNIT_USDC]);
+      const transferData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256'],
+        [USDC.address, router.address, UNIT_USDC],
+      );
 
       const mintData = ethers.utils.defaultAbiCoder.encode(
         ['address', 'address', 'uint256', 'address', 'uint256'],

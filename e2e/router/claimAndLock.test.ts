@@ -207,17 +207,22 @@ describe('AngleRouter - claim and lock', () => {
     } = await initCollateral(
       'wBTC',
       stableMasterEUR,
-      (ANGLE as unknown) as MockANGLE,
+      ANGLE as unknown as MockANGLE,
       governor,
       wBTCdecimal,
       wBTCORACLEUSD,
       0,
       false,
     ));
-    ({ token: DAI, manager: managerDAI, sanToken: sanTokenDAI, perpetualManager: perpEURDAI } = await initCollateral(
+    ({
+      token: DAI,
+      manager: managerDAI,
+      sanToken: sanTokenDAI,
+      perpetualManager: perpEURDAI,
+    } = await initCollateral(
       'DAI',
       stableMasterEUR,
-      (ANGLE as unknown) as MockANGLE,
+      ANGLE as unknown as MockANGLE,
       governor,
       DAIdecimal,
       DAIORACLEUSD,
@@ -322,8 +327,16 @@ describe('AngleRouter - claim and lock', () => {
       ),
     ];
     const transfers: TypeTransfer[] = [
-      { inToken: wBTC.address, amountIn: UNIT_WBTC.mul(BigNumber.from(9)).div(BigNumber.from(4)) },
-      { inToken: DAI.address, amountIn: UNIT_DAI.mul(BigNumber.from(9)).div(BigNumber.from(4)) },
+      {
+        inToken: wBTC.address,
+        receiver: angleRouter.address,
+        amountIn: UNIT_WBTC.mul(BigNumber.from(9)).div(BigNumber.from(4)),
+      },
+      {
+        inToken: DAI.address,
+        receiver: angleRouter.address,
+        amountIn: UNIT_DAI.mul(BigNumber.from(9)).div(BigNumber.from(4)),
+      },
     ];
     const swaps: TypeSwap[] = [];
     const actions = [

@@ -8,17 +8,19 @@ import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.
 import "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+import "./interfaces/external/IWETH9.sol";
+import "./interfaces/external/lido/ISteth.sol";
+import "./interfaces/external/lido/IWStETH.sol";
+import "./interfaces/external/uniswap/IUniswapRouter.sol";
+
 import "./interfaces/IFeeDistributor.sol";
 import "./interfaces/ILiquidityGauge.sol";
 import "./interfaces/ISanToken.sol";
 import "./interfaces/IStableMaster.sol";
 import "./interfaces/IStableMasterFront.sol";
-import "./interfaces/IVeANGLE.sol";
-import "./interfaces/external/IWETH9.sol";
-import "./interfaces/external/uniswap/IUniswapRouter.sol";
+import "./interfaces/ISwapper.sol";
 import "./interfaces/IVaultManager.sol";
-import "./interfaces/external/lido/ISteth.sol";
-import "./interfaces/external/lido/IWStETH.sol";
+import "./interfaces/IVeANGLE.sol";
 
 // =========================== Structs and Enums ===============================
 
@@ -37,7 +39,8 @@ enum ActionType {
     mintSavingsRate,
     depositSavingsRate,
     redeemSavingsRate,
-    withdrawSavingsRate
+    withdrawSavingsRate,
+    swapper
 }
 
 /// @notice All possible swaps
@@ -69,6 +72,7 @@ struct ParamsSwapType {
 /// @param amountIn Amount of token transfer
 struct TransferType {
     IERC20 inToken;
+    address receiver;
     uint256 amountIn;
 }
 
@@ -218,17 +222,6 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         emit StablecoinAdded(address(stableMaster));
     }
 
-    /// @notice Removes a `StableMaster`
-    /// @param stablecoin Address of the associated stablecoin
-    /// @dev Before calling this function, governor or guardian should remove first all pairs
-    /// from the `mapPoolManagers[stableMaster]`. It is assumed that the governor or guardian calling this function
-    /// will act correctly here, it indeed avoids storing a list of all pairs for each `StableMaster`
-    function removeStableMaster(IERC20 stablecoin) external onlyGovernorOrGuardian {
-        IStableMasterFront stableMaster = mapStableMasters[stablecoin];
-        delete mapStableMasters[stablecoin];
-        emit StablecoinRemoved(address(stableMaster));
-    }
-
     /// @notice Adds new collateral types to specific stablecoins
     /// @param stablecoins Addresses of the stablecoins associated to the `StableMaster` of interest
     /// @param poolManagers Addresses of the `PoolManager` contracts associated to the pair (stablecoin,collateral)
@@ -243,39 +236,6 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         for (uint256 i = 0; i < stablecoins.length; i++) {
             IStableMasterFront stableMaster = mapStableMasters[stablecoins[i]];
             _addPair(stableMaster, poolManagers[i], liquidityGauges[i]);
-        }
-    }
-
-    /// @notice Removes collateral types from specific `StableMaster` contracts using the address
-    /// of the associated stablecoins
-    /// @param stablecoins Addresses of the stablecoins
-    /// @param collaterals Addresses of the collaterals
-    /// @param stableMasters List of the associated `StableMaster` contracts
-    /// @dev In the lists, if a `stableMaster` address is null in `stableMasters` then this means that the associated
-    /// `stablecoins` address (at the same index) should be non null
-    function removePairs(
-        IERC20[] calldata stablecoins,
-        IERC20[] calldata collaterals,
-        IStableMasterFront[] calldata stableMasters
-    ) external onlyGovernorOrGuardian {
-        if (collaterals.length != stablecoins.length || stableMasters.length != collaterals.length)
-            revert IncompatibleLengths();
-        Pairs memory pairs;
-        IStableMasterFront stableMaster;
-        for (uint256 i = 0; i < stablecoins.length; i++) {
-            if (address(stableMasters[i]) == address(0))
-                // In this case `collaterals[i]` is a collateral address
-                (stableMaster, pairs) = _getInternalContracts(stablecoins[i], collaterals[i]);
-            else {
-                // In this case `collaterals[i]` is a `PoolManager` address
-                stableMaster = stableMasters[i];
-                pairs = mapPoolManagers[stableMaster][collaterals[i]];
-            }
-            delete mapPoolManagers[stableMaster][collaterals[i]];
-            _changeAllowance(collaterals[i], address(stableMaster), 0);
-            _changeAllowance(collaterals[i], address(pairs.perpetualManager), 0);
-            if (address(pairs.gauge) != address(0)) pairs.sanToken.approve(address(pairs.gauge), 0);
-            emit CollateralToggled(address(stableMaster), address(pairs.poolManager), address(pairs.gauge));
         }
     }
 
@@ -396,8 +356,13 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         uint256[_MAX_TOKENS] memory balanceTokens;
 
         for (uint256 i = 0; i < paramsTransfer.length; i++) {
-            paramsTransfer[i].inToken.safeTransferFrom(msg.sender, address(this), paramsTransfer[i].amountIn);
-            _addToList(listTokens, balanceTokens, address(paramsTransfer[i].inToken), paramsTransfer[i].amountIn);
+            paramsTransfer[i].inToken.safeTransferFrom(
+                msg.sender,
+                paramsTransfer[i].receiver,
+                paramsTransfer[i].amountIn
+            );
+            if (paramsTransfer[i].receiver == address(this))
+                _addToList(listTokens, balanceTokens, address(paramsTransfer[i].inToken), paramsTransfer[i].amountIn);
         }
 
         for (uint256 i = 0; i < paramsSwap.length; i++) {
@@ -442,6 +407,17 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                     ANGLE.safeTransferFrom(msg.sender, address(this), amount);
                     _addToList(listTokens, balanceTokens, address(ANGLE), amount);
                 }
+            } else if (actions[i] == ActionType.swapper) {
+                (
+                    ISwapper swapperContract,
+                    IERC20 inToken,
+                    IERC20 outToken,
+                    address outTokenRecipient,
+                    uint256 outTokenOwed,
+                    uint256 inTokenObtained,
+                    bytes memory payload
+                ) = abi.decode(data[i], (ISwapper, IERC20, IERC20, address, uint256, uint256, bytes));
+                _swapper(swapperContract, inToken, outToken, outTokenRecipient, outTokenOwed, inTokenObtained, payload);
             } else if (actions[i] == ActionType.claimWeeklyInterest) {
                 (address user, address feeDistributor, bool letInContract) = abi.decode(
                     data[i],
@@ -877,35 +853,6 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
             poolManager
         );
         stableMaster.mint(amount, user, poolManager, minStableAmount);
-    }
-
-    /// @notice Burns stablecoins from the protocol
-    /// @param dest Address who will receive the proceeds
-    /// @param amount Amount of collateral to use for the mint
-    /// @param minCollatAmount Minimum Collateral minted for the tx not to revert
-    /// @param addressProcessed Whether `msg.sender` provided the contracts address or the tokens one
-    /// @param stablecoinOrStableMaster Token associated to a `StableMaster` (if `addressProcessed` is false)
-    /// or directly the `StableMaster` contract if `addressProcessed`
-    /// @param collateral Collateral to mint from: it can be null if `addressProcessed` is true but in the corresponding
-    /// action, the `mixer` needs to get a correct address to compute the amount of tokens to use for the mint
-    /// @param poolManager PoolManager associated to the `collateral` (null if `addressProcessed` is not true)
-    function _burn(
-        address dest,
-        uint256 amount,
-        uint256 minCollatAmount,
-        bool addressProcessed,
-        address stablecoinOrStableMaster,
-        address collateral,
-        IPoolManager poolManager
-    ) internal {
-        IStableMasterFront stableMaster;
-        (stableMaster, poolManager) = _mintBurnContracts(
-            addressProcessed,
-            stablecoinOrStableMaster,
-            collateral,
-            poolManager
-        );
-        stableMaster.burn(amount, msg.sender, dest, poolManager, minCollatAmount);
     }
 
     /// @notice Internal version of the `deposit` functions
@@ -1421,6 +1368,26 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         if (!success) _revertBytes(result);
 
         amountOut = abi.decode(result, (uint256));
+    }
+
+    //  @notice Use an external swapper
+    //  @param swapper Contracts implementing the logic of the swap.
+    //  @param inToken Token used to do the swap.
+    //  @param outToken The token wanted.
+    //  @param outTokenRecipient Address who should have at the end of the swap at least `outTokenOwed`.
+    //  @param outTokenOwed Minimal amount for the `outTokenRecipient`.
+    //  @param inTokenObtained Amount of `inToken` used for the swap.
+    //  @param data Additional info for the specific swapper.
+    function _swapper(
+        ISwapper swapper,
+        IERC20 inToken,
+        IERC20 outToken,
+        address outTokenRecipient,
+        uint256 outTokenOwed,
+        uint256 inTokenObtained,
+        bytes memory data
+    ) internal {
+        swapper.swap(inToken, outToken, outTokenRecipient, outTokenOwed, inTokenObtained, data);
     }
 
     /// @notice Internal function used for error handling

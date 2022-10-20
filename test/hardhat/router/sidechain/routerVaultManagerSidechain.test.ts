@@ -105,7 +105,10 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         ),
       ];
 
-      const transferData = ethers.utils.defaultAbiCoder.encode(['address', 'uint256'], [USDC.address, UNIT_USDC]);
+      const transferData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256'],
+        [USDC.address, router.address, UNIT_USDC],
+      );
       const callsBorrow = [createVault(alice.address), addCollateral(1, UNIT_USDC)];
       const dataBorrow = await encodeAngleBorrowSidechain(
         USDC.address,
@@ -139,8 +142,8 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         ),
       ];
       const transferData = ethers.utils.defaultAbiCoder.encode(
-        ['address', 'uint256'],
-        [USDC.address, UNIT_USDC.mul(2)],
+        ['address', 'address', 'uint256'],
+        [USDC.address, router.address, UNIT_USDC.mul(2)],
       );
       const callsBorrow = [
         createVault(alice.address),
@@ -191,8 +194,8 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
       );
 
       const transferData = ethers.utils.defaultAbiCoder.encode(
-        ['address', 'uint256'],
-        [USDC.address, UNIT_USDC.mul(2)],
+        ['address', 'address', 'uint256'],
+        [USDC.address, router.address, UNIT_USDC.mul(2)],
       );
       const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.borrower];
       const dataMixer = [transferData, dataBorrow];
@@ -1163,7 +1166,10 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         '0xe0136b3661826a483734248681e4f59ae66bc6065ceb43fdd469ecb22c21d745',
         callsBorrow,
       );
-      const transferData = ethers.utils.defaultAbiCoder.encode(['address', 'uint256'], [USDC.address, UNIT_USDC]);
+      const transferData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256'],
+        [USDC.address, router.address, UNIT_USDC],
+      );
       const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.borrower];
       const dataMixer = [transferData, dataBorrow];
       await router.connect(alice).mixerVaultManagerPermit([permitParam], permits, actions, dataMixer);
@@ -1199,7 +1205,10 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
       await vaultManager.connect(alice).setPaymentData(0, UNIT_DAI, 0, UNIT_USDC);
       await vaultManager.approveSpenderVault(alice.address, 1, true);
       const permits: TypePermit[] = [];
-      const transferData = ethers.utils.defaultAbiCoder.encode(['address', 'uint256'], [USDC.address, UNIT_USDC]);
+      const transferData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256'],
+        [USDC.address, router.address, UNIT_USDC],
+      );
       const callsBorrow = [createVault(alice.address)];
       const dataBorrow = await encodeAngleBorrowSidechain(
         USDC.address,
@@ -1246,7 +1255,10 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
       await vaultManager.connect(alice).setPaymentData(UNIT_DAI, 0, UNIT_USDC, 0);
       await vaultManager.approveSpenderVault(alice.address, 1, true);
       const permits: TypePermit[] = [];
-      const transferData = ethers.utils.defaultAbiCoder.encode(['address', 'uint256'], [USDC.address, UNIT_USDC]);
+      const transferData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256'],
+        [USDC.address, router.address, UNIT_USDC],
+      );
       const callsBorrow = [createVault(alice.address)];
       const dataBorrow = await encodeAngleBorrowSidechain(
         USDC.address,
@@ -1294,7 +1306,10 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
       await vaultManager.connect(alice).setPaymentData(UNIT_DAI, 0, UNIT_USDC, 0);
       await vaultManager.approveSpenderVault(alice.address, 1, true);
       const permits: TypePermit[] = [];
-      const transferData = ethers.utils.defaultAbiCoder.encode(['address', 'uint256'], [USDC.address, UNIT_USDC]);
+      const transferData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256'],
+        [USDC.address, router.address, UNIT_USDC],
+      );
       const callsBorrow = [createVault(alice.address)];
       const dataBorrow = await encodeAngleBorrowSidechain(
         USDC.address,

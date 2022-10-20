@@ -172,15 +172,12 @@ describe('AngleRouter - e2e', () => {
       sanToken: sanTokenWBTC,
       perpetualManager: perpEURWBTC,
     } = await initCollateral('wBTC', stableMasterEUR, ANGLE, deployer, wBTCdecimal, wBTCORACLEUSD, 0));
-    ({ token: DAI, manager: managerDAI, sanToken: sanTokenDAI, perpetualManager: perpEURDAI } = await initCollateral(
-      'DAI',
-      stableMasterEUR,
-      ANGLE,
-      deployer,
-      DAIdecimal,
-      DAIORACLEUSD,
-      0,
-    ));
+    ({
+      token: DAI,
+      manager: managerDAI,
+      sanToken: sanTokenDAI,
+      perpetualManager: perpEURDAI,
+    } = await initCollateral('DAI', stableMasterEUR, ANGLE, deployer, DAIdecimal, DAIORACLEUSD, 0));
     ({ gauge: gaugeSanEURWBTC } = await initGauge(sanTokenWBTC.address, governor, ANGLE, veANGLE, veBoostProxy));
     ({ gauge: gaugeSanEURDAI } = await initGauge(sanTokenDAI.address, governor, ANGLE, veANGLE, veBoostProxy));
     ({ gauge: gaugeSanEURWBTC2 } = await initGauge(sanTokenWBTC.address, governor, ANGLE, veANGLE, veBoostProxy));
@@ -480,8 +477,8 @@ describe('AngleRouter - e2e', () => {
         await (await wBTC.connect(governor).approve(angleRouter.address, UNIT_WBTC.mul(BigNumber.from('100')))).wait();
 
         const transfers: TypeTransfer[] = [
-          { inToken: wBTC.address, amountIn: UNIT_WBTC.mul(BigNumber.from('100')) },
-          { inToken: DAI.address, amountIn: UNIT_DAI.mul(BigNumber.from('100')) },
+          { inToken: wBTC.address, receiver: angleRouter.address, amountIn: UNIT_WBTC.mul(BigNumber.from('100')) },
+          { inToken: DAI.address, receiver: angleRouter.address, amountIn: UNIT_DAI.mul(BigNumber.from('100')) },
         ];
 
         const actions = [ActionType.mint, ActionType.mint];
@@ -608,8 +605,8 @@ describe('AngleRouter - e2e', () => {
         ];
 
         const transfers: TypeTransfer[] = [
-          { inToken: wBTC.address, amountIn: UNIT_WBTC },
-          { inToken: DAI.address, amountIn: UNIT_DAI },
+          { inToken: wBTC.address, receiver: angleRouter.address, amountIn: UNIT_WBTC },
+          { inToken: DAI.address, receiver: angleRouter.address, amountIn: UNIT_DAI },
         ];
 
         const payload1inch = oneInchRouter.interface.encodeFunctionData('swap', [
@@ -789,7 +786,9 @@ describe('AngleRouter - e2e', () => {
           ),
         ];
 
-        const transfers: TypeTransfer[] = [{ inToken: wBTC.address, amountIn: UNIT_WBTC }];
+        const transfers: TypeTransfer[] = [
+          { inToken: wBTC.address, receiver: angleRouter.address, amountIn: UNIT_WBTC },
+        ];
         const swaps: TypeSwap[] = [];
 
         const actions = [
@@ -846,120 +845,6 @@ describe('AngleRouter - e2e', () => {
         await invariantFunds(angleRouter.address);
         await invariantFunds(cleanAddress.address);
         await invariantFundsUser();
-      });
-    });
-    describe('Wrapper functions', () => {
-      it('claimRewards n°1', async () => {
-        await angleRouter
-          .connect(user)
-          ['claimRewards(address,address[],uint256[],address[],address[])'](
-            user.address,
-            [gaugeEUR.address, gaugeSanEURDAI.address, gaugeSanEURWBTC.address],
-            [BigNumber.from(1), BigNumber.from(1)],
-            [agEUR.address, agEUR.address],
-            [wBTC.address, DAI.address],
-          );
-      });
-      it('claimRewards n°2', async () => {
-        await angleRouter
-          .connect(user)
-          ['claimRewards(address,address[],uint256[],address[])'](
-            user.address,
-            [gaugeEUR.address, gaugeSanEURDAI.address, gaugeSanEURWBTC.address],
-            [BigNumber.from(1), BigNumber.from(1)],
-            [perpEURWBTC.address, perpEURDAI.address],
-          );
-      });
-      it('Deposit n°1', async () => {
-        await (await wBTC.connect(user).approve(angleRouter.address, ethers.constants.MaxUint256)).wait();
-
-        await (await wBTC.connect(governor).mint(user.address, UNIT_WBTC)).wait();
-
-        await angleRouter
-          .connect(user)
-          ['deposit(address,uint256,address,address)'](user.address, UNIT_WBTC, agEUR.address, wBTC.address);
-      });
-      it('Deposit n°2', async () => {
-        await (await wBTC.connect(user).approve(angleRouter.address, ethers.constants.MaxUint256)).wait();
-
-        await (await wBTC.connect(governor).mint(user.address, UNIT_WBTC)).wait();
-
-        await angleRouter
-          .connect(user)
-          ['deposit(address,uint256,address,address,address,address)'](
-            user.address,
-            UNIT_WBTC,
-            stableMasterEUR.address,
-            wBTC.address,
-            managerWBTC.address,
-            sanTokenWBTC.address,
-          );
-      });
-      it('Gauge Deposit', async () => {
-        await (await sanTokenWBTC.connect(user).approve(angleRouter.address, ethers.constants.MaxUint256)).wait();
-
-        await angleRouter
-          .connect(user)
-          .gaugeDeposit(user.address, UNIT_WBTC, gaugeSanEURWBTC.address, false, sanTokenWBTC.address);
-      });
-      it('Mint n°1', async () => {
-        await (await wBTC.connect(user).approve(angleRouter.address, ethers.constants.MaxUint256)).wait();
-
-        await (await wBTC.connect(governor).mint(user.address, UNIT_WBTC)).wait();
-
-        await angleRouter
-          .connect(user)
-          ['mint(address,uint256,uint256,address,address)'](
-            user.address,
-            UNIT_WBTC,
-            UNIT_DAI,
-            agEUR.address,
-            wBTC.address,
-          );
-      });
-      it('Mint n°2', async () => {
-        await (await wBTC.connect(user).approve(angleRouter.address, ethers.constants.MaxUint256)).wait();
-
-        await (await wBTC.connect(governor).mint(user.address, UNIT_WBTC)).wait();
-
-        await angleRouter
-          .connect(user)
-          ['mint(address,uint256,uint256,address,address,address)'](
-            user.address,
-            UNIT_WBTC,
-            UNIT_DAI,
-            stableMasterEUR.address,
-            wBTC.address,
-            managerWBTC.address,
-          );
-      });
-
-      it('Open Perp', async () => {
-        await (await wBTC.connect(user).approve(angleRouter.address, ethers.constants.MaxUint256)).wait();
-
-        await (await wBTC.connect(governor).mint(user.address, UNIT_WBTC)).wait();
-
-        await angleRouter
-          .connect(user)
-          .openPerpetual(
-            user.address,
-            UNIT_WBTC,
-            UNIT_WBTC,
-            wBTCORACLEUSD.mul(BASE_18),
-            BigNumber.from(0),
-            false,
-            agEUR.address,
-            wBTC.address,
-          );
-      });
-      it('add to perpetual', async () => {
-        await (await wBTC.connect(user).approve(angleRouter.address, ethers.constants.MaxUint256)).wait();
-
-        await (await wBTC.connect(governor).mint(user.address, UNIT_WBTC)).wait();
-
-        await angleRouter
-          .connect(user)
-          .addToPerpetual(UNIT_WBTC, BigNumber.from(2), false, agEUR.address, wBTC.address);
       });
     });
   });

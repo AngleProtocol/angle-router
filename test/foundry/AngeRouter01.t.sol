@@ -88,7 +88,11 @@ contract AngleRouter01Test is BaseTest {
         ActionType[] memory actionType = new ActionType[](1);
         bytes[] memory data = new bytes[](1);
 
-        transfers[0] = TransferType({ inToken: IERC20(address(token)), amountIn: previewMint });
+        transfers[0] = TransferType({
+            inToken: IERC20(address(token)),
+            receiver: address(routerProxy),
+            amountIn: previewMint
+        });
         actionType[0] = ActionType.mintSavingsRate;
         data[0] = abi.encode(token, savingsRate, shares, to, maxAmount);
 
@@ -137,7 +141,11 @@ contract AngleRouter01Test is BaseTest {
         ActionType[] memory actionType = new ActionType[](1);
         bytes[] memory data = new bytes[](1);
 
-        transfers[0] = TransferType({ inToken: IERC20(address(token)), amountIn: previewMint });
+        transfers[0] = TransferType({
+            inToken: IERC20(address(token)),
+            receiver: address(routerProxy),
+            amountIn: previewMint
+        });
         actionType[0] = ActionType.mintSavingsRate;
         data[0] = abi.encode(token, savingsRate, shares, to, maxAmount);
 
@@ -183,7 +191,11 @@ contract AngleRouter01Test is BaseTest {
         ActionType[] memory actionType = new ActionType[](1);
         bytes[] memory data = new bytes[](1);
 
-        transfers[0] = TransferType({ inToken: IERC20(address(token)), amountIn: amount });
+        transfers[0] = TransferType({
+            inToken: IERC20(address(token)),
+            receiver: address(routerProxy),
+            amountIn: amount
+        });
         actionType[0] = ActionType.depositSavingsRate;
         data[0] = abi.encode(token, savingsRate, BASE_PARAMS, to, minSharesOut);
 
@@ -230,7 +242,11 @@ contract AngleRouter01Test is BaseTest {
         ActionType[] memory actionType = new ActionType[](1);
         bytes[] memory data = new bytes[](1);
 
-        transfers[0] = TransferType({ inToken: IERC20(address(token)), amountIn: amount });
+        transfers[0] = TransferType({
+            inToken: IERC20(address(token)),
+            receiver: address(routerProxy),
+            amountIn: amount
+        });
         actionType[0] = ActionType.depositSavingsRate;
         data[0] = abi.encode(token, savingsRate, BASE_PARAMS, to, minSharesOut);
 
@@ -282,7 +298,11 @@ contract AngleRouter01Test is BaseTest {
             ActionType[] memory actionType = new ActionType[](1);
             bytes[] memory data = new bytes[](1);
 
-            transfers[0] = TransferType({ inToken: IERC20(address(token)), amountIn: aliceAmount });
+            transfers[0] = TransferType({
+                inToken: IERC20(address(token)),
+                receiver: address(routerProxy),
+                amountIn: aliceAmount
+            });
             actionType[0] = ActionType.depositSavingsRate;
             data[0] = abi.encode(token, savingsRate, BASE_PARAMS, _alice, previewDeposit);
 
@@ -364,7 +384,11 @@ contract AngleRouter01Test is BaseTest {
             ActionType[] memory actionType = new ActionType[](1);
             bytes[] memory data = new bytes[](1);
 
-            transfers[0] = TransferType({ inToken: IERC20(address(token)), amountIn: aliceAmount });
+            transfers[0] = TransferType({
+                inToken: IERC20(address(token)),
+                receiver: address(routerProxy),
+                amountIn: aliceAmount
+            });
             actionType[0] = ActionType.depositSavingsRate;
             data[0] = abi.encode(token, savingsRate, BASE_PARAMS, _alice, previewDeposit);
 
@@ -441,7 +465,11 @@ contract AngleRouter01Test is BaseTest {
             ActionType[] memory actionType = new ActionType[](1);
             bytes[] memory data = new bytes[](1);
 
-            transfers[0] = TransferType({ inToken: IERC20(address(token)), amountIn: aliceAmount });
+            transfers[0] = TransferType({
+                inToken: IERC20(address(token)),
+                receiver: address(routerProxy),
+                amountIn: aliceAmount
+            });
             actionType[0] = ActionType.depositSavingsRate;
             data[0] = abi.encode(token, savingsRate, BASE_PARAMS, _alice, previewDeposit);
 
@@ -519,7 +547,11 @@ contract AngleRouter01Test is BaseTest {
             ActionType[] memory actionType = new ActionType[](1);
             bytes[] memory data = new bytes[](1);
 
-            transfers[0] = TransferType({ inToken: IERC20(address(token)), amountIn: aliceAmount });
+            transfers[0] = TransferType({
+                inToken: IERC20(address(token)),
+                receiver: address(routerProxy),
+                amountIn: aliceAmount
+            });
             actionType[0] = ActionType.depositSavingsRate;
             data[0] = abi.encode(token, savingsRate, BASE_PARAMS, _alice, previewDeposit);
 

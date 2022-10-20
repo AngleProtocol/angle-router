@@ -106,7 +106,7 @@ contract('Router - VaultManager Functionalities', () => {
         ),
       ];
       // const transfers: TypeTransfer[] = [];
-      const transfers: TypeTransfer[] = [{ inToken: USDC.address, amountIn: UNIT_USDC }];
+      const transfers: TypeTransfer[] = [{ inToken: USDC.address, receiver: router.address, amountIn: UNIT_USDC }];
       const swaps: TypeSwap[] = [];
       const callsBorrow = [createVault(alice.address), addCollateral(1, UNIT_USDC)];
       const dataBorrow = await encodeAngleBorrow(
@@ -141,7 +141,9 @@ contract('Router - VaultManager Functionalities', () => {
         ),
       ];
       // const transfers: TypeTransfer[] = [];
-      const transfers: TypeTransfer[] = [{ inToken: USDC.address, amountIn: UNIT_USDC.mul(2) }];
+      const transfers: TypeTransfer[] = [
+        { inToken: USDC.address, receiver: router.address, amountIn: UNIT_USDC.mul(2) },
+      ];
       const swaps: TypeSwap[] = [];
       const callsBorrow = [
         createVault(alice.address),
@@ -182,7 +184,9 @@ contract('Router - VaultManager Functionalities', () => {
         ),
       ];
       // const transfers: TypeTransfer[] = [];
-      const transfers: TypeTransfer[] = [{ inToken: USDC.address, amountIn: UNIT_USDC.mul(2) }];
+      const transfers: TypeTransfer[] = [
+        { inToken: USDC.address, receiver: router.address, amountIn: UNIT_USDC.mul(2) },
+      ];
       const swaps: TypeSwap[] = [];
       const callsBorrow = [addCollateral(0, UNIT_USDC), addCollateral(0, UNIT_USDC)];
       const dataBorrow = await encodeAngleBorrow(
@@ -1410,7 +1414,7 @@ contract('Router - VaultManager Functionalities', () => {
       await vaultManager.connect(alice).setPaymentData(0, UNIT_DAI, 0, UNIT_USDC);
       await vaultManager.approveSpenderVault(alice.address, 1, true);
       const permits: TypePermit[] = [];
-      const transfers: TypeTransfer[] = [{ inToken: USDC.address, amountIn: UNIT_USDC }];
+      const transfers: TypeTransfer[] = [{ inToken: USDC.address, receiver: router.address, amountIn: UNIT_USDC }];
       const swaps: TypeSwap[] = [];
       const callsBorrow = [createVault(alice.address)];
       const dataBorrow = await encodeAngleBorrow(
@@ -1457,7 +1461,7 @@ contract('Router - VaultManager Functionalities', () => {
       await vaultManager.connect(alice).setPaymentData(0, UNIT_DAI, 0, UNIT_USDC);
       await vaultManager.approveSpenderVault(alice.address, 1, true);
       const permits: TypePermit[] = [];
-      const transfers: TypeTransfer[] = [{ inToken: USDC.address, amountIn: UNIT_USDC }];
+      const transfers: TypeTransfer[] = [{ inToken: USDC.address, receiver: router.address, amountIn: UNIT_USDC }];
       const swaps: TypeSwap[] = [];
       const callsBorrow = [createVault(alice.address)];
       const dataBorrow = await encodeAngleBorrow(
@@ -1506,7 +1510,7 @@ contract('Router - VaultManager Functionalities', () => {
       await vaultManager.connect(alice).setPaymentData(UNIT_DAI, 0, UNIT_USDC, 0);
       await vaultManager.approveSpenderVault(alice.address, 1, true);
       const permits: TypePermit[] = [];
-      const transfers: TypeTransfer[] = [{ inToken: USDC.address, amountIn: UNIT_USDC }];
+      const transfers: TypeTransfer[] = [{ inToken: USDC.address, receiver: router.address, amountIn: UNIT_USDC }];
       const swaps: TypeSwap[] = [];
       const callsBorrow = [createVault(alice.address)];
       const dataBorrow = await encodeAngleBorrow(
@@ -1556,7 +1560,7 @@ contract('Router - VaultManager Functionalities', () => {
       await vaultManager.connect(alice).setPaymentData(UNIT_DAI, 0, UNIT_USDC, 0);
       await vaultManager.approveSpenderVault(alice.address, 1, true);
       const permits: TypePermit[] = [];
-      const transfers: TypeTransfer[] = [{ inToken: USDC.address, amountIn: UNIT_USDC }];
+      const transfers: TypeTransfer[] = [{ inToken: USDC.address, receiver: router.address, amountIn: UNIT_USDC }];
       const swaps: TypeSwap[] = [];
       const callsBorrow = [createVault(alice.address)];
       const dataBorrow = await encodeAngleBorrow(

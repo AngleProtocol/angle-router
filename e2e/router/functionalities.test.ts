@@ -161,15 +161,12 @@ describe('AngleRouter - functionalities', () => {
       sanToken: sanTokenWBTC,
       perpetualManager: perpEURWBTC,
     } = await initCollateral('wBTC', stableMasterEUR, ANGLE, deployer, wBTCdecimal, wBTCORACLEUSD, 0));
-    ({ token: DAI, manager: managerDAI, sanToken: sanTokenDAI, perpetualManager: perpEURDAI } = await initCollateral(
-      'DAI',
-      stableMasterEUR,
-      ANGLE,
-      deployer,
-      DAIdecimal,
-      DAIORACLEUSD,
-      0,
-    ));
+    ({
+      token: DAI,
+      manager: managerDAI,
+      sanToken: sanTokenDAI,
+      perpetualManager: perpEURDAI,
+    } = await initCollateral('DAI', stableMasterEUR, ANGLE, deployer, DAIdecimal, DAIORACLEUSD, 0));
 
     ({ gauge: gaugeSanEURWBTC } = await initGauge(sanTokenWBTC.address, governor, ANGLE, veANGLE, veBoostProxy));
     ({ gauge: gaugeSanEURDAI } = await initGauge(sanTokenDAI.address, governor, ANGLE, veANGLE, veBoostProxy));
@@ -238,7 +235,7 @@ describe('AngleRouter - functionalities', () => {
 
         const permits: TypePermit[] = [];
 
-        const transfers: TypeTransfer[] = [{ inToken: DAI.address, amountIn: UNIT_DAI }];
+        const transfers: TypeTransfer[] = [{ inToken: DAI.address, receiver: angleRouter.address, amountIn: UNIT_DAI }];
         const swaps: TypeSwap[] = [
           {
             inToken: wETH.address,
@@ -337,17 +334,17 @@ describe('AngleRouter - functionalities', () => {
         const permits: TypePermit[] = [];
 
         const transfers: TypeTransfer[] = [
-          { inToken: DAI.address, amountIn: UNIT_DAI },
-          { inToken: wBTC.address, amountIn: UNIT_WBTC },
-          { inToken: wETH.address, amountIn: UNIT_ETH },
-          { inToken: USDC.address, amountIn: BigNumber.from(0) },
-          { inToken: agEUR.address, amountIn: BigNumber.from(0) },
-          { inToken: sanTokenWBTC.address, amountIn: BigNumber.from(0) },
-          { inToken: sanTokenDAI.address, amountIn: BigNumber.from(0) },
-          { inToken: ANGLE.address, amountIn: BigNumber.from(0) },
-          { inToken: gaugeEUR.address, amountIn: BigNumber.from(0) },
-          { inToken: gaugeSanEURDAI.address, amountIn: BigNumber.from(0) },
-          { inToken: gaugeSanEURWBTC.address, amountIn: BigNumber.from(0) },
+          { inToken: DAI.address, receiver: angleRouter.address, amountIn: UNIT_DAI },
+          { inToken: wBTC.address, receiver: angleRouter.address, amountIn: UNIT_WBTC },
+          { inToken: wETH.address, receiver: angleRouter.address, amountIn: UNIT_ETH },
+          { inToken: USDC.address, receiver: angleRouter.address, amountIn: BigNumber.from(0) },
+          { inToken: agEUR.address, receiver: angleRouter.address, amountIn: BigNumber.from(0) },
+          { inToken: sanTokenWBTC.address, receiver: angleRouter.address, amountIn: BigNumber.from(0) },
+          { inToken: sanTokenDAI.address, receiver: angleRouter.address, amountIn: BigNumber.from(0) },
+          { inToken: ANGLE.address, receiver: angleRouter.address, amountIn: BigNumber.from(0) },
+          { inToken: gaugeEUR.address, receiver: angleRouter.address, amountIn: BigNumber.from(0) },
+          { inToken: gaugeSanEURDAI.address, receiver: angleRouter.address, amountIn: BigNumber.from(0) },
+          { inToken: gaugeSanEURWBTC.address, receiver: angleRouter.address, amountIn: BigNumber.from(0) },
         ];
         const swaps: TypeSwap[] = [];
 
@@ -362,7 +359,9 @@ describe('AngleRouter - functionalities', () => {
         // permits done before
         const permits: TypePermit[] = [];
 
-        const transfers: TypeTransfer[] = [{ inToken: DAI.address, amountIn: BALANCE_DAI.add(UNIT_DAI) }];
+        const transfers: TypeTransfer[] = [
+          { inToken: DAI.address, receiver: angleRouter.address, amountIn: BALANCE_DAI.add(UNIT_DAI) },
+        ];
         const swaps: TypeSwap[] = [
           {
             inToken: wETH.address,
@@ -404,7 +403,9 @@ describe('AngleRouter - functionalities', () => {
         const collateralParams = await stableMasterEUR.connect(user).collateralMap(managerWBTC.address);
         await (await wBTC.connect(governor).mint(cleanAddress.address, UNIT_WBTC)).wait();
 
-        const transfers: TypeTransfer[] = [{ inToken: wBTC.address, amountIn: UNIT_WBTC }];
+        const transfers: TypeTransfer[] = [
+          { inToken: wBTC.address, receiver: angleRouter.address, amountIn: UNIT_WBTC },
+        ];
         const swaps: TypeSwap[] = [];
         const actions = [ActionType.deposit, ActionType.gaugeDeposit];
         const datas: string[] = [
@@ -441,7 +442,9 @@ describe('AngleRouter - functionalities', () => {
         const collateralParams = await stableMasterEUR.connect(user).collateralMap(managerWBTC.address);
         await (await wBTC.connect(governor).mint(cleanAddress.address, UNIT_WBTC)).wait();
 
-        const transfers: TypeTransfer[] = [{ inToken: wBTC.address, amountIn: UNIT_WBTC }];
+        const transfers: TypeTransfer[] = [
+          { inToken: wBTC.address, receiver: angleRouter.address, amountIn: UNIT_WBTC },
+        ];
         const swaps: TypeSwap[] = [];
         const actions = [ActionType.deposit];
         const datas: string[] = [
@@ -472,7 +475,9 @@ describe('AngleRouter - functionalities', () => {
     });
     describe('Mint', () => {
       it('revert - wrong collateral', async () => {
-        const transfers: TypeTransfer[] = [{ inToken: wBTC.address, amountIn: UNIT_WBTC }];
+        const transfers: TypeTransfer[] = [
+          { inToken: wBTC.address, receiver: angleRouter.address, amountIn: UNIT_WBTC },
+        ];
         const swaps: TypeSwap[] = [];
         const actions = [ActionType.mint];
         const datas: string[] = [
@@ -569,61 +574,6 @@ describe('AngleRouter - functionalities', () => {
         expect(await agEUR.balanceOf(user.address)).to.be.equal(userAgEURbalancePre.add(expectedEURVal));
         await invariantFunds(angleRouter.address);
         await invariantFunds(cleanAddress.address);
-      });
-    });
-    describe('Burn', () => {
-      it('success - create stables', async () => {
-        await DAI.connect(governor).mint(burner.address, UNIT_DAI);
-        await DAI.connect(burner).approve(stableMasterEUR.address, UNIT_DAI);
-        await stableMasterEUR.connect(burner).mint(UNIT_DAI, burner.address, managerDAI.address, parseAmount.ether(1));
-        expect(await agEUR.balanceOf(burner.address)).to.be.equal(parseAmount.ether(1));
-      });
-      it('revert - wrong stablecoin', async () => {
-        await expect(
-          angleRouter.connect(burner).burn(burner.address, parseAmount.ether(1), UNIT_DAI, DAI.address, DAI.address),
-        ).to.be.revertedWith('0');
-      });
-      it('revert - wrong collateral', async () => {
-        await expect(
-          angleRouter
-            .connect(burner)
-            .burn(burner.address, parseAmount.ether(1), UNIT_DAI, agEUR.address, agEUR.address),
-        ).to.be.revertedWith('0');
-      });
-      it('revert - angleRouter not allowed to burn agTokens', async () => {
-        await expect(
-          angleRouter.connect(burner).burn(burner.address, parseAmount.ether(1), UNIT_DAI, agEUR.address, DAI.address),
-        ).to.be.revertedWith('23');
-      });
-      it('revert - wrong amount', async () => {
-        await agEUR.connect(burner).approve(angleRouter.address, parseAmount.ether(1.1));
-        await expect(
-          angleRouter
-            .connect(burner)
-            .burn(burner.address, parseAmount.ether(1.1), UNIT_DAI, agEUR.address, DAI.address),
-        ).to.be.revertedWith('ERC20: burn amount exceeds balance');
-      });
-      it('success - for itself', async () => {
-        await agEUR.connect(burner).approve(angleRouter.address, parseAmount.ether(1));
-        await angleRouter
-          .connect(burner)
-          .burn(burner.address, parseAmount.ether(1), UNIT_DAI, agEUR.address, DAI.address);
-        expect(await DAI.balanceOf(burner.address)).to.be.equal(UNIT_DAI);
-        expect(await agEUR.balanceOf(burner.address)).to.be.equal(ethers.constants.Zero);
-        await DAI.connect(burner).burn(managerDAI.address, UNIT_DAI);
-      });
-      it('success - for someone else', async () => {
-        await agEUR.connect(burner).approve(angleRouter.address, parseAmount.ether(1));
-        await DAI.connect(burner).approve(stableMasterEUR.address, UNIT_DAI);
-        await stableMasterEUR.connect(burner).mint(UNIT_DAI, burner.address, managerDAI.address, parseAmount.ether(1));
-        await angleRouter
-          .connect(burner)
-          .burn(user2.address, parseAmount.ether(1), UNIT_DAI, agEUR.address, DAI.address);
-        expect(await agEUR.balanceOf(burner.address)).to.be.equal(ethers.constants.Zero);
-        expect(await agEUR.balanceOf(user2.address)).to.be.equal(ethers.constants.Zero);
-        expect(await DAI.balanceOf(burner.address)).to.be.equal(ethers.constants.Zero);
-        expect(await DAI.balanceOf(user2.address)).to.be.equal(UNIT_DAI);
-        await DAI.connect(user2).burn(managerDAI.address, UNIT_DAI);
       });
     });
     describe('openPerpetual', () => {
@@ -741,7 +691,7 @@ describe('AngleRouter - functionalities', () => {
         const prevSanBalance = await sanTokenWBTC.balanceOf(user.address);
         const prevSanStakedBalance = await gaugeSanEURWBTC.balanceOf(user.address);
 
-        let transfers: TypeTransfer[] = [{ inToken: wBTC.address, amountIn: UNIT_WBTC }];
+        let transfers: TypeTransfer[] = [{ inToken: wBTC.address, receiver: angleRouter.address, amountIn: UNIT_WBTC }];
         let actions = [ActionType.deposit];
         let datas: string[] = [
           ethers.utils.defaultAbiCoder.encode(
@@ -774,6 +724,7 @@ describe('AngleRouter - functionalities', () => {
         transfers = [
           {
             inToken: sanTokenWBTC.address,
+            receiver: angleRouter.address,
             amountIn: sanTokenToWithdraw,
           },
         ];
@@ -807,7 +758,7 @@ describe('AngleRouter - functionalities', () => {
         const prevSanBalance = await sanTokenWBTC.balanceOf(user.address);
         const prevSanStakedBalance = await gaugeSanEURWBTC.balanceOf(user.address);
 
-        let transfers: TypeTransfer[] = [{ inToken: wBTC.address, amountIn: UNIT_WBTC }];
+        let transfers: TypeTransfer[] = [{ inToken: wBTC.address, receiver: angleRouter.address, amountIn: UNIT_WBTC }];
         let actions = [ActionType.deposit];
         let datas: string[] = [
           ethers.utils.defaultAbiCoder.encode(
@@ -840,6 +791,7 @@ describe('AngleRouter - functionalities', () => {
         transfers = [
           {
             inToken: sanTokenWBTC.address,
+            receiver: angleRouter.address,
             amountIn: sanTokenToWithdraw,
           },
         ];
@@ -872,7 +824,9 @@ describe('AngleRouter - functionalities', () => {
     });
     describe('claimRewards', () => {
       it('success - stake in gauges', async () => {
-        const transfers: TypeTransfer[] = [{ inToken: wBTC.address, amountIn: UNIT_WBTC }];
+        const transfers: TypeTransfer[] = [
+          { inToken: wBTC.address, receiver: angleRouter.address, amountIn: UNIT_WBTC },
+        ];
         const swaps: TypeSwap[] = [];
         const actions = [ActionType.deposit, ActionType.gaugeDeposit];
         const datas: string[] = [
@@ -973,7 +927,11 @@ describe('AngleRouter - functionalities', () => {
       });
       it('success - open perp', async () => {
         const transfers: TypeTransfer[] = [
-          { inToken: wBTC.address, amountIn: UNIT_WBTC.mul(BigNumber.from(5)).div(BigNumber.from(4)) },
+          {
+            inToken: wBTC.address,
+            receiver: angleRouter.address,
+            amountIn: UNIT_WBTC.mul(BigNumber.from(5)).div(BigNumber.from(4)),
+          },
         ];
         const swaps: TypeSwap[] = [];
         const actions = [ActionType.mint, ActionType.openPerpetual];
@@ -1170,7 +1128,9 @@ describe('AngleRouter - functionalities', () => {
         await wBTC.connect(governor).approve(stableMasterEUR.address, ethers.constants.MaxUint256);
 
         // create and distribute rewards
-        const transfers: TypeTransfer[] = [{ inToken: wBTC.address, amountIn: UNIT_WBTC }];
+        const transfers: TypeTransfer[] = [
+          { inToken: wBTC.address, receiver: angleRouter.address, amountIn: UNIT_WBTC },
+        ];
         const swaps: TypeSwap[] = [];
         const actions = [ActionType.mint];
         const datas: string[] = [
@@ -1285,7 +1245,9 @@ describe('AngleRouter - functionalities', () => {
 
         // create and distribute rewards
 
-        const transfers: TypeTransfer[] = [{ inToken: wBTC.address, amountIn: UNIT_WBTC }];
+        const transfers: TypeTransfer[] = [
+          { inToken: wBTC.address, receiver: angleRouter.address, amountIn: UNIT_WBTC },
+        ];
         const swaps: TypeSwap[] = [];
         const actions = [ActionType.mint];
         const datas: string[] = [
@@ -1420,7 +1382,9 @@ describe('AngleRouter - functionalities', () => {
         await (await DAI.connect(governor).mint(user.address, UNIT_DAI.mul(BigNumber.from(3)))).wait();
         BALANCE_DAI = BALANCE_DAI.add(UNIT_DAI.mul(BigNumber.from(3)));
 
-        const transfers: TypeTransfer[] = [{ inToken: DAI.address, amountIn: UNIT_DAI.mul(BigNumber.from(3)) }];
+        const transfers: TypeTransfer[] = [
+          { inToken: DAI.address, receiver: angleRouter.address, amountIn: UNIT_DAI.mul(BigNumber.from(3)) },
+        ];
         const swaps: TypeSwap[] = [];
         const actions = [ActionType.mint, ActionType.openPerpetual, ActionType.addToPerpetual];
         const datas: string[] = [

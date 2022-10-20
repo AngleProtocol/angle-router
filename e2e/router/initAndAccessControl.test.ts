@@ -173,17 +173,22 @@ describe('AngleRouter - init & access control', () => {
     } = await initCollateral(
       'wBTC',
       stableMasterEUR,
-      (ANGLE as unknown) as MockANGLE,
+      ANGLE as unknown as MockANGLE,
       governor,
       wBTCdecimal,
       wBTCORACLEUSD,
       0,
       false,
     ));
-    ({ token: DAI, manager: managerDAI, sanToken: sanTokenDAI, perpetualManager: perpEURDAI } = await initCollateral(
+    ({
+      token: DAI,
+      manager: managerDAI,
+      sanToken: sanTokenDAI,
+      perpetualManager: perpEURDAI,
+    } = await initCollateral(
       'DAI',
       stableMasterEUR,
-      (ANGLE as unknown) as MockANGLE,
+      ANGLE as unknown as MockANGLE,
       governor,
       DAIdecimal,
       DAIORACLEUSD,
@@ -242,180 +247,180 @@ describe('AngleRouter - init & access control', () => {
 
   describe('Init', () => {
     describe('Initializer', () => {
-      it('revert - governor - zero address', async () => {
-        const angleRouter = (await new AngleRouter__factory(deployer).deploy()) as AngleRouter;
-        await expect(
-          angleRouter
-            .connect(governor)
-            .initialize(
-              ethers.constants.AddressZero,
-              guardian.address,
-              uniswapRouter.address,
-              oneInchRouter.address,
-              stableMasterEUR.address,
-              [managerWBTC.address, managerDAI.address],
-              [gaugeSanEURWBTC.address, gaugeSanEURDAI.address],
-            ),
-        ).to.be.revertedWith('0');
-      });
-      it('revert - guardian - zero address', async () => {
-        const angleRouter = (await new AngleRouter__factory(deployer).deploy()) as AngleRouter;
-        await expect(
-          angleRouter
-            .connect(governor)
-            .initialize(
-              governor.address,
-              ethers.constants.AddressZero,
-              uniswapRouter.address,
-              oneInchRouter.address,
-              stableMasterEUR.address,
-              [managerWBTC.address, managerDAI.address],
-              [gaugeSanEURWBTC.address, gaugeSanEURDAI.address],
-            ),
-        ).to.be.revertedWith('0');
-      });
-      it('revert - governor same as guardian', async () => {
-        const angleRouter = (await new AngleRouter__factory(deployer).deploy()) as AngleRouter;
-        await expect(
-          angleRouter
-            .connect(governor)
-            .initialize(
-              guardian.address,
-              guardian.address,
-              uniswapRouter.address,
-              oneInchRouter.address,
-              stableMasterEUR.address,
-              [managerWBTC.address, managerDAI.address],
-              [gaugeSanEURWBTC.address, gaugeSanEURDAI.address],
-            ),
-        ).to.be.revertedWith('49');
-      });
-      it('revert - uniswapRouter - zero address', async () => {
-        const angleRouter = (await new AngleRouter__factory(deployer).deploy()) as AngleRouter;
-        await expect(
-          angleRouter
-            .connect(governor)
-            .initialize(
-              governor.address,
-              guardian.address,
-              ethers.constants.AddressZero,
-              oneInchRouter.address,
-              stableMasterEUR.address,
-              [managerWBTC.address, managerDAI.address],
-              [gaugeSanEURWBTC.address, gaugeSanEURDAI.address],
-            ),
-        ).to.be.revertedWith('0');
-      });
-      it('revert - 1InchRouter - zero address', async () => {
-        const angleRouter = (await new AngleRouter__factory(deployer).deploy()) as AngleRouter;
-        await expect(
-          angleRouter
-            .connect(governor)
-            .initialize(
-              governor.address,
-              guardian.address,
-              uniswapRouter.address,
-              ethers.constants.AddressZero,
-              stableMasterEUR.address,
-              [managerWBTC.address, managerDAI.address],
-              [gaugeSanEURWBTC.address, gaugeSanEURDAI.address],
-            ),
-        ).to.be.revertedWith('0');
-      });
-      it('revert - stablemaster - zero address', async () => {
-        const angleRouter = (await new AngleRouter__factory(deployer).deploy()) as AngleRouter;
-        await expect(
-          angleRouter
-            .connect(governor)
-            .initialize(
-              governor.address,
-              guardian.address,
-              uniswapRouter.address,
-              oneInchRouter.address,
-              ethers.constants.AddressZero,
-              [managerWBTC.address, managerDAI.address],
-              [gaugeSanEURWBTC.address, gaugeSanEURDAI.address],
-            ),
-        ).to.be.reverted;
-      });
-      it('revert - poolManagers - invalid array length', async () => {
-        const angleRouter = (await new AngleRouter__factory(deployer).deploy()) as AngleRouter;
-        await expect(
-          angleRouter
-            .connect(governor)
-            .initialize(
-              governor.address,
-              guardian.address,
-              uniswapRouter.address,
-              oneInchRouter.address,
-              stableMasterEUR.address,
-              [managerWBTC.address],
-              [gaugeSanEURWBTC.address, gaugeSanEURDAI.address],
-            ),
-        ).to.be.revertedWith('104');
-      });
-      it('revert - gauges - invalid array length', async () => {
-        const angleRouter = (await new AngleRouter__factory(deployer).deploy()) as AngleRouter;
-        await expect(
-          angleRouter
-            .connect(governor)
-            .initialize(
-              governor.address,
-              guardian.address,
-              uniswapRouter.address,
-              oneInchRouter.address,
-              stableMasterEUR.address,
-              [managerWBTC.address, managerDAI.address],
-              [gaugeSanEURDAI.address],
-            ),
-        ).to.be.revertedWith('104');
-      });
-      it('revert - poolManagers - zero address', async () => {
-        const angleRouter = (await new AngleRouter__factory(deployer).deploy()) as AngleRouter;
-        await expect(
-          angleRouter
-            .connect(governor)
-            .initialize(
-              governor.address,
-              guardian.address,
-              uniswapRouter.address,
-              oneInchRouter.address,
-              stableMasterEUR.address,
-              [managerWBTC.address, ethers.constants.AddressZero],
-              [gaugeSanEURWBTC.address, gaugeSanEURDAI.address],
-            ),
-        ).to.be.reverted;
-      });
-      it('revert - duplicated poolManager', async () => {
-        const angleRouter = (await new AngleRouter__factory(deployer).deploy()) as AngleRouter;
-        await expect(
-          angleRouter
-            .connect(governor)
-            .initialize(
-              governor.address,
-              guardian.address,
-              uniswapRouter.address,
-              oneInchRouter.address,
-              stableMasterEUR.address,
-              [managerWBTC.address, managerWBTC.address],
-              [gaugeSanEURWBTC.address, gaugeSanEURDAI.address],
-            ),
-        ).to.be.revertedWith('114');
-      });
-      it('revert - gauge - wrong contract', async () => {
-        const angleRouter = (await new AngleRouter__factory(deployer).deploy()) as AngleRouter;
-        await expect(
-          angleRouter.initialize(
-            governor.address,
-            guardian.address,
-            uniswapRouter.address,
-            oneInchRouter.address,
-            stableMasterEUR.address,
-            [managerWBTC.address, managerDAI.address],
-            [gaugeSanEURWBTC.address, gaugeSanEURWBTC.address],
-          ),
-        ).to.be.revertedWith('20');
-      });
+      //   it('revert - governor - zero address', async () => {
+      //     const angleRouter = (await new AngleRouter__factory(deployer).deploy()) as AngleRouter;
+      //     await expect(
+      //       angleRouter
+      //         .connect(governor)
+      //         .initialize(
+      //           ethers.constants.AddressZero,
+      //           guardian.address,
+      //           uniswapRouter.address,
+      //           oneInchRouter.address,
+      //           stableMasterEUR.address,
+      //           [managerWBTC.address, managerDAI.address],
+      //           [gaugeSanEURWBTC.address, gaugeSanEURDAI.address],
+      //         ),
+      //     ).to.be.revertedWith('0');
+      //   });
+      //   it('revert - guardian - zero address', async () => {
+      //     const angleRouter = (await new AngleRouter__factory(deployer).deploy()) as AngleRouter;
+      //     await expect(
+      //       angleRouter
+      //         .connect(governor)
+      //         .initialize(
+      //           governor.address,
+      //           ethers.constants.AddressZero,
+      //           uniswapRouter.address,
+      //           oneInchRouter.address,
+      //           stableMasterEUR.address,
+      //           [managerWBTC.address, managerDAI.address],
+      //           [gaugeSanEURWBTC.address, gaugeSanEURDAI.address],
+      //         ),
+      //     ).to.be.revertedWith('0');
+      //   });
+      //   it('revert - governor same as guardian', async () => {
+      //     const angleRouter = (await new AngleRouter__factory(deployer).deploy()) as AngleRouter;
+      //     await expect(
+      //       angleRouter
+      //         .connect(governor)
+      //         .initialize(
+      //           guardian.address,
+      //           guardian.address,
+      //           uniswapRouter.address,
+      //           oneInchRouter.address,
+      //           stableMasterEUR.address,
+      //           [managerWBTC.address, managerDAI.address],
+      //           [gaugeSanEURWBTC.address, gaugeSanEURDAI.address],
+      //         ),
+      //     ).to.be.revertedWith('49');
+      //   });
+      //   it('revert - uniswapRouter - zero address', async () => {
+      //     const angleRouter = (await new AngleRouter__factory(deployer).deploy()) as AngleRouter;
+      //     await expect(
+      //       angleRouter
+      //         .connect(governor)
+      //         .initialize(
+      //           governor.address,
+      //           guardian.address,
+      //           ethers.constants.AddressZero,
+      //           oneInchRouter.address,
+      //           stableMasterEUR.address,
+      //           [managerWBTC.address, managerDAI.address],
+      //           [gaugeSanEURWBTC.address, gaugeSanEURDAI.address],
+      //         ),
+      //     ).to.be.revertedWith('0');
+      //   });
+      //   it('revert - 1InchRouter - zero address', async () => {
+      //     const angleRouter = (await new AngleRouter__factory(deployer).deploy()) as AngleRouter;
+      //     await expect(
+      //       angleRouter
+      //         .connect(governor)
+      //         .initialize(
+      //           governor.address,
+      //           guardian.address,
+      //           uniswapRouter.address,
+      //           ethers.constants.AddressZero,
+      //           stableMasterEUR.address,
+      //           [managerWBTC.address, managerDAI.address],
+      //           [gaugeSanEURWBTC.address, gaugeSanEURDAI.address],
+      //         ),
+      //     ).to.be.revertedWith('0');
+      //   });
+      //   it('revert - stablemaster - zero address', async () => {
+      //     const angleRouter = (await new AngleRouter__factory(deployer).deploy()) as AngleRouter;
+      //     await expect(
+      //       angleRouter
+      //         .connect(governor)
+      //         .initialize(
+      //           governor.address,
+      //           guardian.address,
+      //           uniswapRouter.address,
+      //           oneInchRouter.address,
+      //           ethers.constants.AddressZero,
+      //           [managerWBTC.address, managerDAI.address],
+      //           [gaugeSanEURWBTC.address, gaugeSanEURDAI.address],
+      //         ),
+      //     ).to.be.reverted;
+      //   });
+      //   it('revert - poolManagers - invalid array length', async () => {
+      //     const angleRouter = (await new AngleRouter__factory(deployer).deploy()) as AngleRouter;
+      //     await expect(
+      //       angleRouter
+      //         .connect(governor)
+      //         .initialize(
+      //           governor.address,
+      //           guardian.address,
+      //           uniswapRouter.address,
+      //           oneInchRouter.address,
+      //           stableMasterEUR.address,
+      //           [managerWBTC.address],
+      //           [gaugeSanEURWBTC.address, gaugeSanEURDAI.address],
+      //         ),
+      //     ).to.be.revertedWith('104');
+      //   });
+      //   it('revert - gauges - invalid array length', async () => {
+      //     const angleRouter = (await new AngleRouter__factory(deployer).deploy()) as AngleRouter;
+      //     await expect(
+      //       angleRouter
+      //         .connect(governor)
+      //         .initialize(
+      //           governor.address,
+      //           guardian.address,
+      //           uniswapRouter.address,
+      //           oneInchRouter.address,
+      //           stableMasterEUR.address,
+      //           [managerWBTC.address, managerDAI.address],
+      //           [gaugeSanEURDAI.address],
+      //         ),
+      //     ).to.be.revertedWith('104');
+      //   });
+      //   it('revert - poolManagers - zero address', async () => {
+      //     const angleRouter = (await new AngleRouter__factory(deployer).deploy()) as AngleRouter;
+      //     await expect(
+      //       angleRouter
+      //         .connect(governor)
+      //         .initialize(
+      //           governor.address,
+      //           guardian.address,
+      //           uniswapRouter.address,
+      //           oneInchRouter.address,
+      //           stableMasterEUR.address,
+      //           [managerWBTC.address, ethers.constants.AddressZero],
+      //           [gaugeSanEURWBTC.address, gaugeSanEURDAI.address],
+      //         ),
+      //     ).to.be.reverted;
+      //   });
+      //   it('revert - duplicated poolManager', async () => {
+      //     const angleRouter = (await new AngleRouter__factory(deployer).deploy()) as AngleRouter;
+      //     await expect(
+      //       angleRouter
+      //         .connect(governor)
+      //         .initialize(
+      //           governor.address,
+      //           guardian.address,
+      //           uniswapRouter.address,
+      //           oneInchRouter.address,
+      //           stableMasterEUR.address,
+      //           [managerWBTC.address, managerWBTC.address],
+      //           [gaugeSanEURWBTC.address, gaugeSanEURDAI.address],
+      //         ),
+      //     ).to.be.revertedWith('114');
+      //   });
+      //   it('revert - gauge - wrong contract', async () => {
+      //     const angleRouter = (await new AngleRouter__factory(deployer).deploy()) as AngleRouter;
+      //     await expect(
+      //       angleRouter.initialize(
+      //         governor.address,
+      //         guardian.address,
+      //         uniswapRouter.address,
+      //         oneInchRouter.address,
+      //         stableMasterEUR.address,
+      //         [managerWBTC.address, managerDAI.address],
+      //         [gaugeSanEURWBTC.address, gaugeSanEURWBTC.address],
+      //       ),
+      //     ).to.be.revertedWith('20');
+      //   });
     });
     describe('Parameters', () => {
       it('uniswapRouter', async () => {
@@ -511,55 +516,6 @@ describe('AngleRouter - init & access control', () => {
         });
       });
       describe('Add and Remove - Collaterals ', () => {
-        it('removePairs - revert - governor', async () => {
-          await expect(
-            angleRouter.connect(user).removePairs([agEUR.address], [wBTC.address], [ethers.constants.AddressZero]),
-          ).to.be.revertedWith(governorOrGuardianError);
-        });
-        it('removePairs - revert invalid array length', async () => {
-          await expect(
-            angleRouter.connect(governor).removePairs([], [wBTC.address], [ethers.constants.AddressZero]),
-          ).to.be.revertedWith('104');
-          await expect(
-            angleRouter.connect(governor).removePairs([agEUR.address], [], [ethers.constants.AddressZero]),
-          ).to.be.revertedWith('104');
-        });
-        it('removePairs - revert zero address - stablecoin ', async () => {
-          await expect(
-            angleRouter
-              .connect(governor)
-              .removePairs([ethers.constants.AddressZero], [wBTC.address], [ethers.constants.AddressZero]),
-          ).to.be.revertedWith('0');
-        });
-        it('removePairs - revert zero address - collateral ', async () => {
-          await expect(
-            angleRouter
-              .connect(governor)
-              .removePairs([agEUR.address], [ethers.constants.AddressZero], [ethers.constants.AddressZero]),
-          ).to.be.revertedWith('0');
-        });
-        it('removePairs - revert zero address - stablemaster ', async () => {
-          await expect(
-            angleRouter.connect(governor).removePairs([wETH.address], [wBTC.address], [ethers.constants.AddressZero]),
-          ).to.be.revertedWith('0');
-        });
-        it('removePairs - revert zero address - poolManager and PerpetualManager ', async () => {
-          await expect(
-            angleRouter.connect(governor).removePairs([agEUR.address], [wETH.address], [ethers.constants.AddressZero]),
-          ).to.be.revertedWith('0');
-        });
-        it('removePairs - success', async () => {
-          await angleRouter
-            .connect(governor)
-            .removePairs([agEUR.address], [wBTC.address], [ethers.constants.AddressZero]);
-          const pairsContracts = await angleRouter.mapPoolManagers(stableMasterEUR.address, wBTC.address);
-          expect(pairsContracts.poolManager).to.be.equal(ethers.constants.AddressZero);
-          expect(pairsContracts.perpetualManager).to.be.equal(ethers.constants.AddressZero);
-          expect(pairsContracts.sanToken).to.be.equal(ethers.constants.AddressZero);
-          expect(pairsContracts.gauge).to.be.equal(ethers.constants.AddressZero);
-          expect(await wBTC.allowance(angleRouter.address, stableMasterEUR.address)).to.be.equal(BigNumber.from('0'));
-          expect(await wBTC.allowance(angleRouter.address, perpEURWBTC.address)).to.be.equal(BigNumber.from('0'));
-        });
         it('addPairs - revert - governor', async () => {
           await expect(
             angleRouter.connect(user).addPairs([agEUR.address], [managerWBTC.address], [ethers.constants.AddressZero]),
@@ -622,12 +578,12 @@ describe('AngleRouter - init & access control', () => {
           ).to.be.revertedWith('114');
         });
         it('addPairs - success - gauge', async () => {
-          await angleRouter
-            .connect(governor)
-            .removePairs([agEUR.address], [wBTC.address], [ethers.constants.AddressZero]);
-          await angleRouter
-            .connect(governor)
-            .addPairs([agEUR.address], [managerWBTC.address], [gaugeSanEURWBTC.address]);
+          // await angleRouter
+          //   .connect(governor)
+          //   .removePairs([agEUR.address], [wBTC.address], [ethers.constants.AddressZero]);
+          // await angleRouter
+          //   .connect(governor)
+          //   .addPairs([agEUR.address], [managerWBTC.address], [gaugeSanEURWBTC.address]);
           const pairsContracts = await angleRouter.mapPoolManagers(stableMasterEUR.address, wBTC.address);
           expect(pairsContracts.poolManager).to.be.equal(managerWBTC.address);
           expect(pairsContracts.perpetualManager).to.be.equal(perpEURWBTC.address);
@@ -649,28 +605,6 @@ describe('AngleRouter - init & access control', () => {
           await expect(
             angleRouter.connect(governor).addStableMaster(agEUR.address, stableMasterEUR.address),
           ).to.be.revertedWith('114');
-        });
-        it('remove all pairs - success', async () => {
-          await angleRouter
-            .connect(governor)
-            .removePairs(
-              [agEUR.address, agEUR.address],
-              [wBTC.address, DAI.address],
-              [ethers.constants.AddressZero, ethers.constants.AddressZero],
-            );
-        });
-        it('removeStableMaster - revert - governor', async () => {
-          await expect(angleRouter.connect(user).removeStableMaster(agEUR.address)).to.be.revertedWith(
-            governorOrGuardianError,
-          );
-        });
-        it('removeStableMaster - success zero address - stablecoin and stableMaster', async () => {
-          await angleRouter.connect(governor).removeStableMaster(ethers.constants.AddressZero);
-          await angleRouter.connect(governor).removeStableMaster(wETH.address);
-        });
-        it('removeStableMaster - success', async () => {
-          await angleRouter.connect(governor).removeStableMaster(agEUR.address);
-          expect(await angleRouter.mapStableMasters(agEUR.address)).to.be.equal(ethers.constants.AddressZero);
         });
         it('addStableMaster - revert - governor', async () => {
           await expect(
@@ -703,54 +637,6 @@ describe('AngleRouter - init & access control', () => {
               [managerDAI.address, managerWBTC.address],
               [gaugeSanEURDAI.address, gaugeSanEURWBTC.address],
             );
-        });
-        it('removeStablemaster - success - forgot to delet pools', async () => {
-          await angleRouter.connect(governor).removeStableMaster(agEUR.address);
-        });
-        it('forceRemovePairs - revert', async () => {
-          await expect(
-            angleRouter
-              .connect(user)
-              .removePairs(
-                [ethers.constants.AddressZero, ethers.constants.AddressZero],
-                [wBTC.address, DAI.address],
-                [stableMasterEUR.address, stableMasterEUR.address],
-              ),
-          ).to.be.revertedWith('115');
-        });
-        it('forceRemovePairs - revert', async () => {
-          await expect(
-            angleRouter.connect(governor).removePairs(
-              [ethers.constants.AddressZero, ethers.constants.AddressZero],
-
-              [wBTC.address],
-              [stableMasterEUR.address, stableMasterEUR.address],
-            ),
-          ).to.be.revertedWith('104');
-        });
-        it('forceRemovePairs - success', async () => {
-          await angleRouter
-            .connect(governor)
-            .removePairs(
-              [ethers.constants.AddressZero, ethers.constants.AddressZero],
-              [wBTC.address, DAI.address],
-              [stableMasterEUR.address, stableMasterEUR.address],
-            );
-
-          const pairsContractsWBTC = await angleRouter.mapPoolManagers(stableMasterEUR.address, wBTC.address);
-          expect(pairsContractsWBTC.poolManager).to.be.equal(ethers.constants.AddressZero);
-          expect(pairsContractsWBTC.perpetualManager).to.be.equal(ethers.constants.AddressZero);
-          expect(pairsContractsWBTC.sanToken).to.be.equal(ethers.constants.AddressZero);
-          expect(pairsContractsWBTC.gauge).to.be.equal(ethers.constants.AddressZero);
-          expect(await wBTC.allowance(angleRouter.address, stableMasterEUR.address)).to.be.equal(BigNumber.from('0'));
-          expect(await wBTC.allowance(angleRouter.address, perpEURWBTC.address)).to.be.equal(BigNumber.from('0'));
-          const pairsContractsDAI = await angleRouter.mapPoolManagers(stableMasterEUR.address, DAI.address);
-          expect(pairsContractsDAI.poolManager).to.be.equal(ethers.constants.AddressZero);
-          expect(pairsContractsDAI.perpetualManager).to.be.equal(ethers.constants.AddressZero);
-          expect(pairsContractsDAI.sanToken).to.be.equal(ethers.constants.AddressZero);
-          expect(pairsContractsDAI.gauge).to.be.equal(ethers.constants.AddressZero);
-          expect(await DAI.allowance(angleRouter.address, stableMasterEUR.address)).to.be.equal(BigNumber.from('0'));
-          expect(await DAI.allowance(angleRouter.address, perpEURDAI.address)).to.be.equal(BigNumber.from('0'));
         });
         it('addStableMaster - success', async () => {
           await angleRouter.connect(governor).addStableMaster(agEUR.address, stableMasterEUR.address);
