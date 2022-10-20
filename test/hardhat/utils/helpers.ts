@@ -99,15 +99,9 @@ const time = {
     target = ethers.BigNumber.from(target);
 
     const currentBlock = await time.latestBlock();
-    const start = Date.now();
-    let notified;
     if (target.lt(currentBlock))
       throw Error(`Target block #(${target}) is lower than current block #(${currentBlock})`);
     while (ethers.BigNumber.from(await time.latestBlock()).lt(target)) {
-      if (!notified && Date.now() - start >= 5000) {
-        notified = true;
-        console.warn("You're advancing many blocks; this test may be slow.");
-      }
       await time.advanceBlock();
     }
   },
@@ -134,11 +128,11 @@ async function deployUpgradeable(factory: ContractFactory, ...args: any[]): Prom
 async function expectApproxDelta(actual: BigNumber, expected: BigNumber, delta: BigNumber): Promise<void> {
   const margin = expected.div(delta);
   if (actual.isNegative()) {
-    expect(expected.gte(actual.add(margin))).to.be.true;
-    expect(expected.lte(actual.sub(margin))).to.be.true;
+    expect(expected.gte(actual.add(margin))).to.be.equal(true);
+    expect(expected.lte(actual.sub(margin))).to.be.equal(true);
   } else {
-    expect(expected.lte(actual.add(margin))).to.be.true;
-    expect(expected.gte(actual.sub(margin))).to.be.true;
+    expect(expected.lte(actual.add(margin))).to.be.equal(true);
+    expect(expected.gte(actual.sub(margin))).to.be.equal(true);
   }
 }
 
