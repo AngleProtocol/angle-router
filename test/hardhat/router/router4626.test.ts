@@ -1,3 +1,4 @@
+import { parseAmount } from '@angleprotocol/sdk';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { BigNumber, Signer } from 'ethers';
 import { parseEther, parseUnits } from 'ethers/lib/utils';
@@ -8,6 +9,8 @@ import {
   AngleRouter__factory,
   MockERC4626,
   MockERC4626__factory,
+  MockSavingsRateIlliquid,
+  MockSavingsRateIlliquid__factory,
   MockTokenPermit,
   MockTokenPermit__factory,
 } from '../../../typechain';
@@ -22,6 +25,7 @@ contract('Router - ERC4626 Functionalities', () => {
   let alice: SignerWithAddress;
   let bob: SignerWithAddress;
   let strat: MockERC4626;
+  let stratIlliquid: MockSavingsRateIlliquid;
   let router: AngleRouter;
   let UNIT_USDC: BigNumber;
   let UNIT_DAI: BigNumber;
@@ -53,14 +57,14 @@ contract('Router - ERC4626 Functionalities', () => {
   });
 
   beforeEach(async () => {
-    // If the forked-network state needs to be reset between each test, run this
-    // await network.provider.request({method: 'hardhat_reset', params: []});
     router = (await deployUpgradeable(new AngleRouter__factory(deployer))) as AngleRouter;
     USDC = (await new MockTokenPermit__factory(deployer).deploy('USDC', 'USDC', USDCdecimal)) as MockTokenPermit;
     strat = (await new MockERC4626__factory(deployer).deploy(USDC.address, 'testsr', 'testsr')) as MockERC4626;
+    stratIlliquid = (await new MockSavingsRateIlliquid__factory(deployer).deploy(
+      USDC.address,
+    )) as MockSavingsRateIlliquid;
     await USDC.mint(alice.address, parseUnits('1000', 6));
   });
-
   describe('mixer - mint', () => {
     it('success - shares minted to the to address - when there are no shares', async () => {
       const permits: TypePermit[] = [
@@ -370,6 +374,172 @@ contract('Router - ERC4626 Functionalities', () => {
       await expect(router.connect(alice).mixer(permits, transfers, swaps, actions, dataMixer)).to.be.revertedWith(
         'TooSmallAmountOut',
       );
+    });
+  });
+  describe('mixer - prepareRedeem', () => {
+    it('success - redemption happens well', async () => {
+      await USDC.connect(alice).approve(stratIlliquid.address, parseUnits('1000', 6));
+      await stratIlliquid.connect(alice).mint(parseEther('1000'), alice.address);
+      await stratIlliquid.connect(alice).approve(router.address, parseEther('1000'));
+      const permits: TypePermit[] = [];
+      const transfers: TypeTransfer[] = [];
+      const swaps: TypeSwap[] = [];
+
+      const redeemData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256', 'address', 'uint256'],
+        [USDC.address, stratIlliquid.address, parseEther('1'), bob.address, parseUnits('0', 6)],
+      );
+
+      const actions = [ActionType.prepareRedeemSavingsRate];
+      const dataMixer = [redeemData];
+      await router.connect(alice).mixer(permits, transfers, swaps, actions, dataMixer);
+      expect(await USDC.balanceOf(bob.address)).to.be.equal(parseUnits('1', 6));
+      expect(await USDC.balanceOf(alice.address)).to.be.equal(parseUnits('0', 6));
+      expect(await stratIlliquid.balanceOf(alice.address)).to.be.equal(parseEther('999'));
+      expect(await stratIlliquid.totalSupply()).to.be.equal(parseEther('999'));
+      expect(await USDC.allowance(router.address, stratIlliquid.address)).to.be.equal(0);
+    });
+    it('success - redemption happens well when done through the router', async () => {
+      await USDC.connect(alice).approve(stratIlliquid.address, parseUnits('1000', 6));
+      await stratIlliquid.connect(alice).mint(parseEther('1000'), alice.address);
+      await stratIlliquid.connect(alice).approve(router.address, parseEther('1000'));
+      const permits: TypePermit[] = [];
+      const transfers: TypeTransfer[] = [];
+      const swaps: TypeSwap[] = [];
+
+      const redeemData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256', 'address', 'uint256'],
+        [USDC.address, stratIlliquid.address, parseEther('1'), router.address, parseUnits('0', 6)],
+      );
+
+      const actions = [ActionType.prepareRedeemSavingsRate];
+      const dataMixer = [redeemData];
+      await router.connect(alice).mixer(permits, transfers, swaps, actions, dataMixer);
+      expect(await USDC.balanceOf(alice.address)).to.be.equal(parseUnits('1', 6));
+      expect(await stratIlliquid.balanceOf(alice.address)).to.be.equal(parseEther('999'));
+      expect(await stratIlliquid.totalSupply()).to.be.equal(parseEther('999'));
+      expect(await USDC.allowance(router.address, stratIlliquid.address)).to.be.equal(0);
+    });
+    it('reverts - when there not enough is obtained', async () => {
+      await USDC.connect(alice).approve(stratIlliquid.address, parseUnits('1000', 6));
+      await stratIlliquid.connect(alice).mint(parseEther('1000'), alice.address);
+      await stratIlliquid.connect(alice).approve(router.address, parseEther('1000'));
+      const permits: TypePermit[] = [];
+      const transfers: TypeTransfer[] = [];
+      const swaps: TypeSwap[] = [];
+
+      const redeemData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256', 'address', 'uint256'],
+        [USDC.address, stratIlliquid.address, parseEther('1'), bob.address, parseUnits('1000000', 6)],
+      );
+      const actions = [ActionType.redeemSavingsRate];
+      const dataMixer = [redeemData];
+      await expect(router.connect(alice).mixer(permits, transfers, swaps, actions, dataMixer)).to.be.revertedWith(
+        'TooSmallAmountOut',
+      );
+    });
+    it('success - when a portion is put aside', async () => {
+      await USDC.connect(alice).approve(stratIlliquid.address, parseUnits('1000', 6));
+      await stratIlliquid.connect(alice).mint(parseEther('1000'), alice.address);
+      await stratIlliquid.connect(alice).approve(router.address, parseEther('1000'));
+      await stratIlliquid.setSplitFactor(parseAmount.gwei('0.3'));
+      const permits: TypePermit[] = [];
+      const transfers: TypeTransfer[] = [];
+      const swaps: TypeSwap[] = [];
+
+      const redeemData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256', 'address', 'uint256'],
+        [USDC.address, stratIlliquid.address, parseEther('1'), bob.address, parseUnits('0', 6)],
+      );
+
+      const actions = [ActionType.prepareRedeemSavingsRate];
+      const dataMixer = [redeemData];
+      await router.connect(alice).mixer(permits, transfers, swaps, actions, dataMixer);
+      expect(await USDC.balanceOf(bob.address)).to.be.equal(parseUnits('0.7', 6));
+      expect(await USDC.balanceOf(stratIlliquid.address)).to.be.equal(parseUnits('999.3', 6));
+      expect(await stratIlliquid.receiverRewards(bob.address)).to.be.equal(parseUnits('0.3', 6));
+      expect(await USDC.balanceOf(alice.address)).to.be.equal(parseUnits('0', 6));
+      expect(await stratIlliquid.balanceOf(alice.address)).to.be.equal(parseEther('999'));
+      expect(await stratIlliquid.totalSupply()).to.be.equal(parseEther('999'));
+      expect(await USDC.allowance(router.address, stratIlliquid.address)).to.be.equal(0);
+    });
+    it('success - when a portion is put aside through the router', async () => {
+      await USDC.connect(alice).approve(stratIlliquid.address, parseUnits('1000', 6));
+      await stratIlliquid.connect(alice).mint(parseEther('1000'), alice.address);
+      await stratIlliquid.connect(alice).approve(router.address, parseEther('1000'));
+      await stratIlliquid.setSplitFactor(parseAmount.gwei('0.3'));
+      const permits: TypePermit[] = [];
+      const transfers: TypeTransfer[] = [];
+      const swaps: TypeSwap[] = [];
+
+      const redeemData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256', 'address', 'uint256'],
+        [USDC.address, stratIlliquid.address, parseEther('1'), router.address, parseUnits('0', 6)],
+      );
+
+      const actions = [ActionType.prepareRedeemSavingsRate];
+      const dataMixer = [redeemData];
+      await router.connect(alice).mixer(permits, transfers, swaps, actions, dataMixer);
+      expect(await USDC.balanceOf(alice.address)).to.be.equal(parseUnits('0.7', 6));
+      expect(await USDC.balanceOf(stratIlliquid.address)).to.be.equal(parseUnits('999.3', 6));
+      // The rest stays for the router so we won't be able to handle the rewards for you
+      expect(await stratIlliquid.receiverRewards(router.address)).to.be.equal(parseUnits('0.3', 6));
+      expect(await stratIlliquid.balanceOf(alice.address)).to.be.equal(parseEther('999'));
+      expect(await stratIlliquid.totalSupply()).to.be.equal(parseEther('999'));
+      expect(await USDC.allowance(router.address, stratIlliquid.address)).to.be.equal(0);
+    });
+  });
+  describe('mixer - claimRedeem', () => {
+    it('success - amount goes to the redeemer', async () => {
+      await USDC.mint(stratIlliquid.address, parseUnits('1000', 6));
+      await stratIlliquid.setReceiverRewards(bob.address, parseUnits('300', 6));
+      const permits: TypePermit[] = [];
+      const transfers: TypeTransfer[] = [];
+      const swaps: TypeSwap[] = [];
+
+      const redeemData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'address', 'address[]'],
+        [USDC.address, stratIlliquid.address, bob.address, []],
+      );
+
+      const actions = [ActionType.claimRedeemSavingsRate];
+      const dataMixer = [redeemData];
+      await router.connect(alice).mixer(permits, transfers, swaps, actions, dataMixer);
+      expect(await USDC.balanceOf(bob.address)).to.be.equal(parseUnits('300', 6));
+    });
+    it('success - amount going to the router', async () => {
+      await USDC.mint(stratIlliquid.address, parseUnits('1000', 6));
+      await stratIlliquid.setReceiverRewards(router.address, parseUnits('300', 6));
+      const permits: TypePermit[] = [];
+      const transfers: TypeTransfer[] = [];
+      const swaps: TypeSwap[] = [];
+
+      const redeemData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'address', 'address[]'],
+        [USDC.address, stratIlliquid.address, router.address, []],
+      );
+
+      const actions = [ActionType.claimRedeemSavingsRate];
+      const dataMixer = [redeemData];
+      await router.connect(deployer).mixer(permits, transfers, swaps, actions, dataMixer);
+      expect(await USDC.balanceOf(deployer.address)).to.be.equal(parseUnits('300', 6));
+    });
+    it('success - when strategies to claim', async () => {
+      await USDC.mint(stratIlliquid.address, parseUnits('1000', 6));
+      await stratIlliquid.setReceiverRewards(bob.address, parseUnits('300', 6));
+      const permits: TypePermit[] = [];
+      const transfers: TypeTransfer[] = [];
+      const swaps: TypeSwap[] = [];
+
+      const redeemData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'address', 'address[]'],
+        [USDC.address, stratIlliquid.address, bob.address, [alice.address]],
+      );
+      const actions = [ActionType.claimRedeemSavingsRate];
+      const dataMixer = [redeemData];
+      await router.connect(alice).mixer(permits, transfers, swaps, actions, dataMixer);
+      expect(await USDC.balanceOf(bob.address)).to.be.equal(parseUnits('300', 6));
+      expect(await stratIlliquid.counter(alice.address)).to.be.equal(1);
     });
   });
 });

@@ -679,6 +679,8 @@ abstract contract BaseAngleRouterSidechain is Initializable {
     /// @return amountOut Amount of assets received by `to`
     /// @dev Note that when calling this function the user does not have the guarantee that all shares
     /// will be immediately processed and some shares may be leftover to claim
+    /// @dev If `to` is the router address, if there are leftover funds that cannot be immediately claimed in the
+    /// transaction then they will be lost, meaning that anyone will be able to claim them
     function _prepareRedeemSavingsRate(
         ISavingsRateIlliquid savingsRate,
         uint256 shares,

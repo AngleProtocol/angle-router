@@ -664,14 +664,9 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                 uint256 amount = _prepareRedeemSavingsRate(savingsRate, shares, to, minAmountOut);
                 if (to == address(this)) _addToList(listTokens, balanceTokens, token, amount);
             } else if (actions[i] == ActionType.claimRedeemSavingsRate) {
-                (
-                    address token,
-                    ISavingsRateIlliquid savingsRate,
-                    address receiver,
-                    address[] memory strategiesToClaim,
-                    address to
-                ) = abi.decode(data[i], (address, ISavingsRateIlliquid, address, address[], address));
-                uint256 amount = _claimRedeemSavingsRate(savingsRate, receiver, strategiesToClaim);
+                (address token, ISavingsRateIlliquid savingsRate, address to, address[] memory strategiesToClaim) = abi
+                    .decode(data[i], (address, ISavingsRateIlliquid, address, address[]));
+                uint256 amount = _claimRedeemSavingsRate(savingsRate, to, strategiesToClaim);
                 if (to == address(this)) _addToList(listTokens, balanceTokens, token, amount);
             }
         }
@@ -1092,6 +1087,8 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
     /// @return amountOut Amount of assets received by `to`
     /// @dev Note that when calling this function the user does not have the guarantee that all shares
     /// will be immediately processed and some shares may be leftover to claim
+    /// @dev If `to` is the router address, if there are leftover funds that cannot be immediately claimed in the
+    /// transaction then they will be lost, meaning that anyone will be able to claim them
     function _prepareRedeemSavingsRate(
         ISavingsRateIlliquid savingsRate,
         uint256 shares,
