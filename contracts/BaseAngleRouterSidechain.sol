@@ -11,6 +11,7 @@ import "./interfaces/external/uniswap/IUniswapRouter.sol";
 import "./interfaces/IAgTokenMultiChain.sol";
 import "./interfaces/ICoreBorrow.sol";
 import "./interfaces/ILiquidityGauge.sol";
+import "./interfaces/ISavingsRateIlliquid.sol";
 import "./interfaces/ISwapper.sol";
 import "./interfaces/IVaultManager.sol";
 
@@ -36,6 +37,8 @@ enum ActionType {
     depositSavingsRate,
     redeemSavingsRate,
     withdrawSavingsRate,
+    prepareRedeemSavingsRate,
+    claimRedeemSavingsRate,
     swapper
 }
 
@@ -69,11 +72,9 @@ abstract contract BaseAngleRouterSidechain is Initializable {
     /// @notice How many actions can be performed on a given `VaultManager` contract
     uint256 private constant _MAX_BORROW_ACTIONS = 10;
 
-    // =============================== Event =======================================
+    // ============================== EVENTS / ERRORS ==============================
 
     event CoreUpdated(address indexed _core);
-
-    // ============================= Error Messages ================================
 
     error IncompatibleLengths();
     error InvalidReturnMessage();
@@ -84,7 +85,7 @@ abstract contract BaseAngleRouterSidechain is Initializable {
     error TransferFailed();
     error ZeroAddress();
 
-    // =============================== References ==================================
+    // ================================= REFERENCES ================================
 
     /// @notice Core Borrow address
     ICoreBorrow public core;
@@ -104,7 +105,7 @@ abstract contract BaseAngleRouterSidechain is Initializable {
         core = ICoreBorrow(_core);
     }
 
-    // ============================== Modifiers ====================================
+    // ================================= MODIFIERS =================================
 
     /// @notice Checks whether the `msg.sender` has the governor role or not
     modifier onlyGovernor() {
@@ -118,13 +119,9 @@ abstract contract BaseAngleRouterSidechain is Initializable {
         _;
     }
 
-    // =========================== Governance utilities ============================
+    // ============================ GOVERNANCE UTILITIES ===========================
 
     /// @notice Sets a new `core` contract
-    /// @dev This function should typically be called on all treasury contracts after the `setCore`
-    /// function has been called on the `CoreBorrow` contract
-    /// @dev One sanity check that can be performed here is to verify whether at least the governor
-    /// calling the contract is still a governor in the new core
     function setCore(ICoreBorrow _core) external onlyGovernor {
         if (!_core.isGovernor(msg.sender)) revert NotGovernor();
         core = ICoreBorrow(_core);
@@ -146,10 +143,10 @@ abstract contract BaseAngleRouterSidechain is Initializable {
         }
     }
 
-    // =========================== Router Functionalities =========================
+    // =========================== ROUTER FUNCTIONALITIES ==========================
 
     /// @notice Wrapper built on top of the `_claimRewards` function. It allows to claim rewards for multiple
-    /// gauges and perpetuals at once
+    /// gauges at once
     /// @param gaugeUser Address for which to fetch the rewards from the gauges
     /// @param liquidityGauges Gauges to claim on
     /// @dev If the caller wants to send the rewards to another account it first needs to
@@ -289,6 +286,18 @@ abstract contract BaseAngleRouterSidechain is Initializable {
                     (IERC4626, uint256, address, uint256)
                 );
                 _withdrawSavingsRate(savingsRate, amount, to, maxSharesOut);
+            } else if (actions[i] == ActionType.prepareRedeemSavingsRate) {
+                (ISavingsRateIlliquid savingsRate, uint256 amount, address to, uint256 minAmountOut) = abi.decode(
+                    data[i],
+                    (ISavingsRateIlliquid, uint256, address, uint256)
+                );
+                _prepareRedeemSavingsRate(savingsRate, amount, to, minAmountOut);
+            } else if (actions[i] == ActionType.claimRedeemSavingsRate) {
+                (ISavingsRateIlliquid savingsRate, address receiver, address[] memory strategiesToClaim) = abi.decode(
+                    data[i],
+                    (ISavingsRateIlliquid, address, address[])
+                );
+                _claimRedeemSavingsRate(savingsRate, receiver, strategiesToClaim);
             }
         }
     }
@@ -340,7 +349,7 @@ abstract contract BaseAngleRouterSidechain is Initializable {
 
     receive() external payable {}
 
-    // ===================== Internal Action Related Functions =====================
+    // ===================== INTERNAL ACTION-RELATED FUNCTIONS =====================
 
     /// @notice Internal version of the `claimRewards` function
     function _claimRewards(address gaugeUser, address[] memory liquidityGauges) internal virtual {
@@ -463,7 +472,7 @@ abstract contract BaseAngleRouterSidechain is Initializable {
         return amount;
     }
 
-    // ===================== Virtual Functions to Override =========================
+    // ======================= VIRTUAL FUNCTIONS TO OVERRIDE =======================
 
     /// @notice Wraps a token to another wrapped version of it
     /// @dev It can be used to get wstETH from stETH
@@ -487,7 +496,7 @@ abstract contract BaseAngleRouterSidechain is Initializable {
     /// @dev The amount to wrap is usually specified in the `msg.value`
     function _unwrapNative(uint256 minAmountOut, address to) internal virtual returns (uint256);
 
-    // ======================== Internal Utility Functions =========================
+    // ========================= INTERNAL UTILITY FUNCTIONS ========================
 
     /// @notice Changes allowance of this contract for a given token
     /// @param token Address of the token to change allowance
@@ -598,29 +607,30 @@ abstract contract BaseAngleRouterSidechain is Initializable {
         }
     }
 
-    //  @notice mint `shares` from an ERC4626 savings rate.
-    //  @param savingsRate The ERC4626 savingsRate to mint shares from.
-    //  @param shares The amount of shares to mint from `savingsRate`.
-    //  @param to The destination of ownership shares.
-    //  @param maxAmountIn The max amount of assets used to mint.
-    //  @return amountIn the amount of assets used to mint by `to`.
+    /// @notice Mints `shares` from an ERC4626 `SavingsRate` contract
+    /// @param savingsRate ERC4626 `SavingsRate` to mint shares from
+    /// @param shares Amount of shares to mint from `savingsRate`
+    /// @param to Address to which shares should be sent
+    /// @param maxAmountIn Max amount of assets used to mint
+    /// @return amountIn Amount of assets used to mint by `to`
     function _mintSavingsRate(
         IERC4626 savingsRate,
         uint256 shares,
         address to,
         uint256 maxAmountIn
     ) internal returns (uint256 amountIn) {
-        // The check is useless as the contract need to approve an amount
+        // This check is useless as the contract needs to approve an amount and it will revert
+        // anyway if more than `maxAmountIn` is used
         // We let it just in case we call this function outside of the mixer
         _slippageCheck(maxAmountIn, (amountIn = savingsRate.mint(shares, to)));
     }
 
-    //  @notice deposit `amount` to an ERC4626 savingsRate.
-    //  @param savingsRate The ERC4626 savingsRate to deposit assets to.
-    //  @param amount The amount of assets to deposit to `savingsRate`.
-    //  @param to The destination of ownership shares.
-    //  @param minSharesOut The min amount of `savingsRate` shares received by `to`.
-    //  @return sharesOut the amount of shares received by `to`.
+    /// @notice Deposits `amount` to an ERC4626 `SavingsRate` contract
+    /// @param savingsRate The ERC4626 `SavingsRate` to deposit assets to
+    /// @param amount Amount of assets to deposit
+    /// @param to Address to which shares should be sent
+    /// @param minSharesOut Minimum amount of `SavingsRate` shares that `to` should received
+    /// @return sharesOut Amount of shares received by `to`
     function _depositSavingsRate(
         IERC4626 savingsRate,
         uint256 amount,
@@ -630,12 +640,12 @@ abstract contract BaseAngleRouterSidechain is Initializable {
         _slippageCheck(sharesOut = savingsRate.deposit(amount, to), minSharesOut);
     }
 
-    //  @notice withdraw `amount` from an ERC4626 savingsRate.
-    //  @param savingsRate The ERC4626 savingsRate to withdraw assets from.
-    //  @param amount The amount of assets to withdraw from savingsRate.
-    //  @param to The destination of assets.
-    //  @param minSharesOut The min amount of shares received by `to`.
-    //  @return sharesOut the amount of shares received by `to`.
+    /// @notice Withdraws `amount` from an ERC4626 `SavingsRate` contract
+    /// @param savingsRate ERC4626 `SavingsRate` to withdraw assets from
+    /// @param amount Amount of assets to withdraw
+    /// @param to Destination of assets
+    /// @param maxSharesOut Maximum amount of shares that should be burnt in the operation
+    /// @return sharesOut Amount of shares burnt
     function _withdrawSavingsRate(
         IERC4626 savingsRate,
         uint256 amount,
@@ -645,12 +655,12 @@ abstract contract BaseAngleRouterSidechain is Initializable {
         _slippageCheck(maxSharesOut, sharesOut = savingsRate.withdraw(amount, to, msg.sender));
     }
 
-    //  @notice redeem `shares` shares from an ERC4626 savingsRate.
-    //  @param savingsRate The ERC4626 savingsRate to redeem shares from.
-    //  @param shares The amount of shares to redeem from the savingsRate.
-    //  @param to The destination of assets.
-    //  @param minAmountOut The min amount of assets received by `to`.
-    //  @return amountOut the amount of assets received by `to`.
+    /// @notice Redeems `shares` from an ERC4626 `SavingsRate` contract
+    /// @param savingsRate ERC4626 `SavingsRate` to redeem shares from
+    /// @param shares Amount of shares to redeem
+    /// @param to Destination of assets
+    /// @param minAmountOut Minimum amount of assets that `to` should receive in the redemption process
+    /// @return amountOut Amount of assets received by `to`
     function _redeemSavingsRate(
         IERC4626 savingsRate,
         uint256 shares,
@@ -660,14 +670,43 @@ abstract contract BaseAngleRouterSidechain is Initializable {
         _slippageCheck(amountOut = savingsRate.redeem(shares, to, msg.sender), minAmountOut);
     }
 
-    //  @notice Use an external swapper
-    //  @param swapper Contracts implementing the logic of the swap.
-    //  @param inToken Token used to do the swap.
-    //  @param outToken The token wanted.
-    //  @param outTokenRecipient Address who should have at the end of the swap at least `outTokenOwed`.
-    //  @param outTokenOwed Minimal amount for the `outTokenRecipient`.
-    //  @param inTokenObtained Amount of `inToken` used for the swap.
-    //  @param data Additional info for the specific swapper.
+    /// @notice Processes the redemption of `shares` shares from an ERC4626 `SavingsRate` contract with
+    /// potentially illiquid strategies
+    /// @param savingsRate ERC4626 `SavingsRate` to redeem shares from
+    /// @param shares Amount of shares to redeem
+    /// @param to Destination of assets
+    /// @param minAmountOut Minimum amount of assets that `to` should receive in the transaction
+    /// @return amountOut Amount of assets received by `to`
+    /// @dev Note that when calling this function the user does not have the guarantee that all shares
+    /// will be immediately processed and some shares may be leftover to claim
+    function _prepareRedeemSavingsRate(
+        ISavingsRateIlliquid savingsRate,
+        uint256 shares,
+        address to,
+        uint256 minAmountOut
+    ) internal returns (uint256 amountOut) {
+        _slippageCheck(amountOut = savingsRate.prepareRedeem(shares, to, msg.sender), minAmountOut);
+    }
+
+    /// @notice Claims assets from previously shares previously sent by `receiver` to the
+    /// `ssavingsRate` contract
+    /// @return amountOut Amount of assets obtained during the claim
+    function _claimRedeemSavingsRate(
+        ISavingsRateIlliquid savingsRate,
+        address receiver,
+        address[] memory strategiesToClaim
+    ) internal returns (uint256 amountOut) {
+        return savingsRate.claimRedeem(receiver, strategiesToClaim);
+    }
+
+    /// @notice Uses an external swapper
+    /// @param swapper Contracts implementing the logic of the swap
+    /// @param inToken Token used to do the swap
+    /// @param outToken Token wanted
+    /// @param outTokenRecipient Address who should have at the end of the swap at least `outTokenOwed`
+    /// @param outTokenOwed Minimal amount for the `outTokenRecipient`
+    /// @param inTokenObtained Amount of `inToken` used for the swap
+    /// @param data Additional info for the specific swapper
     function _swapper(
         ISwapper swapper,
         IERC20 inToken,
