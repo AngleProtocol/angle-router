@@ -16,13 +16,14 @@ import "./interfaces/external/uniswap/IUniswapRouter.sol";
 import "./interfaces/IFeeDistributor.sol";
 import "./interfaces/ILiquidityGauge.sol";
 import "./interfaces/ISanToken.sol";
+import "./interfaces/ISavingsRateIlliquid.sol";
 import "./interfaces/IStableMaster.sol";
 import "./interfaces/IStableMasterFront.sol";
 import "./interfaces/ISwapper.sol";
 import "./interfaces/IVaultManager.sol";
 import "./interfaces/IVeANGLE.sol";
 
-// =========================== Structs and Enums ===============================
+// ============================= STRUCTS AND ENUMS =============================
 
 /// @notice Action types
 enum ActionType {
@@ -40,6 +41,8 @@ enum ActionType {
     depositSavingsRate,
     redeemSavingsRate,
     withdrawSavingsRate,
+    prepareRedeemSavingsRate,
+    claimRedeemSavingsRate,
     swapper
 }
 
@@ -117,7 +120,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
     // @notice veANGLE contract
     IVeANGLE public constant VEANGLE = IVeANGLE(0x0C462Dbb9EC8cD1630f1728B2CFD2769d09f0dd5);
 
-    // =============================== Events ======================================
+    // =================================== EVENTS ==================================
 
     event AdminChanged(address indexed admin, bool setGovernor);
     event StablecoinAdded(address indexed stableMaster);
@@ -126,7 +129,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
     event SanTokenLiquidityGaugeUpdated(address indexed sanToken, address indexed newLiquidityGauge);
     event Recovered(address indexed tokenAddress, address indexed to, uint256 amount);
 
-    // =============================== Mappings ====================================
+    // ================================== MAPPINGS =================================
 
     /// @notice Maps an agToken to its counterpart `StableMaster`
     mapping(IERC20 => IStableMasterFront) public mapStableMasters;
@@ -137,7 +140,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
     /// @notice Whether the token was already approved on 1Inch
     mapping(IERC20 => bool) public oneInchAllowedToken;
 
-    // =============================== References ==================================
+    // ================================= REFERENCES ================================
 
     /// @notice Governor address
     address public governor;
@@ -165,7 +168,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
     /// @notice Wrapped StETH contract
     IWStETH public constant WSTETH = IWStETH(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0);
 
-    // ============================= Error Messages ================================
+    // =================================== ERRORS ==================================
 
     error AlreadyAdded();
     error IncompatibleLengths();
@@ -184,7 +187,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
     // Removed the `initialize` function in this implementation since it has already been called and can not be called again
     // You can check it for context at the end of this contract
 
-    // ============================== Modifiers ====================================
+    // ================================= MODIFIERS =================================
 
     /// @notice Checks to see if it is the `governor` or `guardian` calling this contract
     /// @dev There is no Access Control here, because it can be handled cheaply through this modifier
@@ -194,7 +197,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         _;
     }
 
-    // =========================== Governance utilities ============================
+    // ============================ GOVERNANCE UTILITIES ===========================
 
     /// @notice Changes the guardian or the governor address
     /// @param admin New guardian or guardian address
@@ -304,7 +307,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         emit Recovered(tokenAddress, to, tokenAmount);
     }
 
-    // =========================== Router Functionalities =========================
+    // =========================== ROUTER FUNCTIONALITIES ==========================
 
     /// @notice Allows composable calls to different functions within the protocol
     /// @param paramsPermit Array of params `PermitType` used to do a 1 tx to approve the router on each token (can be done once by
@@ -650,6 +653,26 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
                 );
                 _withdrawSavingsRate(savingsRate, amount, to, maxSharesOut);
                 if (to == address(this)) _addToList(listTokens, balanceTokens, token, amount);
+            } else if (actions[i] == ActionType.prepareRedeemSavingsRate) {
+                (
+                    address token,
+                    ISavingsRateIlliquid savingsRate,
+                    uint256 shares,
+                    address to,
+                    uint256 minAmountOut
+                ) = abi.decode(data[i], (address, ISavingsRateIlliquid, uint256, address, uint256));
+                uint256 amount = _prepareRedeemSavingsRate(savingsRate, shares, to, minAmountOut);
+                if (to == address(this)) _addToList(listTokens, balanceTokens, token, amount);
+            } else if (actions[i] == ActionType.claimRedeemSavingsRate) {
+                (
+                    address token,
+                    ISavingsRateIlliquid savingsRate,
+                    address receiver,
+                    address[] memory strategiesToClaim,
+                    address to
+                ) = abi.decode(data[i], (address, ISavingsRateIlliquid, address, address[], address));
+                uint256 amount = _claimRedeemSavingsRate(savingsRate, receiver, strategiesToClaim);
+                if (to == address(this)) _addToList(listTokens, balanceTokens, token, amount);
             }
         }
 
@@ -710,7 +733,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
 
     receive() external payable {}
 
-    // ======================== Internal Utility Functions =========================
+    // ========================= INTERNAL UTILITY FUNCTIONS ========================
     // Most internal utility functions have a wrapper built on top of it
 
     /// @notice Internal version of the `claimRewards` function
@@ -1000,10 +1023,10 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         IPerpetualManagerFrontWithClaim(stablecoinOrPerpetualManager).addToPerpetual(perpetualID, margin);
     }
 
-    /// @notice Mints `shares` from an ERC4626 Savings Rate contract
-    /// @param savingsRate The ERC4626 savingsRate to mint shares from
+    /// @notice Mints `shares` from an ERC4626 `SavingsRate` contract
+    /// @param savingsRate ERC4626 `SavingsRate` to mint shares from
     /// @param shares Amount of shares to mint from `savingsRate`
-    /// @param to Address to which the minted shares should be sent
+    /// @param to Address to which shares should be sent
     /// @param maxAmountIn Max amount of assets used to mint
     /// @return amountIn Amount of assets used to mint by `to`
     function _mintSavingsRate(
@@ -1015,11 +1038,11 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         if (maxAmountIn < (amountIn = savingsRate.mint(shares, to))) revert TooSmallAmountOut();
     }
 
-    /// @notice Deposits `amount` to an ERC4626 Savings Rate contract
-    /// @param savingsRate The ERC4626 savingsRate to deposit assets to
-    /// @param amount Amount of assets to deposit to `savingsRate`.
-    /// @param to Address to which the minted shares should be sent
-    /// @param minSharesOut Minimum amount of `savingsRate` shares the `to` address should receive
+    /// @notice Deposits `amount` to an ERC4626 `SavingsRate` contract
+    /// @param savingsRate The ERC4626 `SavingsRate` to deposit assets to
+    /// @param amount Amount of assets to deposit
+    /// @param to Address to which shares should be sent
+    /// @param minSharesOut Minimum amount of `SavingsRate` shares that `to` should received
     /// @return sharesOut Amount of shares received by `to`
     function _depositSavingsRate(
         IERC4626 savingsRate,
@@ -1030,12 +1053,12 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         if ((sharesOut = savingsRate.deposit(amount, to)) < minSharesOut) revert TooSmallAmountOut();
     }
 
-    /// @notice Withdraws `amount` of assets from an ERC4626 Savings Rate contract
-    /// @param savingsRate The ERC4626 savingsRate to withdraw assets from
-    /// @param amount Amount of assets to withdraw from the savingsRate contract
-    /// @param to Address to which the withdrawn assets should be sent
-    /// @param maxSharesOut Maximum amount of shares that should be burnt in this withdrawal operation
-    /// @return sharesOut Amount of shares received by the `to` address
+    /// @notice Withdraws `amount` from an ERC4626 `SavingsRate` contract
+    /// @param savingsRate ERC4626 `SavingsRate` to withdraw assets from
+    /// @param amount Amount of assets to withdraw
+    /// @param to Destination of assets
+    /// @param maxSharesOut Maximum amount of shares that should be burnt in the operation
+    /// @return sharesOut Amount of shares burnt
     function _withdrawSavingsRate(
         IERC4626 savingsRate,
         uint256 amount,
@@ -1045,12 +1068,12 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         if (maxSharesOut < (sharesOut = savingsRate.withdraw(amount, to, msg.sender))) revert TooSmallAmountOut();
     }
 
-    /// @notice Redeems `shares` shares from an ERC4626 savingsRate.
-    /// @param savingsRate The ERC4626 savingsRate to redeem shares from.
-    /// @param shares Amount of shares to redeem from the savingsRate contract
-    /// @param to Address to which the withdrawn assets should be sent
-    /// @param minAmountOut Minimum amount of assets that the `to` address should receive
-    /// @return amountOut Amount of assets received by the `to` address
+    /// @notice Redeems `shares` from an ERC4626 `SavingsRate` contract
+    /// @param savingsRate ERC4626 `SavingsRate` to redeem shares from
+    /// @param shares Amount of shares to redeem
+    /// @param to Destination of assets
+    /// @param minAmountOut Minimum amount of assets that `to` should receive in the redemption process
+    /// @return amountOut Amount of assets received by `to`
     function _redeemSavingsRate(
         IERC4626 savingsRate,
         uint256 shares,
@@ -1060,7 +1083,34 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         if ((amountOut = savingsRate.redeem(shares, to, msg.sender)) < minAmountOut) revert TooSmallAmountOut();
     }
 
-    // ======================== Internal Utility Functions =========================
+    /// @notice Processes the redemption of `shares` shares from an ERC4626 `SavingsRate` contract with
+    /// potentially illiquid strategies
+    /// @param savingsRate ERC4626 `SavingsRate` to redeem shares from
+    /// @param shares Amount of shares to redeem
+    /// @param to Destination of assets
+    /// @param minAmountOut Minimum amount of assets that `to` should receive in the transaction
+    /// @return amountOut Amount of assets received by `to`
+    /// @dev Note that when calling this function the user does not have the guarantee that all shares
+    /// will be immediately processed and some shares may be leftover to claim
+    function _prepareRedeemSavingsRate(
+        ISavingsRateIlliquid savingsRate,
+        uint256 shares,
+        address to,
+        uint256 minAmountOut
+    ) internal returns (uint256 amountOut) {
+        if ((amountOut = savingsRate.prepareRedeem(shares, to, msg.sender)) < minAmountOut) revert TooSmallAmountOut();
+    }
+
+    /// @notice Claims assets from previously shares previously sent by `receiver` to the
+    /// `ssavingsRate` contract
+    /// @return amountOut Amount of assets obtained during the claim
+    function _claimRedeemSavingsRate(
+        ISavingsRateIlliquid savingsRate,
+        address receiver,
+        address[] memory strategiesToClaim
+    ) internal returns (uint256 amountOut) {
+        return savingsRate.claimRedeem(receiver, strategiesToClaim);
+    }
 
     /// @notice Parses the actions submitted to the router contract to interact with a `VaultManager` and makes sure that
     /// the calling address is well approved for all the vaults with which it is interacting
