@@ -29,10 +29,10 @@ async function main() {
   // testUpgradeability('OldRouter2', 'contracts/mock/OldRouter2.sol');
 
   testStorage(
-    'OldRouterOptimism',
-    'contracts/mock/OldRouterOptimism.sol',
-    'AngleRouterOptimism',
-    'contracts/sidechains/optimism/AngleRouterOptimism.sol',
+    'OldAngleRouterPolygon',
+    'contracts/deprecated/OldAngleRouterPolygon.sol',
+    'AngleRouterPolygon',
+    'contracts/sidechains/polygon/AngleRouterPolygon.sol',
   );
 }
 
