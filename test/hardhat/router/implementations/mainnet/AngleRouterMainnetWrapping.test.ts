@@ -43,7 +43,7 @@ contract('AngleRouterMainnet - Wrapping logic', () => {
   before(async () => {
     ({ deployer, alice, bob } = await ethers.getNamedSigners());
     USDCdecimal = BigNumber.from('6');
-    wETH = (await ethers.getContractAt(ERC20__factory.abi, '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1')) as ERC20;
+    wETH = (await ethers.getContractAt(ERC20__factory.abi, '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')) as ERC20;
 
     permits = [];
   });
@@ -54,14 +54,14 @@ contract('AngleRouterMainnet - Wrapping logic', () => {
       params: [
         {
           forking: {
-            jsonRpcUrl: process.env.ETH_NODE_URI_ARBITRUM,
-            // Changing Arbitrum fork block breaks some tests
-            blockNumber: 24263795,
+            jsonRpcUrl: process.env.ETH_NODE_URI_MAINNET,
+            // Changing Ethereum fork block breaks some tests
+            blockNumber: 15983159,
           },
         },
       ],
     });
-    // await hre.network.provider.send('hardhat_setBalance', [alice.address, '0x10000000000000000000000000000']);
+    await hre.network.provider.send('hardhat_setBalance', [alice.address, '0x10000000000000000000000000000']);
     // If the forked-network state needs to be reset between each test, run this
     router = (await deployUpgradeable(new AngleRouterMainnet__factory(deployer))) as AngleRouterMainnet;
     USDC = (await new MockTokenPermit__factory(deployer).deploy('USDC', 'USDC', USDCdecimal)) as MockTokenPermit;
@@ -76,7 +76,6 @@ contract('AngleRouterMainnet - Wrapping logic', () => {
     await core.toggleGovernor(alice.address);
     await core.toggleGuardian(alice.address);
     await core.toggleGuardian(bob.address);
-    // await router.initializeRouter(core.address, uniswap.address, oneInch.address);
   });
 
   describe('mixer', () => {
@@ -86,12 +85,11 @@ contract('AngleRouterMainnet - Wrapping logic', () => {
         await USDC.connect(alice).approve(router.address, parseUnits('1', USDCdecimal));
 
         const transferData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'uint256'],
-          [USDC.address, parseUnits('0.3', USDCdecimal)],
+          ['address', 'address', 'uint256'],
+          [USDC.address, router.address, parseUnits('0.3', USDCdecimal)],
         );
         const actions = [ActionType.transfer];
         const dataMixer = [transferData];
-
         await router.connect(alice).mixer(permits, actions, dataMixer, { value: parseEther('1') });
 
         const actions2 = [ActionType.sweepNative];
