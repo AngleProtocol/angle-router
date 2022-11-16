@@ -61,10 +61,7 @@ contract AngleRouter is BaseRouter, ReentrancyGuardUpgradeable {
 
     error AlreadyAdded();
     error InvalidAddress();
-    error InvalidCall();
-    error InvalidConditions();
     error InvalidToken();
-    error NotGovernorOrGuardian();
 
     // ================================== MAPPINGS =================================
 
@@ -93,16 +90,6 @@ contract AngleRouter is BaseRouter, ReentrancyGuardUpgradeable {
     /// @dev We Removed the `initialize` function in this implementation since it has already been called
     /// and can not be called again. You can check it for context at the end of this contract
     constructor() initializer {}
-
-    // ================================= MODIFIERS =================================
-
-    /// @notice Checks to see if it is the `governor` or `guardian` calling this contract
-    /// @dev There is no Access Control here, because it can be handled cheaply through this modifier
-    /// @dev In this contract, the `governor` and the `guardian` address have exactly similar rights
-    modifier onlyGovernorOrGuardian() {
-        if (msg.sender != governor && msg.sender != guardian) revert NotGovernorOrGuardian();
-        _;
-    }
 
     // =========================== ROUTER FUNCTIONALITIES ==========================
 
@@ -519,6 +506,14 @@ contract AngleRouter is BaseRouter, ReentrancyGuardUpgradeable {
             stablecoinOrPerpetualManager = address(pairs.perpetualManager);
         }
         IPerpetualManagerFrontWithClaim(stablecoinOrPerpetualManager).addToPerpetual(perpetualID, margin);
+    }
+
+    // ================================== MODIFIER =================================
+
+    /// @notice Checks to see if it is the `governor` or `guardian` calling this contract
+    modifier onlyGovernorOrGuardian() {
+        if (msg.sender != governor && msg.sender != guardian) revert NotGovernorOrGuardian();
+        _;
     }
 
     // ============================ GOVERNANCE UTILITIES ===========================

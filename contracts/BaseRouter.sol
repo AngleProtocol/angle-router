@@ -87,6 +87,7 @@ abstract contract BaseRouter is Initializable {
     error IncompatibleLengths();
     error InvalidReturnMessage();
     error NotApprovedOrOwner();
+    error NotGovernorOrGuardian();
     error TooSmallAmountOut();
     error TransferFailed();
     error ZeroAddress();

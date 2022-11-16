@@ -15,7 +15,6 @@ abstract contract BaseAngleRouterSidechain is BaseRouter {
     event CoreUpdated(address indexed _core);
 
     error NotGovernor();
-    error NotGovernorOrGuardian();
 
     // ================================= REFERENCES ================================
 
@@ -40,20 +39,6 @@ abstract contract BaseAngleRouterSidechain is BaseRouter {
         core = ICoreBorrow(_core);
         uniswapV3Router = IUniswapV3Router(_uniswapRouter);
         oneInch = _oneInch;
-    }
-
-    // ================================= MODIFIERS =================================
-
-    /// @notice Checks whether the `msg.sender` has the governor role or not
-    modifier onlyGovernor() {
-        if (!core.isGovernor(msg.sender)) revert NotGovernor();
-        _;
-    }
-
-    /// @notice Checks whether the `msg.sender` has the governor role or the guardian role
-    modifier onlyGovernorOrGuardian() {
-        if (!core.isGovernorOrGuardian(msg.sender)) revert NotGovernorOrGuardian();
-        _;
     }
 
     // =========================== ROUTER FUNCTIONALITIES ==========================
@@ -129,6 +114,20 @@ abstract contract BaseAngleRouterSidechain is BaseRouter {
     /// @inheritdoc BaseRouter
     function _getUniswapRouter() internal view virtual override returns (IUniswapV3Router) {
         return uniswapV3Router;
+    }
+
+    // ================================= MODIFIERS =================================
+
+    /// @notice Checks whether the `msg.sender` has the governor role or not
+    modifier onlyGovernor() {
+        if (!core.isGovernor(msg.sender)) revert NotGovernor();
+        _;
+    }
+
+    /// @notice Checks whether the `msg.sender` has the governor role or the guardian role
+    modifier onlyGovernorOrGuardian() {
+        if (!core.isGovernorOrGuardian(msg.sender)) revert NotGovernorOrGuardian();
+        _;
     }
 
     // ============================ GOVERNANCE UTILITIES ===========================
