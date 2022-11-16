@@ -2,82 +2,21 @@
 
 pragma solidity 0.8.12;
 
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/draft-IERC20PermitUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
-import "@openzeppelin/contracts/interfaces/IERC4626.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "./interfaces/external/IWETH9.sol";
 import "./interfaces/external/lido/ISteth.sol";
 import "./interfaces/external/lido/IWStETH.sol";
-import "./interfaces/external/uniswap/IUniswapRouter.sol";
 
 import "./interfaces/IFeeDistributor.sol";
-import "./interfaces/ILiquidityGauge.sol";
 import "./interfaces/ISanToken.sol";
-import "./interfaces/ISavingsRateIlliquid.sol";
 import "./interfaces/IStableMaster.sol";
 import "./interfaces/IStableMasterFront.sol";
-import "./interfaces/ISwapper.sol";
-import "./interfaces/IVaultManager.sol";
 import "./interfaces/IVeANGLE.sol";
 
+import "./BaseRouter.sol";
+
 // ============================= STRUCTS AND ENUMS =============================
-
-/// @notice Action types
-enum ActionType {
-    claimRewards,
-    claimWeeklyInterest,
-    gaugeDeposit,
-    withdraw,
-    mint,
-    deposit,
-    openPerpetual,
-    addToPerpetual,
-    veANGLEDeposit,
-    borrower,
-    mintSavingsRate,
-    depositSavingsRate,
-    redeemSavingsRate,
-    withdrawSavingsRate,
-    prepareRedeemSavingsRate,
-    claimRedeemSavingsRate,
-    swapper
-}
-
-/// @notice All possible swaps
-enum SwapType {
-    UniswapV3,
-    oneINCH,
-    WrapStETH,
-    None
-}
-
-/// @notice Params for swaps
-/// @param inToken Token to swap
-/// @param collateral Token to swap for
-/// @param amountIn Amount of token to sell
-/// @param minAmountOut Minimum amount of collateral to receive for the swap to not revert
-/// @param args Either the path for Uniswap or the payload for 1Inch
-/// @param swapType Which swap route to take
-struct ParamsSwapType {
-    IERC20 inToken;
-    address collateral;
-    uint256 amountIn;
-    uint256 minAmountOut;
-    bytes args;
-    SwapType swapType;
-}
-
-/// @notice Params for direct collateral transfer
-/// @param inToken Token to transfer
-/// @param amountIn Amount of token transfer
-struct TransferType {
-    IERC20 inToken;
-    address receiver;
-    uint256 amountIn;
-}
 
 /// @notice References to the contracts associated to a collateral for a stablecoin
 struct Pairs {
@@ -85,17 +24,6 @@ struct Pairs {
     IPerpetualManagerFrontWithClaim perpetualManager;
     ISanToken sanToken;
     ILiquidityGauge gauge;
-}
-
-/// @notice Data needed to get permits
-struct PermitType {
-    address token;
-    address owner;
-    uint256 value;
-    uint256 deadline;
-    uint8 v;
-    bytes32 r;
-    bytes32 s;
 }
 
 /// @title Angle Router
@@ -106,19 +34,19 @@ struct PermitType {
 /// @dev Interfaces were designed for both advanced users which know the addresses of the protocol's contract, but most of the time
 /// users which only know addresses of the stablecoins and collateral types of the protocol can perform the actions they want without
 /// needing to understand what's happening under the hood
-contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
+contract AngleRouter is BaseRouter, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
-    /// @notice Base used for params
-    uint256 public constant BASE_PARAMS = 10**9;
 
-    /// @notice Base used for params
-    uint256 private constant _MAX_TOKENS = 10;
-    // @notice Wrapped ETH contract
+    /// @notice Wrapped ETH contract
     IWETH9 public constant WETH9 = IWETH9(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
-    // @notice ANGLE contract
+    /// @notice ANGLE contract
     IERC20 public constant ANGLE = IERC20(0x31429d1856aD1377A8A0079410B297e1a9e214c2);
-    // @notice veANGLE contract
+    /// @notice veANGLE contract
     IVeANGLE public constant VEANGLE = IVeANGLE(0x0C462Dbb9EC8cD1630f1728B2CFD2769d09f0dd5);
+    /// @notice StETH contract
+    IStETH public constant STETH = IStETH(0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84);
+    /// @notice Wrapped StETH contract
+    IWStETH public constant WSTETH = IWStETH(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0);
 
     // =================================== EVENTS ==================================
 
@@ -128,6 +56,15 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
     event CollateralToggled(address indexed stableMaster, address indexed poolManager, address indexed liquidityGauge);
     event SanTokenLiquidityGaugeUpdated(address indexed sanToken, address indexed newLiquidityGauge);
     event Recovered(address indexed tokenAddress, address indexed to, uint256 amount);
+
+    // =================================== ERRORS ==================================
+
+    error AlreadyAdded();
+    error InvalidAddress();
+    error InvalidCall();
+    error InvalidConditions();
+    error InvalidToken();
+    error NotGovernorOrGuardian();
 
     // ================================== MAPPINGS =================================
 
@@ -153,39 +90,9 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
 
     uint256[50] private __gap;
 
-    struct PermitVaultManagerType {
-        address vaultManager;
-        address owner;
-        bool approved;
-        uint256 deadline;
-        uint8 v;
-        bytes32 r;
-        bytes32 s;
-    }
-
-    /// @notice StETH contract
-    IStETH public constant STETH = IStETH(0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84);
-    /// @notice Wrapped StETH contract
-    IWStETH public constant WSTETH = IWStETH(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0);
-
-    // =================================== ERRORS ==================================
-
-    error AlreadyAdded();
-    error IncompatibleLengths();
-    error InvalidAddress();
-    error InvalidCall();
-    error InvalidConditions();
-    error InvalidReturnMessage();
-    error InvalidToken();
-    error NotApprovedOrOwner();
-    error NotGovernorOrGuardian();
-    error TooSmallAmountOut();
-    error ZeroAddress();
-
+    /// @dev We Removed the `initialize` function in this implementation since it has already been called
+    /// and can not be called again. You can check it for context at the end of this contract
     constructor() initializer {}
-
-    // Removed the `initialize` function in this implementation since it has already been called and can not be called again
-    // You can check it for context at the end of this contract
 
     // ================================= MODIFIERS =================================
 
@@ -197,539 +104,174 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         _;
     }
 
-    // ============================ GOVERNANCE UTILITIES ===========================
-
-    /// @notice Changes the guardian or the governor address
-    /// @param admin New guardian or guardian address
-    /// @param setGovernor Whether to set Governor if true, or Guardian if false
-    /// @dev There can only be one guardian and one governor address in the router
-    /// and both need to be different
-    function setGovernorOrGuardian(address admin, bool setGovernor) external onlyGovernorOrGuardian {
-        if (admin == address(0)) revert ZeroAddress();
-        if (guardian == admin || governor == admin) revert InvalidAddress();
-        if (setGovernor) governor = admin;
-        else guardian = admin;
-        emit AdminChanged(admin, setGovernor);
-    }
-
-    /// @notice Adds a new `StableMaster`
-    /// @param stablecoin Address of the new stablecoin
-    /// @param stableMaster Address of the new `StableMaster`
-    function addStableMaster(IERC20 stablecoin, IStableMasterFront stableMaster) external onlyGovernorOrGuardian {
-        // No need to check if the `stableMaster` address is a zero address as otherwise the call to `stableMaster.agToken()`
-        // would revert
-        if (address(stablecoin) == address(0)) revert ZeroAddress();
-        if (address(mapStableMasters[stablecoin]) != address(0)) revert AlreadyAdded();
-        if (stableMaster.agToken() != address(stablecoin)) revert InvalidToken();
-        mapStableMasters[stablecoin] = stableMaster;
-        emit StablecoinAdded(address(stableMaster));
-    }
-
-    /// @notice Adds new collateral types to specific stablecoins
-    /// @param stablecoins Addresses of the stablecoins associated to the `StableMaster` of interest
-    /// @param poolManagers Addresses of the `PoolManager` contracts associated to the pair (stablecoin,collateral)
-    /// @param liquidityGauges Addresses of liquidity gauges contract associated to sanToken
-    function addPairs(
-        IERC20[] calldata stablecoins,
-        IPoolManager[] calldata poolManagers,
-        ILiquidityGauge[] calldata liquidityGauges
-    ) external onlyGovernorOrGuardian {
-        if (poolManagers.length != stablecoins.length || liquidityGauges.length != stablecoins.length)
-            revert IncompatibleLengths();
-        for (uint256 i = 0; i < stablecoins.length; i++) {
-            IStableMasterFront stableMaster = mapStableMasters[stablecoins[i]];
-            _addPair(stableMaster, poolManagers[i], liquidityGauges[i]);
-        }
-    }
-
-    /// @notice Sets new `liquidityGauge` contract for the associated sanTokens
-    /// @param stablecoins Addresses of the stablecoins
-    /// @param collaterals Addresses of the collaterals
-    /// @param newLiquidityGauges Addresses of the new liquidity gauges contract
-    /// @dev If `newLiquidityGauge` is null, this means that there is no liquidity gauge for this pair
-    /// @dev This function could be used to simply revoke the approval to a liquidity gauge
-    function setLiquidityGauges(
-        IERC20[] calldata stablecoins,
-        IERC20[] calldata collaterals,
-        ILiquidityGauge[] calldata newLiquidityGauges
-    ) external onlyGovernorOrGuardian {
-        if (collaterals.length != stablecoins.length || newLiquidityGauges.length != stablecoins.length)
-            revert IncompatibleLengths();
-        for (uint256 i = 0; i < stablecoins.length; i++) {
-            IStableMasterFront stableMaster = mapStableMasters[stablecoins[i]];
-            Pairs storage pairs = mapPoolManagers[stableMaster][collaterals[i]];
-            ILiquidityGauge gauge = pairs.gauge;
-            ISanToken sanToken = pairs.sanToken;
-            if (address(stableMaster) == address(0) || address(pairs.poolManager) == address(0)) revert ZeroAddress();
-            pairs.gauge = newLiquidityGauges[i];
-            if (address(gauge) != address(0)) {
-                sanToken.approve(address(gauge), 0);
-            }
-            if (address(newLiquidityGauges[i]) != address(0)) {
-                // Checking compatibility of the staking token: it should be the sanToken
-                if (address(newLiquidityGauges[i].staking_token()) != address(sanToken)) revert InvalidToken();
-                sanToken.approve(address(newLiquidityGauges[i]), type(uint256).max);
-            }
-            emit SanTokenLiquidityGaugeUpdated(address(sanToken), address(newLiquidityGauges[i]));
-        }
-    }
-
-    /// @notice Change allowance for a contract.
-    /// @param tokens Addresses of the tokens to allow
-    /// @param spenders Addresses to allow transfer
-    /// @param amounts Amounts to allow
-    /// @dev Approvals are normally given in the `addGauges` method, in the initializer and in
-    /// the internal functions to process swaps with Uniswap and 1Inch
-    function changeAllowance(
-        IERC20[] calldata tokens,
-        address[] calldata spenders,
-        uint256[] calldata amounts
-    ) external onlyGovernorOrGuardian {
-        if (tokens.length != spenders.length || tokens.length != amounts.length) revert IncompatibleLengths();
-        for (uint256 i = 0; i < tokens.length; i++) {
-            _changeAllowance(tokens[i], spenders[i], amounts[i]);
-        }
-    }
-
-    /// @notice Supports recovering any tokens as the router does not own any other tokens than
-    /// the one mistakenly sent
-    /// @param tokenAddress Address of the token to transfer
-    /// @param to Address to give tokens to
-    /// @param tokenAmount Amount of tokens to transfer
-    /// @dev If tokens are mistakenly sent to this contract, any address can take advantage of the `mixer` function
-    /// below to get the funds back
-    function recoverERC20(
-        address tokenAddress,
-        address to,
-        uint256 tokenAmount
-    ) external onlyGovernorOrGuardian {
-        IERC20(tokenAddress).safeTransfer(to, tokenAmount);
-        emit Recovered(tokenAddress, to, tokenAmount);
-    }
-
     // =========================== ROUTER FUNCTIONALITIES ==========================
 
-    /// @notice Allows composable calls to different functions within the protocol
-    /// @param paramsPermit Array of params `PermitType` used to do a 1 tx to approve the router on each token (can be done once by
-    /// setting high approved amounts) which supports the `permit` standard. Users willing to interact with the contract
-    /// with tokens that do not support permit should approve the contract for these tokens prior to interacting with it
-    /// @param paramsTransfer Array of params `TransferType` used to transfer tokens to the router
-    /// @param paramsSwap Array of params `ParamsSwapType` used to swap tokens
-    /// @param actions List of actions to be performed by the router (in order of execution): make sure to read for each action the
-    /// associated internal function
-    /// @param data Array of encoded data for each of the actions performed in this mixer. This is where the bytes-encoded parameters
-    /// for a given action are stored
-    /// @dev This function first fills the router balances via transfers and swaps. It then proceeds with each
-    /// action in the order at which they are given
-    /// @dev With this function, users can specify paths to swap tokens to the desired token of their choice. Yet the protocol
-    /// does not verify the payload given and cannot check that the swap performed by users actually gives the desired
-    /// out token: in this case funds will be lost by the user
-    /// @dev For some actions (`mint`, `deposit`, `openPerpetual`, `addToPerpetual`, `withdraw`), users are
-    /// required to give a proportion of the amount of token they have brought to the router within the transaction (through
-    /// a direct transfer or a swap) they want to use for the operation. If you want to use all the USDC you have brought (through an ETH -> USDC)
-    /// swap to mint stablecoins for instance, you should use `BASE_PARAMS` as a proportion.
-    /// @dev The proportion that is specified for an action is a proportion of what is left. If you want to use 50% of your USDC for a `mint`
-    /// and the rest for an `openPerpetual`, proportion used for the `mint` should be 50% (that is `BASE_PARAMS/2`), and proportion
-    /// for the `openPerpetual` should be all that is left that is 100% (= `BASE_PARAMS`).
-    /// @dev For each action here, make sure to read the documentation of the associated internal function to know how to correctly
-    /// specify parameters
-    function mixer(
-        PermitType[] memory paramsPermit,
-        TransferType[] memory paramsTransfer,
-        ParamsSwapType[] memory paramsSwap,
-        ActionType[] memory actions,
-        bytes[] calldata data
-    ) public payable {
-        // Do all the permits once for all: if all tokens have already been approved, there's no need for this step
-        for (uint256 i = 0; i < paramsPermit.length; i++) {
-            IERC20PermitUpgradeable(paramsPermit[i].token).permit(
-                paramsPermit[i].owner,
-                address(this),
-                paramsPermit[i].value,
-                paramsPermit[i].deadline,
-                paramsPermit[i].v,
-                paramsPermit[i].r,
-                paramsPermit[i].s
+    /// @inheritdoc BaseRouter
+    function _chainSpecificAction(ActionType action, bytes memory data) internal override {
+        if (action == ActionType.claimRewardsWithPerps) {
+            (
+                address user,
+                uint256 proportionToBeTransferred,
+                address[] memory claimLiquidityGauges,
+                uint256[] memory claimPerpetualIDs,
+                bool addressProcessed,
+                address[] memory stablecoins,
+                address[] memory collateralsOrPerpetualManagers
+            ) = abi.decode(data, (address, uint256, address[], uint256[], bool, address[], address[]));
+
+            uint256 amount = ANGLE.balanceOf(user);
+
+            _claimRewardsWithPerps(
+                user,
+                claimLiquidityGauges,
+                claimPerpetualIDs,
+                addressProcessed,
+                stablecoins,
+                collateralsOrPerpetualManagers
             );
-        }
-
-        // Then, do all the transfer to load all needed funds into the router
-        // This function is limited to 10 different assets to be spent on the protocol (agTokens, collaterals, sanTokens)
-        address[_MAX_TOKENS] memory listTokens;
-        uint256[_MAX_TOKENS] memory balanceTokens;
-
-        for (uint256 i = 0; i < paramsTransfer.length; i++) {
-            paramsTransfer[i].inToken.safeTransferFrom(
-                msg.sender,
-                paramsTransfer[i].receiver,
-                paramsTransfer[i].amountIn
-            );
-            if (paramsTransfer[i].receiver == address(this))
-                _addToList(listTokens, balanceTokens, address(paramsTransfer[i].inToken), paramsTransfer[i].amountIn);
-        }
-
-        for (uint256 i = 0; i < paramsSwap.length; i++) {
-            // Caution here: if the args are not set such that end token is the params `paramsSwap[i].collateral`,
-            // then the funds will be lost, and any user could take advantage of it to fetch the funds
-            uint256 amountOut = _transferAndSwap(
-                paramsSwap[i].inToken,
-                paramsSwap[i].amountIn,
-                paramsSwap[i].minAmountOut,
-                paramsSwap[i].swapType,
-                paramsSwap[i].args
-            );
-            _addToList(listTokens, balanceTokens, address(paramsSwap[i].collateral), amountOut);
-        }
-
-        // Performing actions one after the others
-        for (uint256 i = 0; i < actions.length; i++) {
-            if (actions[i] == ActionType.claimRewards) {
-                (
-                    address user,
-                    uint256 proportionToBeTransferred,
-                    address[] memory claimLiquidityGauges,
-                    uint256[] memory claimPerpetualIDs,
-                    bool addressProcessed,
-                    address[] memory stablecoins,
-                    address[] memory collateralsOrPerpetualManagers
-                ) = abi.decode(data[i], (address, uint256, address[], uint256[], bool, address[], address[]));
-
-                uint256 amount = ANGLE.balanceOf(user);
-
-                _claimRewards(
-                    user,
-                    claimLiquidityGauges,
-                    claimPerpetualIDs,
-                    addressProcessed,
-                    stablecoins,
-                    collateralsOrPerpetualManagers
-                );
-                if (proportionToBeTransferred > 0) {
-                    amount = ANGLE.balanceOf(user) - amount;
-                    amount = (amount * proportionToBeTransferred) / BASE_PARAMS;
-                    ANGLE.safeTransferFrom(msg.sender, address(this), amount);
-                    _addToList(listTokens, balanceTokens, address(ANGLE), amount);
-                }
-            } else if (actions[i] == ActionType.swapper) {
-                (
-                    ISwapper swapperContract,
-                    IERC20 inToken,
-                    IERC20 outToken,
-                    address outTokenRecipient,
-                    uint256 outTokenOwed,
-                    uint256 inTokenObtained,
-                    bytes memory payload
-                ) = abi.decode(data[i], (ISwapper, IERC20, IERC20, address, uint256, uint256, bytes));
-                _swapper(swapperContract, inToken, outToken, outTokenRecipient, outTokenOwed, inTokenObtained, payload);
-            } else if (actions[i] == ActionType.claimWeeklyInterest) {
-                (address user, address feeDistributor, bool letInContract) = abi.decode(
-                    data[i],
-                    (address, address, bool)
-                );
-
-                (uint256 amount, IERC20 token) = _claimWeeklyInterest(
-                    user,
-                    IFeeDistributorFront(feeDistributor),
-                    letInContract
-                );
-                if (address(token) != address(0)) _addToList(listTokens, balanceTokens, address(token), amount);
-                // In all the following action, the `amount` variable represents the proportion of the
-                // balance that needs to be used for this action (in `BASE_PARAMS`)
-                // We name it `amount` here to save some new variable declaration costs
-            } else if (actions[i] == ActionType.veANGLEDeposit) {
-                (address user, uint256 amount) = abi.decode(data[i], (address, uint256));
-
-                amount = _computeProportion(amount, listTokens, balanceTokens, address(ANGLE), true);
-                _depositOnLocker(user, amount);
-            } else if (actions[i] == ActionType.gaugeDeposit) {
-                (address user, uint256 amount, address stakedToken, address gauge, bool shouldClaimRewards) = abi
-                    .decode(data[i], (address, uint256, address, address, bool));
-
-                amount = _computeProportion(amount, listTokens, balanceTokens, stakedToken, true);
-                _gaugeDeposit(user, amount, ILiquidityGauge(gauge), shouldClaimRewards);
-            } else if (actions[i] == ActionType.deposit) {
-                (
-                    address user,
-                    uint256 amount,
-                    bool addressProcessed,
-                    address stablecoinOrStableMaster,
-                    address collateral,
-                    address poolManager,
-                    address sanToken
-                ) = abi.decode(data[i], (address, uint256, bool, address, address, address, address));
-
-                amount = _computeProportion(amount, listTokens, balanceTokens, collateral, true);
-                (amount, sanToken) = _deposit(
-                    user,
-                    amount,
-                    addressProcessed,
-                    stablecoinOrStableMaster,
-                    collateral,
-                    IPoolManager(poolManager),
-                    ISanToken(sanToken)
-                );
-
-                if (amount > 0) _addToList(listTokens, balanceTokens, sanToken, amount);
-            } else if (actions[i] == ActionType.withdraw) {
-                (
-                    uint256 amount,
-                    bool addressProcessed,
-                    address stablecoinOrStableMaster,
-                    address collateralOrPoolManager,
-                    address sanToken
-                ) = abi.decode(data[i], (uint256, bool, address, address, address));
-
-                amount = _computeProportion(amount, listTokens, balanceTokens, sanToken, true);
-                // Reusing the `collateralOrPoolManager` variable to save some variable declarations
-                (amount, collateralOrPoolManager) = _withdraw(
-                    amount,
-                    addressProcessed,
-                    stablecoinOrStableMaster,
-                    collateralOrPoolManager
-                );
-                _addToList(listTokens, balanceTokens, collateralOrPoolManager, amount);
-            } else if (actions[i] == ActionType.mint) {
-                (
-                    address user,
-                    uint256 amount,
-                    uint256 minStableAmount,
-                    bool addressProcessed,
-                    address stablecoinOrStableMaster,
-                    address collateral,
-                    address poolManager
-                ) = abi.decode(data[i], (address, uint256, uint256, bool, address, address, address));
-
-                amount = _computeProportion(amount, listTokens, balanceTokens, collateral, true);
-                _mint(
-                    user,
-                    amount,
-                    minStableAmount,
-                    addressProcessed,
-                    stablecoinOrStableMaster,
-                    collateral,
-                    IPoolManager(poolManager)
-                );
-            } else if (actions[i] == ActionType.openPerpetual) {
-                (
-                    address user,
-                    uint256 amount,
-                    uint256 amountCommitted,
-                    uint256 extremeRateOracle,
-                    uint256 minNetMargin,
-                    bool addressProcessed,
-                    address stablecoinOrPerpetualManager,
-                    address collateral
-                ) = abi.decode(data[i], (address, uint256, uint256, uint256, uint256, bool, address, address));
-
-                amount = _computeProportion(amount, listTokens, balanceTokens, collateral, true);
-
-                _openPerpetual(
-                    user,
-                    amount,
-                    amountCommitted,
-                    extremeRateOracle,
-                    minNetMargin,
-                    addressProcessed,
-                    stablecoinOrPerpetualManager,
-                    collateral
-                );
-            } else if (actions[i] == ActionType.addToPerpetual) {
-                (
-                    uint256 amount,
-                    uint256 perpetualID,
-                    bool addressProcessed,
-                    address stablecoinOrPerpetualManager,
-                    address collateral
-                ) = abi.decode(data[i], (uint256, uint256, bool, address, address));
-
-                amount = _computeProportion(amount, listTokens, balanceTokens, collateral, true);
-                _addToPerpetual(amount, perpetualID, addressProcessed, stablecoinOrPerpetualManager, collateral);
-            } else if (actions[i] == ActionType.borrower) {
-                (
-                    address collateral,
-                    address stablecoin,
-                    address vaultManager,
-                    address to,
-                    address who,
-                    ActionBorrowType[] memory actionsBorrow,
-                    bytes[] memory dataBorrow,
-                    bytes memory repayData
-                ) = abi.decode(
-                        data[i],
-                        (address, address, address, address, address, ActionBorrowType[], bytes[], bytes)
-                    );
-                _parseVaultIDs(actionsBorrow, dataBorrow, vaultManager);
-                _changeAllowance(IERC20(collateral), address(vaultManager), type(uint256).max);
-                uint256 stablecoinBalance;
-                uint256 collateralBalance;
-                // In this case, this may mean that the `VaultManager` will engage in some way in a swap of stablecoins
-                // or collateral and we should not trust the amounts outputted by the `_angleBorrower` function as the true amounts
-                if (repayData.length > 0) {
-                    stablecoinBalance = IERC20(stablecoin).balanceOf(address(this));
-                    collateralBalance = IERC20(collateral).balanceOf(address(this));
-                }
-
-                PaymentData memory paymentData = _angleBorrower(
-                    vaultManager,
-                    actionsBorrow,
-                    dataBorrow,
-                    to,
-                    who,
-                    repayData
-                );
-
-                _changeAllowance(IERC20(collateral), address(vaultManager), 0);
-
-                if (repayData.length > 0) {
-                    paymentData.collateralAmountToGive = IERC20(collateral).balanceOf(address(this));
-                    paymentData.stablecoinAmountToGive = IERC20(stablecoin).balanceOf(address(this));
-                    paymentData.collateralAmountToReceive = collateralBalance;
-                    paymentData.stablecoinAmountToReceive = stablecoinBalance;
-                }
-
-                // Handle collateral transfers
-                if (paymentData.collateralAmountToReceive > paymentData.collateralAmountToGive) {
-                    uint256 index = _searchList(listTokens, collateral);
-                    balanceTokens[index] -= paymentData.collateralAmountToReceive - paymentData.collateralAmountToGive;
-                } else if (
-                    paymentData.collateralAmountToReceive < paymentData.collateralAmountToGive &&
-                    (to == address(this) || repayData.length > 0)
-                ) {
-                    _addToList(
-                        listTokens,
-                        balanceTokens,
-                        collateral,
-                        paymentData.collateralAmountToGive - paymentData.collateralAmountToReceive
-                    );
-                }
-                // Handle stablecoins transfers: the `VaultManager` is called with the `from` address being the `msg.sender`
-                // so we don't need to update the stablecoin balance if stablecoins are given to it from this operation as
-                // the `VaultManager` will call `burnFrom` and will just check that the router has allowance for the `msg.sender`
-                if (
-                    paymentData.stablecoinAmountToReceive < paymentData.stablecoinAmountToGive &&
-                    (to == address(this) || repayData.length > 0)
-                ) {
-                    _addToList(
-                        listTokens,
-                        balanceTokens,
-                        stablecoin,
-                        paymentData.stablecoinAmountToGive - paymentData.stablecoinAmountToReceive
-                    );
-                }
-            } else if (actions[i] == ActionType.mintSavingsRate) {
-                (IERC20 token, IERC4626 savingsRate, uint256 shares, address to, uint256 maxAmountIn) = abi.decode(
-                    data[i],
-                    (IERC20, IERC4626, uint256, address, uint256)
-                );
-                _changeAllowance(token, address(savingsRate), maxAmountIn);
-                uint256 amountSpent = _mintSavingsRate(savingsRate, shares, to, maxAmountIn);
-                _changeAllowance(token, address(savingsRate), 0);
-
-                // update the internal balances
-                _computeProportion(amountSpent, listTokens, balanceTokens, address(token), false);
-                if (to == address(this)) _addToList(listTokens, balanceTokens, address(savingsRate), shares);
-            } else if (actions[i] == ActionType.depositSavingsRate) {
-                (IERC20 token, IERC4626 savingsRate, uint256 amount, address to, uint256 minSharesOut) = abi.decode(
-                    data[i],
-                    (IERC20, IERC4626, uint256, address, uint256)
-                );
-                amount = _computeProportion(amount, listTokens, balanceTokens, address(token), true);
-
-                _changeAllowance(token, address(savingsRate), amount);
-                uint256 shares = _depositSavingsRate(savingsRate, amount, to, minSharesOut);
-
-                if (to == address(this)) _addToList(listTokens, balanceTokens, address(savingsRate), shares);
-            } else if (actions[i] == ActionType.redeemSavingsRate) {
-                (address token, IERC4626 savingsRate, uint256 shares, address to, uint256 minAmountOut) = abi.decode(
-                    data[i],
-                    (address, IERC4626, uint256, address, uint256)
-                );
-                uint256 amount = _redeemSavingsRate(savingsRate, shares, to, minAmountOut);
-                if (to == address(this)) _addToList(listTokens, balanceTokens, token, amount);
-            } else if (actions[i] == ActionType.withdrawSavingsRate) {
-                (address token, IERC4626 savingsRate, uint256 amount, address to, uint256 maxSharesOut) = abi.decode(
-                    data[i],
-                    (address, IERC4626, uint256, address, uint256)
-                );
-                _withdrawSavingsRate(savingsRate, amount, to, maxSharesOut);
-                if (to == address(this)) _addToList(listTokens, balanceTokens, token, amount);
-            } else if (actions[i] == ActionType.prepareRedeemSavingsRate) {
-                (
-                    address token,
-                    ISavingsRateIlliquid savingsRate,
-                    uint256 shares,
-                    address to,
-                    uint256 minAmountOut
-                ) = abi.decode(data[i], (address, ISavingsRateIlliquid, uint256, address, uint256));
-                uint256 amount = _prepareRedeemSavingsRate(savingsRate, shares, to, minAmountOut);
-                if (to == address(this)) _addToList(listTokens, balanceTokens, token, amount);
-            } else if (actions[i] == ActionType.claimRedeemSavingsRate) {
-                (address token, ISavingsRateIlliquid savingsRate, address to, address[] memory strategiesToClaim) = abi
-                    .decode(data[i], (address, ISavingsRateIlliquid, address, address[]));
-                uint256 amount = _claimRedeemSavingsRate(savingsRate, to, strategiesToClaim);
-                if (to == address(this)) _addToList(listTokens, balanceTokens, token, amount);
+            if (proportionToBeTransferred > 0) {
+                amount = ANGLE.balanceOf(user) - amount;
+                amount = (amount * proportionToBeTransferred) / 10**9;
+                ANGLE.safeTransferFrom(msg.sender, address(this), amount);
             }
-        }
-
-        // Once all actions have been performed, the router sends back the unused funds from users
-        // If a user sends funds (through a swap) but specifies incorrectly the collateral associated to it, then
-        //  the mixer will revert when trying to send the remaining funds back
-        for (uint256 i = 0; i < balanceTokens.length; i++) {
-            if (balanceTokens[i] > 0) IERC20(listTokens[i]).safeTransfer(msg.sender, balanceTokens[i]);
+        } else if (action == ActionType.claimWeeklyInterest) {
+            (address user, address feeDistributor, bool letInContract) = abi.decode(data, (address, address, bool));
+            _claimWeeklyInterest(user, IFeeDistributorFront(feeDistributor), letInContract);
+        } else if (action == ActionType.veANGLEDeposit) {
+            (address user, uint256 amount) = abi.decode(data, (address, uint256));
+            _depositOnLocker(user, amount);
+        } else if (action == ActionType.gaugeDeposit) {
+            (address user, uint256 amount, address stakedToken, address gauge, bool shouldClaimRewards) = abi.decode(
+                data,
+                (address, uint256, address, address, bool)
+            );
+            if (amount == type(uint256).max) amount = IERC20(stakedToken).balanceOf(address(this));
+            _gaugeDeposit(user, amount, ILiquidityGauge(gauge), shouldClaimRewards);
+        } else if (action == ActionType.deposit) {
+            (
+                address user,
+                uint256 amount,
+                bool addressProcessed,
+                address stablecoinOrStableMaster,
+                address collateral,
+                address poolManager,
+                address sanToken
+            ) = abi.decode(data, (address, uint256, bool, address, address, address, address));
+            _deposit(
+                user,
+                amount,
+                addressProcessed,
+                stablecoinOrStableMaster,
+                collateral,
+                IPoolManager(poolManager),
+                ISanToken(sanToken)
+            );
+        } else if (action == ActionType.withdraw) {
+            (
+                uint256 amount,
+                bool addressProcessed,
+                address stablecoinOrStableMaster,
+                address collateralOrPoolManager,
+                address sanToken
+            ) = abi.decode(data, (uint256, bool, address, address, address));
+            if (amount == type(uint256).max) amount = IERC20(sanToken).balanceOf(address(this));
+            // Reusing the `collateralOrPoolManager` variable to save some variable declarations
+            _withdraw(amount, addressProcessed, stablecoinOrStableMaster, collateralOrPoolManager);
+        } else if (action == ActionType.mint) {
+            (
+                address user,
+                uint256 amount,
+                uint256 minStableAmount,
+                bool addressProcessed,
+                address stablecoinOrStableMaster,
+                address collateral,
+                address poolManager
+            ) = abi.decode(data, (address, uint256, uint256, bool, address, address, address));
+            _mint(
+                user,
+                amount,
+                minStableAmount,
+                addressProcessed,
+                stablecoinOrStableMaster,
+                collateral,
+                IPoolManager(poolManager)
+            );
+        } else if (action == ActionType.openPerpetual) {
+            (
+                address user,
+                uint256 amount,
+                uint256 amountCommitted,
+                uint256 extremeRateOracle,
+                uint256 minNetMargin,
+                bool addressProcessed,
+                address stablecoinOrPerpetualManager,
+                address collateral
+            ) = abi.decode(data, (address, uint256, uint256, uint256, uint256, bool, address, address));
+            _openPerpetual(
+                user,
+                amount,
+                amountCommitted,
+                extremeRateOracle,
+                minNetMargin,
+                addressProcessed,
+                stablecoinOrPerpetualManager,
+                collateral
+            );
+        } else if (action == ActionType.addToPerpetual) {
+            (
+                uint256 amount,
+                uint256 perpetualID,
+                bool addressProcessed,
+                address stablecoinOrPerpetualManager,
+                address collateral
+            ) = abi.decode(data, (uint256, uint256, bool, address, address));
+            _addToPerpetual(amount, perpetualID, addressProcessed, stablecoinOrPerpetualManager, collateral);
+        } else if (action == ActionType.wrapMultiple) {
+            uint256 minAmountOut = abi.decode(data, (uint256));
+            _wrapMultiple(minAmountOut);
         }
     }
 
-    /// @notice Wrapper built on top of the base `mixer` function to grant approval to a `VaultManager` contract before performing
-    /// actions and then revoking this approval after these actions
-    /// @param paramsPermitVaultManager Parameters to sign permit to give allowance to the router for a `VaultManager` contract
-    /// @dev In `paramsPermitVaultManager`, the signatures for granting approvals must be given first before the signatures
-    /// to revoke approvals
-    /// @dev The router contract has been built to be safe to keep approvals as you cannot take an action on a vault you are not
-    /// approved for, but people wary about their approvals may want to grant it before immediately revoking it, although this
-    /// is just an option
-    function mixerVaultManagerPermit(
-        PermitVaultManagerType[] memory paramsPermitVaultManager,
-        PermitType[] memory paramsPermit,
-        TransferType[] memory paramsTransfer,
-        ParamsSwapType[] memory paramsSwap,
-        ActionType[] memory actions,
-        bytes[] calldata data
-    ) external payable {
-        for (uint256 i = 0; i < paramsPermitVaultManager.length; i++) {
-            if (paramsPermitVaultManager[i].approved) {
-                IVaultManagerFunctions(paramsPermitVaultManager[i].vaultManager).permit(
-                    paramsPermitVaultManager[i].owner,
-                    address(this),
-                    true,
-                    paramsPermitVaultManager[i].deadline,
-                    paramsPermitVaultManager[i].v,
-                    paramsPermitVaultManager[i].r,
-                    paramsPermitVaultManager[i].s
-                );
-            } else break;
-        }
-        mixer(paramsPermit, paramsTransfer, paramsSwap, actions, data);
-        // Storing the index at which starting the iteration for revoking approvals in a variable would make the stack
-        // too deep
-        for (uint256 i = 0; i < paramsPermitVaultManager.length; i++) {
-            if (!paramsPermitVaultManager[i].approved) {
-                IVaultManagerFunctions(paramsPermitVaultManager[i].vaultManager).permit(
-                    paramsPermitVaultManager[i].owner,
-                    address(this),
-                    false,
-                    paramsPermitVaultManager[i].deadline,
-                    paramsPermitVaultManager[i].v,
-                    paramsPermitVaultManager[i].r,
-                    paramsPermitVaultManager[i].s
-                );
-            }
-        }
+    /// @inheritdoc BaseRouter
+    function _get1InchRouter() internal view override returns (address) {
+        return oneInch;
     }
 
-    receive() external payable {}
+    /// @inheritdoc BaseRouter
+    function _getUniswapRouter() internal view override returns (IUniswapV3Router) {
+        return uniswapV3Router;
+    }
 
-    // ========================= INTERNAL UTILITY FUNCTIONS ========================
-    // Most internal utility functions have a wrapper built on top of it
+    /// @inheritdoc BaseRouter
+    function _getNativeWrapper() internal pure override returns (IWETH9) {
+        return WETH9;
+    }
+
+    /// @inheritdoc BaseRouter
+    function _wrap(uint256 amount, uint256 minAmountOut) internal override returns (uint256 amountOut) {
+        amountOut = WSTETH.wrap(amount);
+        _slippageCheck(amountOut, minAmountOut);
+    }
+
+    /// @inheritdoc BaseRouter
+    function _unwrap(
+        uint256 amount,
+        uint256 minAmountOut,
+        address to
+    ) internal override returns (uint256 amountOut) {
+        amountOut = WSTETH.unwrap(amount);
+        _slippageCheck(amountOut, minAmountOut);
+        if (to != address(0)) IERC20(address(STETH)).safeTransfer(to, amountOut);
+    }
+
+    /// @notice Wraps ETH directly to wstETH in one transaction
+    function _wrapMultiple(uint256 minAmountOut) internal {
+        uint256 amountOut = STETH.getSharesByPooledEth(msg.value);
+        _slippageCheck(amountOut, minAmountOut);
+        //solhint-disable-next-line
+        (bool success, bytes memory result) = address(WSTETH).call{ value: msg.value }("");
+        if (!success) _revertBytes(result);
+    }
 
     /// @notice Internal version of the `claimRewards` function
     /// Allows to claim rewards for multiple gauges and perpetuals at once
@@ -743,8 +285,8 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
     /// `addressProcessed` is true
     /// @dev If the caller wants to send the rewards to another account than `gaugeUser` it first needs to
     /// call `set_rewards_receiver(otherAccount)` on each `liquidityGauge`
-    /// @dev The function only takes rewards received by users,
-    function _claimRewards(
+    /// @dev The function only takes rewards received by users
+    function _claimRewardsWithPerps(
         address gaugeUser,
         address[] memory liquidityGauges,
         uint256[] memory perpetualIDs,
@@ -780,24 +322,6 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         VEANGLE.deposit_for(user, amount);
     }
 
-    /// @notice Allows to call angle builder actions on VaultManager (Angle Protocol borrowing module)
-    /// @param vaultManager Address of the vault to perform actions on
-    /// @param actionsBorrow Actions type to perform on the vaultManager
-    /// @param dataBorrow Data needed for each actions
-    /// @param to Address to send the funds to
-    /// @param who Address Swapper to handle repayments
-    /// @param repayData Bytes to use at the discretion of the msg.sender
-    function _angleBorrower(
-        address vaultManager,
-        ActionBorrowType[] memory actionsBorrow,
-        bytes[] memory dataBorrow,
-        address to,
-        address who,
-        bytes memory repayData
-    ) internal returns (PaymentData memory paymentData) {
-        return IVaultManagerFunctions(vaultManager).angle(actionsBorrow, dataBorrow, msg.sender, to, who, repayData);
-    }
-
     /// @notice Allows to claim weekly interest distribution and if wanted to transfer it to the `angleRouter` for future use
     /// @param user Address to claim for
     /// @param _feeDistributor Address of the fee distributor to claim to
@@ -818,26 +342,6 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         } else {
             amount = 0;
         }
-    }
-
-    /// @notice Internal version of the `gaugeDeposit` function
-    /// Allows to deposit tokens into a gauge
-    /// @param user Address on behalf of which deposit should be made in the gauge
-    /// @param amount Amount to stake
-    /// @param gauge LiquidityGauge to stake in
-    /// @param shouldClaimRewards Whether to claim or not previously accumulated rewards
-    /// @dev You should be cautious on who will receive the rewards (if `shouldClaimRewards` is true)
-    /// It can be set on each gauge
-    /// @dev In the `mixer`, before calling for this action, user should have made sure to get in the router
-    /// the associated token (by like a  `deposit` action)
-    /// @dev The function will revert if the gauge has not already been approved by the contract
-    function _gaugeDeposit(
-        address user,
-        uint256 amount,
-        ILiquidityGauge gauge,
-        bool shouldClaimRewards
-    ) internal {
-        gauge.deposit(amount, user, shouldClaimRewards);
     }
 
     /// @notice Internal version of the `mint` functions
@@ -984,7 +488,6 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
             (, Pairs memory pairs) = _getInternalContracts(IERC20(stablecoinOrPerpetualManager), IERC20(collateral));
             stablecoinOrPerpetualManager = address(pairs.perpetualManager);
         }
-
         return
             IPerpetualManagerFrontWithClaim(stablecoinOrPerpetualManager).openPerpetual(
                 owner,
@@ -1018,217 +521,117 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         IPerpetualManagerFrontWithClaim(stablecoinOrPerpetualManager).addToPerpetual(perpetualID, margin);
     }
 
-    /// @notice Mints `shares` from an ERC4626 `SavingsRate` contract
-    /// @param savingsRate ERC4626 `SavingsRate` to mint shares from
-    /// @param shares Amount of shares to mint from `savingsRate`
-    /// @param to Address to which shares should be sent
-    /// @param maxAmountIn Max amount of assets used to mint
-    /// @return amountIn Amount of assets used to mint by `to`
-    function _mintSavingsRate(
-        IERC4626 savingsRate,
-        uint256 shares,
-        address to,
-        uint256 maxAmountIn
-    ) internal returns (uint256 amountIn) {
-        if (maxAmountIn < (amountIn = savingsRate.mint(shares, to))) revert TooSmallAmountOut();
+    // ============================ GOVERNANCE UTILITIES ===========================
+
+    /// @notice Changes the guardian or the governor address
+    /// @param admin New guardian or guardian address
+    /// @param setGovernor Whether to set Governor if true, or Guardian if false
+    /// @dev There can only be one guardian and one governor address in the router
+    /// and both need to be different
+    function setGovernorOrGuardian(address admin, bool setGovernor) external onlyGovernorOrGuardian {
+        if (admin == address(0)) revert ZeroAddress();
+        if (guardian == admin || governor == admin) revert InvalidAddress();
+        if (setGovernor) governor = admin;
+        else guardian = admin;
+        emit AdminChanged(admin, setGovernor);
     }
 
-    /// @notice Deposits `amount` to an ERC4626 `SavingsRate` contract
-    /// @param savingsRate The ERC4626 `SavingsRate` to deposit assets to
-    /// @param amount Amount of assets to deposit
-    /// @param to Address to which shares should be sent
-    /// @param minSharesOut Minimum amount of `SavingsRate` shares that `to` should received
-    /// @return sharesOut Amount of shares received by `to`
-    function _depositSavingsRate(
-        IERC4626 savingsRate,
-        uint256 amount,
-        address to,
-        uint256 minSharesOut
-    ) internal returns (uint256 sharesOut) {
-        if ((sharesOut = savingsRate.deposit(amount, to)) < minSharesOut) revert TooSmallAmountOut();
+    /// @notice Adds a new `StableMaster`
+    /// @param stablecoin Address of the new stablecoin
+    /// @param stableMaster Address of the new `StableMaster`
+    function addStableMaster(IERC20 stablecoin, IStableMasterFront stableMaster) external onlyGovernorOrGuardian {
+        // No need to check if the `stableMaster` address is a zero address as otherwise the call to `stableMaster.agToken()`
+        // would revert
+        if (address(stablecoin) == address(0)) revert ZeroAddress();
+        if (address(mapStableMasters[stablecoin]) != address(0)) revert AlreadyAdded();
+        if (stableMaster.agToken() != address(stablecoin)) revert InvalidToken();
+        mapStableMasters[stablecoin] = stableMaster;
+        emit StablecoinAdded(address(stableMaster));
     }
 
-    /// @notice Withdraws `amount` from an ERC4626 `SavingsRate` contract
-    /// @param savingsRate ERC4626 `SavingsRate` to withdraw assets from
-    /// @param amount Amount of assets to withdraw
-    /// @param to Destination of assets
-    /// @param maxSharesOut Maximum amount of shares that should be burnt in the operation
-    /// @return sharesOut Amount of shares burnt
-    function _withdrawSavingsRate(
-        IERC4626 savingsRate,
-        uint256 amount,
-        address to,
-        uint256 maxSharesOut
-    ) internal returns (uint256 sharesOut) {
-        if (maxSharesOut < (sharesOut = savingsRate.withdraw(amount, to, msg.sender))) revert TooSmallAmountOut();
-    }
-
-    /// @notice Redeems `shares` from an ERC4626 `SavingsRate` contract
-    /// @param savingsRate ERC4626 `SavingsRate` to redeem shares from
-    /// @param shares Amount of shares to redeem
-    /// @param to Destination of assets
-    /// @param minAmountOut Minimum amount of assets that `to` should receive in the redemption process
-    /// @return amountOut Amount of assets received by `to`
-    function _redeemSavingsRate(
-        IERC4626 savingsRate,
-        uint256 shares,
-        address to,
-        uint256 minAmountOut
-    ) internal returns (uint256 amountOut) {
-        if ((amountOut = savingsRate.redeem(shares, to, msg.sender)) < minAmountOut) revert TooSmallAmountOut();
-    }
-
-    /// @notice Processes the redemption of `shares` shares from an ERC4626 `SavingsRate` contract with
-    /// potentially illiquid strategies
-    /// @param savingsRate ERC4626 `SavingsRate` to redeem shares from
-    /// @param shares Amount of shares to redeem
-    /// @param to Destination of assets
-    /// @param minAmountOut Minimum amount of assets that `to` should receive in the transaction
-    /// @return amountOut Amount of assets received by `to`
-    /// @dev Note that when calling this function the user does not have the guarantee that all shares
-    /// will be immediately processed and some shares may be leftover to claim
-    /// @dev If `to` is the router address, if there are leftover funds that cannot be immediately claimed in the
-    /// transaction then they will be lost, meaning that anyone will be able to claim them
-    function _prepareRedeemSavingsRate(
-        ISavingsRateIlliquid savingsRate,
-        uint256 shares,
-        address to,
-        uint256 minAmountOut
-    ) internal returns (uint256 amountOut) {
-        if ((amountOut = savingsRate.prepareRedeem(shares, to, msg.sender)) < minAmountOut) revert TooSmallAmountOut();
-    }
-
-    /// @notice Claims assets from previously shares previously sent by `receiver` to the
-    /// `ssavingsRate` contract
-    /// @return amountOut Amount of assets obtained during the claim
-    function _claimRedeemSavingsRate(
-        ISavingsRateIlliquid savingsRate,
-        address receiver,
-        address[] memory strategiesToClaim
-    ) internal returns (uint256 amountOut) {
-        return savingsRate.claimRedeem(receiver, strategiesToClaim);
-    }
-
-    /// @notice Parses the actions submitted to the router contract to interact with a `VaultManager` and makes sure that
-    /// the calling address is well approved for all the vaults with which it is interacting
-    /// @dev If such check was not made, we could end up in a situation where an address has given an approval for all its
-    /// vaults to the router contract, and another address takes advantage of this to instruct actions on these other vaults
-    /// to the router: it is hence super important for the router to pay attention to the fact that the addresses interacting
-    /// with a vault are approved for this vault
-    function _parseVaultIDs(
-        ActionBorrowType[] memory actionsBorrow,
-        bytes[] memory dataBorrow,
-        address vaultManager
-    ) internal view {
-        if (actionsBorrow.length >= _MAX_TOKENS) revert IncompatibleLengths();
-        // The amount of vaults to check cannot be bigger than the maximum amount of tokens
-        // supported
-        uint256[_MAX_TOKENS] memory vaultIDsToCheckOwnershipOf;
-        bool createVaultAction;
-        uint256 lastVaultID;
-        uint256 vaultIDLength;
-        for (uint256 i = 0; i < actionsBorrow.length; i++) {
-            uint256 vaultID;
-            // If there is a createVault action, the router should not worry about looking at
-            // next vaultIDs given equal to 0
-            if (actionsBorrow[i] == ActionBorrowType.createVault) {
-                createVaultAction = true;
-                continue;
-                // There are then different ways depending on the action to find the `vaultID`
-            } else if (
-                actionsBorrow[i] == ActionBorrowType.removeCollateral || actionsBorrow[i] == ActionBorrowType.borrow
-            ) {
-                (vaultID, ) = abi.decode(dataBorrow[i], (uint256, uint256));
-            } else if (actionsBorrow[i] == ActionBorrowType.closeVault) {
-                vaultID = abi.decode(dataBorrow[i], (uint256));
-            } else if (actionsBorrow[i] == ActionBorrowType.getDebtIn) {
-                (vaultID, , , ) = abi.decode(dataBorrow[i], (uint256, address, uint256, uint256));
-            } else continue;
-            // If we need to add a null `vaultID`, we look at the `vaultIDCount` in the `VaultManager`
-            // if there has not been any specific action
-            if (vaultID == 0) {
-                if (createVaultAction) {
-                    continue;
-                } else {
-                    // If we haven't stored the last `vaultID`, we need to fetch it
-                    if (lastVaultID == 0) {
-                        lastVaultID = IVaultManagerStorage(vaultManager).vaultIDCount();
-                    }
-                    vaultID = lastVaultID;
-                }
-            }
-
-            // Check if this `vaultID` has already been verified
-            for (uint256 j = 0; j < vaultIDLength; j++) {
-                if (vaultIDsToCheckOwnershipOf[j] == vaultID) {
-                    // If yes, we continue to the next iteration
-                    continue;
-                }
-            }
-            // Verify this new vaultID and add it to the list
-            if (!IVaultManagerFunctions(vaultManager).isApprovedOrOwner(msg.sender, vaultID)) {
-                revert NotApprovedOrOwner();
-            }
-            vaultIDsToCheckOwnershipOf[vaultIDLength] = vaultID;
-            vaultIDLength += 1;
+    /// @notice Adds new collateral types to specific stablecoins
+    /// @param stablecoins Addresses of the stablecoins associated to the `StableMaster` of interest
+    /// @param poolManagers Addresses of the `PoolManager` contracts associated to the pair (stablecoin,collateral)
+    /// @param liquidityGauges Addresses of liquidity gauges contract associated to sanToken
+    function addPairs(
+        IERC20[] calldata stablecoins,
+        IPoolManager[] calldata poolManagers,
+        ILiquidityGauge[] calldata liquidityGauges
+    ) external onlyGovernorOrGuardian {
+        if (poolManagers.length != stablecoins.length || liquidityGauges.length != stablecoins.length)
+            revert IncompatibleLengths();
+        for (uint256 i = 0; i < stablecoins.length; i++) {
+            IStableMasterFront stableMaster = mapStableMasters[stablecoins[i]];
+            _addPair(stableMaster, poolManagers[i], liquidityGauges[i]);
         }
     }
 
-    /// @notice Checks if collateral in the list
-    /// @param list List of addresses
-    /// @param searchFor Address of interest
-    /// @return index Place of the address in the list if it is in or current length otherwise
-    function _searchList(address[_MAX_TOKENS] memory list, address searchFor) internal pure returns (uint256 index) {
-        uint256 i;
-        while (i < list.length && list[i] != address(0)) {
-            if (list[i] == searchFor) return i;
-            i++;
+    /// @notice Sets new `liquidityGauge` contract for the associated sanTokens
+    /// @param stablecoins Addresses of the stablecoins
+    /// @param collaterals Addresses of the collaterals
+    /// @param newLiquidityGauges Addresses of the new liquidity gauges contract
+    /// @dev If `newLiquidityGauge` is null, this means that there is no liquidity gauge for this pair
+    /// @dev This function could be used to simply revoke the approval to a liquidity gauge
+    function setLiquidityGauges(
+        IERC20[] calldata stablecoins,
+        IERC20[] calldata collaterals,
+        ILiquidityGauge[] calldata newLiquidityGauges
+    ) external onlyGovernorOrGuardian {
+        if (collaterals.length != stablecoins.length || newLiquidityGauges.length != stablecoins.length)
+            revert IncompatibleLengths();
+        for (uint256 i = 0; i < stablecoins.length; i++) {
+            IStableMasterFront stableMaster = mapStableMasters[stablecoins[i]];
+            Pairs storage pairs = mapPoolManagers[stableMaster][collaterals[i]];
+            ILiquidityGauge gauge = pairs.gauge;
+            ISanToken sanToken = pairs.sanToken;
+            if (address(stableMaster) == address(0) || address(pairs.poolManager) == address(0)) revert ZeroAddress();
+            pairs.gauge = newLiquidityGauges[i];
+            if (address(gauge) != address(0)) {
+                sanToken.approve(address(gauge), 0);
+            }
+            if (address(newLiquidityGauges[i]) != address(0)) {
+                // Checking compatibility of the staking token: it should be the sanToken
+                if (address(newLiquidityGauges[i].staking_token()) != address(sanToken)) revert InvalidToken();
+                sanToken.approve(address(newLiquidityGauges[i]), type(uint256).max);
+            }
+            emit SanTokenLiquidityGaugeUpdated(address(sanToken), address(newLiquidityGauges[i]));
         }
-        return i;
     }
 
-    /// @notice Modifies stored balances for a given collateral
-    /// @param list List of collateral addresses
-    /// @param balances List of balances for the different supported collateral types
-    /// @param searchFor Address of the collateral of interest
-    /// @param amount Amount to add in the balance for this collateral
-    function _addToList(
-        address[_MAX_TOKENS] memory list,
-        uint256[_MAX_TOKENS] memory balances,
-        address searchFor,
-        uint256 amount
-    ) internal pure {
-        uint256 index = _searchList(list, searchFor);
-        // add it to the list if non existent and we add tokens
-        if (list[index] == address(0)) list[index] = searchFor;
-        balances[index] += amount;
+    /// @notice Change allowance for a contract.
+    /// @param tokens Addresses of the tokens to allow
+    /// @param spenders Addresses to allow transfer
+    /// @param amounts Amounts to allow
+    /// @dev Approvals are normally given in the `addGauges` method, in the initializer and in
+    /// the internal functions to process swaps with Uniswap and 1Inch
+    function changeAllowance(
+        IERC20[] calldata tokens,
+        address[] calldata spenders,
+        uint256[] calldata amounts
+    ) external onlyGovernorOrGuardian {
+        if (tokens.length != spenders.length || tokens.length != amounts.length) revert IncompatibleLengths();
+        for (uint256 i = 0; i < tokens.length; i++) {
+            _changeAllowance(tokens[i], spenders[i], amounts[i]);
+        }
     }
 
-    /// @notice Computes the proportion of the collateral leftover balance to use for a given action
-    /// @param proportion Ratio to take from balance
-    /// @param list Collateral list
-    /// @param balances Balances of each collateral asset in the collateral list
-    /// @param searchFor Collateral to look for
-    /// @param isProportion Whether the `proportion` parameter is to be seen as an actual proportion or as a full amount
-    /// @return amount Amount to use for the action (based on the proportion given)
-    /// @dev To use all the collateral balance available for an action, users should give `proportion` a value of
-    /// `BASE_PARAMS`
-    function _computeProportion(
-        uint256 proportion,
-        address[_MAX_TOKENS] memory list,
-        uint256[_MAX_TOKENS] memory balances,
-        address searchFor,
-        bool isProportion
-    ) internal pure returns (uint256 amount) {
-        uint256 index = _searchList(list, searchFor);
-
-        // Reverts if the index was not found
-        if (list[index] == address(0)) revert InvalidConditions();
-
-        if (isProportion) amount = (proportion * balances[index]) / BASE_PARAMS;
-        else amount = proportion;
-        balances[index] -= amount;
+    /// @notice Supports recovering any tokens as the router does not own any other tokens than
+    /// the one mistakenly sent
+    /// @param tokenAddress Address of the token to transfer
+    /// @param to Address to give tokens to
+    /// @param tokenAmount Amount of tokens to transfer
+    /// @dev If tokens are mistakenly sent to this contract, any address can take advantage of the `mixer` function
+    /// below to get the funds back
+    function recoverERC20(
+        address tokenAddress,
+        address to,
+        uint256 tokenAmount
+    ) external onlyGovernorOrGuardian {
+        IERC20(tokenAddress).safeTransfer(to, tokenAmount);
+        emit Recovered(tokenAddress, to, tokenAmount);
     }
+
+    // ========================= INTERNAL UTILITY FUNCTIONS ========================
 
     /// @notice Gets Angle contracts associated to a pair (stablecoin, collateral)
     /// @param stablecoin Token associated to a `StableMaster`
@@ -1309,156 +712,7 @@ contract AngleRouter is Initializable, ReentrancyGuardUpgradeable {
         emit CollateralToggled(address(stableMaster), address(poolManager), address(liquidityGauge));
     }
 
-    /// @notice Changes allowance of this contract for a given token
-    /// @param token Address of the token to change allowance
-    /// @param spender Address to change the allowance of
-    /// @param amount Amount allowed
-    function _changeAllowance(
-        IERC20 token,
-        address spender,
-        uint256 amount
-    ) internal {
-        uint256 currentAllowance = token.allowance(address(this), spender);
-        if (currentAllowance < amount) {
-            token.safeIncreaseAllowance(spender, amount - currentAllowance);
-        } else if (currentAllowance > amount) {
-            token.safeDecreaseAllowance(spender, currentAllowance - amount);
-        }
-    }
-
-    /// @notice Transfers collateral or an arbitrary token which is then swapped on UniswapV3 or on 1Inch
-    /// @param inToken Token to swap for the collateral
-    /// @param amount Amount of in token to swap for the collateral
-    /// @param minAmountOut Minimum amount accepted for the swap to happen
-    /// @param swapType Choice on which contracts to swap
-    /// @param args Bytes representing either the path to swap your input token to the accepted collateral on Uniswap or payload for 1Inch
-    /// @dev The `path` provided is not checked, meaning people could swap for a token A and declare that they've swapped for another token B.
-    /// However, the mixer manipulates its token balance only through the addresses registered in `listTokens`, so any subsequent mixer action
-    /// trying to transfer funds B will do it through address of token A and revert as A is not actually funded.
-    /// In case there is not subsequent action, `mixer` will revert when trying to send back what appears to be remaining tokens A.
-    function _transferAndSwap(
-        IERC20 inToken,
-        uint256 amount,
-        uint256 minAmountOut,
-        SwapType swapType,
-        bytes memory args
-    ) internal returns (uint256) {
-        if (address(this).balance >= amount) {
-            if (address(inToken) == address(WETH9)) {
-                WETH9.deposit{ value: amount }(); // wrap only what is needed to pay
-            } else if (address(inToken) == address(WSTETH)) {
-                uint256 amountOut = STETH.getSharesByPooledEth(amount);
-                //solhint-disable-next-line
-                (bool success, bytes memory result) = address(WSTETH).call{ value: amount }("");
-                if (!success) _revertBytes(result);
-                amount = amountOut;
-            }
-        } else {
-            inToken.safeTransferFrom(msg.sender, address(this), amount);
-        }
-        return _swap(inToken, amount, minAmountOut, swapType, args);
-    }
-
-    /// @notice swap an amount of inToken
-    /// @param inToken Token to swap for the collateral
-    /// @param amount Amount of in token to swap for the collateral
-    /// @param minAmountOut Minimum amount accepted for the swap to happen
-    /// @param swapType Choice on which contracts to swap
-    function _swap(
-        IERC20 inToken,
-        uint256 amount,
-        uint256 minAmountOut,
-        SwapType swapType,
-        bytes memory args
-    ) internal returns (uint256 amountOut) {
-        if (swapType == SwapType.UniswapV3) amountOut = _swapOnUniswapV3(inToken, amount, minAmountOut, args);
-        else if (swapType == SwapType.oneINCH) amountOut = _swapOn1Inch(inToken, args);
-        else if (swapType == SwapType.WrapStETH) amountOut = WSTETH.wrap(amount);
-        else if (swapType == SwapType.None) amountOut = amount;
-        else revert InvalidCall();
-        if (amountOut < minAmountOut) revert TooSmallAmountOut();
-    }
-
-    /// @notice Allows to swap any token to an accepted collateral via UniswapV3 (if there is a path)
-    /// @param inToken Address token used as entrance of the swap
-    /// @param amount Amount of in token to swap for the accepted collateral
-    /// @param minAmountOut Minimum amount accepted for the swap to happen
-    /// @param path Bytes representing the path to swap your input token to the accepted collateral
-    function _swapOnUniswapV3(
-        IERC20 inToken,
-        uint256 amount,
-        uint256 minAmountOut,
-        bytes memory path
-    ) internal returns (uint256 amountOut) {
-        // Approve transfer to the `uniswapV3Router` if it is the first time that the token is used
-        if (!uniAllowedToken[inToken]) {
-            inToken.safeApprove(address(uniswapV3Router), type(uint256).max);
-            uniAllowedToken[inToken] = true;
-        }
-        amountOut = uniswapV3Router.exactInput(
-            ExactInputParams(path, address(this), block.timestamp, amount, minAmountOut)
-        );
-    }
-
-    /// @notice Allows to swap any token to an accepted collateral via 1Inch Router
-    /// @param payload Bytes needed for 1Inch router to process the swap
-    /// @dev The `payload` given is expected to be obtained from 1Inch API
-    function _swapOn1Inch(IERC20 inToken, bytes memory payload) internal returns (uint256 amountOut) {
-        // Approve transfer to the `oneInch` router if it is the first time the token is used
-        if (!oneInchAllowedToken[inToken]) {
-            inToken.safeApprove(address(oneInch), type(uint256).max);
-            oneInchAllowedToken[inToken] = true;
-        }
-
-        //solhint-disable-next-line
-        (bool success, bytes memory result) = oneInch.call(payload);
-        if (!success) _revertBytes(result);
-
-        amountOut = abi.decode(result, (uint256));
-    }
-
-    //  @notice Use an external swapper
-    //  @param swapper Contracts implementing the logic of the swap.
-    //  @param inToken Token used to do the swap.
-    //  @param outToken The token wanted.
-    //  @param outTokenRecipient Address who should have at the end of the swap at least `outTokenOwed`.
-    //  @param outTokenOwed Minimal amount for the `outTokenRecipient`.
-    //  @param inTokenObtained Amount of `inToken` used for the swap.
-    //  @param data Additional info for the specific swapper.
-    function _swapper(
-        ISwapper swapper,
-        IERC20 inToken,
-        IERC20 outToken,
-        address outTokenRecipient,
-        uint256 outTokenOwed,
-        uint256 inTokenObtained,
-        bytes memory data
-    ) internal {
-        swapper.swap(inToken, outToken, outTokenRecipient, outTokenOwed, inTokenObtained, data);
-    }
-
-    /// @notice Internal function used for error handling
-    function _revertBytes(bytes memory errMsg) internal pure {
-        if (errMsg.length > 0) {
-            //solhint-disable-next-line
-            assembly {
-                revert(add(32, errMsg), mload(errMsg))
-            }
-        }
-        revert InvalidReturnMessage();
-    }
-
-    // /// For context, we give here the initialize function that was used for this contract in another implementation
-    // /// @notice Deploys the `AngleRouter` contract
-    // /// @param _governor Governor address
-    // /// @param _guardian Guardian address
-    // /// @param _uniswapV3Router UniswapV3 router address
-    // /// @param _oneInch 1Inch aggregator address
-    // /// @param existingStableMaster Address of the existing `StableMaster`
-    // /// @param existingPoolManagers Addresses of the associated poolManagers
-    // /// @param existingLiquidityGauges Addresses of liquidity gauge contracts associated to sanTokens
-    // /// @dev Be cautious with safe approvals, all tokens will have unlimited approvals within the protocol or
-    // /// UniswapV3 and 1Inch
+    /// For context, we give here the initialize function that was used for this contract in another implementation
     // function initialize(
     //     address _governor,
     //     address _guardian,
