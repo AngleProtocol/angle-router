@@ -14,13 +14,13 @@ import {
   MockSavingsRateIlliquid__factory,
   MockTokenPermit,
   MockTokenPermit__factory,
-} from '../../../../typechain';
-import { expect } from '../../../../utils/chai-setup';
-import { ActionTypeSidechain, initToken, TypePermit } from '../../../../utils/helpers';
-import { signPermit } from '../../../../utils/sign';
-import { deployUpgradeable } from '../../utils/helpers';
+} from '../../../typechain';
+import { expect } from '../../../utils/chai-setup';
+import { ActionType, initToken, TypePermit } from '../../../utils/helpers';
+import { signPermit } from '../../../utils/sign';
+import { deployUpgradeable } from '../utils/helpers';
 
-contract('BaseAngleRouterSidechain - ERC4626 functionalities', () => {
+contract('BaseRouter - ERC4626 functionalities', () => {
   // As a proxy for the AngleRouter sidechain we're using the Polygon implementation of it
   let deployer: SignerWithAddress;
   let USDC: MockTokenPermit;
@@ -98,7 +98,7 @@ contract('BaseAngleRouterSidechain - ERC4626 functionalities', () => {
         [USDC.address, strat.address, parseEther('1'), bob.address, parseEther('100')],
       );
 
-      const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.mintSavingsRate];
+      const actions = [ActionType.transfer, ActionType.mintSavingsRate];
       const dataMixer = [transferData, mintData];
 
       await router.connect(alice).mixer(permits, actions, dataMixer);
@@ -131,7 +131,7 @@ contract('BaseAngleRouterSidechain - ERC4626 functionalities', () => {
         [USDC.address, strat.address, parseEther('1'), bob.address, parseEther('100')],
       );
 
-      const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.mintSavingsRate];
+      const actions = [ActionType.transfer, ActionType.mintSavingsRate];
       const dataMixer = [transferData, mintData];
       await router.connect(alice).mixer(permits, actions, dataMixer);
 
@@ -147,7 +147,7 @@ contract('BaseAngleRouterSidechain - ERC4626 functionalities', () => {
       await USDC.connect(deployer).approve(router.address, parseUnits('1000', 6));
       await router
         .connect(deployer)
-        .mixer([], [ActionTypeSidechain.transfer, ActionTypeSidechain.mintSavingsRate], [transferData2, mintData2]);
+        .mixer([], [ActionType.transfer, ActionType.mintSavingsRate], [transferData2, mintData2]);
 
       expect(await USDC.balanceOf(bob.address)).to.be.equal(0);
       expect(await USDC.balanceOf(alice.address)).to.be.equal(parseUnits('999', 6));
@@ -178,7 +178,7 @@ contract('BaseAngleRouterSidechain - ERC4626 functionalities', () => {
         ['address', 'address', 'uint256', 'address', 'uint256'],
         [USDC.address, strat.address, parseEther('1'), bob.address, parseEther('0')],
       );
-      const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.mintSavingsRate];
+      const actions = [ActionType.transfer, ActionType.mintSavingsRate];
       const dataMixer = [transferData, mintData];
       await expect(router.connect(alice).mixer(permits, actions, dataMixer)).to.be.reverted;
     });
@@ -207,7 +207,7 @@ contract('BaseAngleRouterSidechain - ERC4626 functionalities', () => {
         [USDC.address, strat.address, parseUnits('1', 6), bob.address, parseEther('0')],
       );
 
-      const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.depositSavingsRate];
+      const actions = [ActionType.transfer, ActionType.depositSavingsRate];
       const dataMixer = [transferData, mintData];
 
       await router.connect(alice).mixer(permits, actions, dataMixer);
@@ -240,7 +240,7 @@ contract('BaseAngleRouterSidechain - ERC4626 functionalities', () => {
         [USDC.address, strat.address, parseUnits('1', 6), bob.address, parseEther('0')],
       );
 
-      const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.depositSavingsRate];
+      const actions = [ActionType.transfer, ActionType.depositSavingsRate];
       const dataMixer = [transferData, mintData];
 
       await router.connect(alice).mixer(permits, actions, dataMixer);
@@ -257,7 +257,7 @@ contract('BaseAngleRouterSidechain - ERC4626 functionalities', () => {
       await USDC.connect(deployer).approve(router.address, parseUnits('1000', 6));
       await router
         .connect(deployer)
-        .mixer([], [ActionTypeSidechain.transfer, ActionTypeSidechain.depositSavingsRate], [transferData2, mintData2]);
+        .mixer([], [ActionType.transfer, ActionType.depositSavingsRate], [transferData2, mintData2]);
 
       expect(await USDC.balanceOf(bob.address)).to.be.equal(0);
       expect(await USDC.balanceOf(alice.address)).to.be.equal(parseUnits('999', 6));
@@ -290,7 +290,7 @@ contract('BaseAngleRouterSidechain - ERC4626 functionalities', () => {
         [USDC.address, strat.address, parseUnits('1', 6), bob.address, parseEther('1000')],
       );
 
-      const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.depositSavingsRate];
+      const actions = [ActionType.transfer, ActionType.depositSavingsRate];
       const dataMixer = [transferData, mintData];
 
       await expect(router.connect(alice).mixer(permits, actions, dataMixer)).to.be.revertedWith('TooSmallAmountOut');
@@ -327,11 +327,7 @@ contract('BaseAngleRouterSidechain - ERC4626 functionalities', () => {
         [USDC.address, strat.address, parseUnits('1', 6), bob.address, parseEther('0')],
       );
       const dataMixer = [transferData, swapData, mintData];
-      const actions = [
-        ActionTypeSidechain.transfer,
-        ActionTypeSidechain.oneInch,
-        ActionTypeSidechain.depositSavingsRate,
-      ];
+      const actions = [ActionType.transfer, ActionType.oneInch, ActionType.depositSavingsRate];
       await router.connect(alice).mixer([], actions, dataMixer);
       expect(await DAI.balanceOf(oneInch.address)).to.be.equal(parseEther('1'));
       expect(await USDC.balanceOf(strat.address)).to.be.equal(parseUnits('1', 6));
@@ -372,11 +368,7 @@ contract('BaseAngleRouterSidechain - ERC4626 functionalities', () => {
         [strat.address, parseEther('1'), bob.address, parseUnits('0', 6)],
       );
 
-      const actions = [
-        ActionTypeSidechain.transfer,
-        ActionTypeSidechain.mintSavingsRate,
-        ActionTypeSidechain.redeemSavingsRate,
-      ];
+      const actions = [ActionType.transfer, ActionType.mintSavingsRate, ActionType.redeemSavingsRate];
       const dataMixer = [transferData, mintData, redeemData];
 
       await strat.connect(alice).approve(router.address, parseEther('13'));
@@ -398,7 +390,7 @@ contract('BaseAngleRouterSidechain - ERC4626 functionalities', () => {
         [strat.address, parseEther('1'), bob.address, parseUnits('0', 6)],
       );
 
-      const actions = [ActionTypeSidechain.redeemSavingsRate];
+      const actions = [ActionType.redeemSavingsRate];
       const dataMixer = [redeemData];
 
       await strat.connect(alice).approve(router.address, parseEther('1300'));
@@ -420,7 +412,7 @@ contract('BaseAngleRouterSidechain - ERC4626 functionalities', () => {
         [strat.address, parseEther('1'), bob.address, parseUnits('10', 6)],
       );
 
-      const actions = [ActionTypeSidechain.redeemSavingsRate];
+      const actions = [ActionType.redeemSavingsRate];
       const dataMixer = [redeemData];
 
       await strat.connect(alice).approve(router.address, parseEther('1300'));
@@ -458,11 +450,7 @@ contract('BaseAngleRouterSidechain - ERC4626 functionalities', () => {
         [strat.address, parseUnits('1', 6), bob.address, parseEther('2')],
       );
 
-      const actions = [
-        ActionTypeSidechain.transfer,
-        ActionTypeSidechain.mintSavingsRate,
-        ActionTypeSidechain.withdrawSavingsRate,
-      ];
+      const actions = [ActionType.transfer, ActionType.mintSavingsRate, ActionType.withdrawSavingsRate];
       const dataMixer = [transferData, mintData, redeemData];
 
       await strat.connect(alice).approve(router.address, parseEther('13'));
@@ -484,7 +472,7 @@ contract('BaseAngleRouterSidechain - ERC4626 functionalities', () => {
         [strat.address, parseUnits('1', 6), bob.address, parseEther('100')],
       );
 
-      const actions = [ActionTypeSidechain.withdrawSavingsRate];
+      const actions = [ActionType.withdrawSavingsRate];
       const dataMixer = [redeemData];
 
       await strat.connect(alice).approve(router.address, parseEther('1300'));
@@ -506,7 +494,7 @@ contract('BaseAngleRouterSidechain - ERC4626 functionalities', () => {
         [strat.address, parseUnits('1', 6), bob.address, parseEther('100')],
       );
 
-      const actions = [ActionTypeSidechain.redeemSavingsRate];
+      const actions = [ActionType.redeemSavingsRate];
       const dataMixer = [redeemData];
 
       await strat.connect(alice).approve(router.address, parseEther('1300'));
@@ -547,7 +535,7 @@ contract('BaseAngleRouterSidechain - ERC4626 functionalities', () => {
         [USDC.address, parseUnits('0', USDCdecimal), bob.address],
       );
 
-      const actions = [ActionTypeSidechain.withdrawSavingsRate, ActionTypeSidechain.oneInch, ActionTypeSidechain.sweep];
+      const actions = [ActionType.withdrawSavingsRate, ActionType.oneInch, ActionType.sweep];
       const dataMixer = [redeemData, swapData, sweepData];
 
       await router.connect(alice).mixer([], actions, dataMixer);
@@ -589,11 +577,7 @@ contract('BaseAngleRouterSidechain - ERC4626 functionalities', () => {
         [stratIlliquid.address, parseEther('1'), bob.address, parseUnits('0', 6)],
       );
 
-      const actions = [
-        ActionTypeSidechain.transfer,
-        ActionTypeSidechain.mintSavingsRate,
-        ActionTypeSidechain.prepareRedeemSavingsRate,
-      ];
+      const actions = [ActionType.transfer, ActionType.mintSavingsRate, ActionType.prepareRedeemSavingsRate];
       const dataMixer = [transferData, mintData, redeemData];
 
       await stratIlliquid.connect(alice).approve(router.address, parseEther('13'));
@@ -615,7 +599,7 @@ contract('BaseAngleRouterSidechain - ERC4626 functionalities', () => {
         [stratIlliquid.address, parseEther('1'), bob.address, parseUnits('0', 6)],
       );
 
-      const actions = [ActionTypeSidechain.prepareRedeemSavingsRate];
+      const actions = [ActionType.prepareRedeemSavingsRate];
       const dataMixer = [redeemData];
 
       await stratIlliquid.connect(alice).approve(router.address, parseEther('1300'));
@@ -639,7 +623,7 @@ contract('BaseAngleRouterSidechain - ERC4626 functionalities', () => {
         [stratIlliquid.address, parseEther('1'), bob.address, parseUnits('0', 6)],
       );
 
-      const actions = [ActionTypeSidechain.prepareRedeemSavingsRate];
+      const actions = [ActionType.prepareRedeemSavingsRate];
       const dataMixer = [redeemData];
 
       await stratIlliquid.connect(alice).approve(router.address, parseEther('1300'));
@@ -662,7 +646,7 @@ contract('BaseAngleRouterSidechain - ERC4626 functionalities', () => {
         [stratIlliquid.address, parseEther('1'), bob.address, parseUnits('10', 6)],
       );
 
-      const actions = [ActionTypeSidechain.prepareRedeemSavingsRate];
+      const actions = [ActionType.prepareRedeemSavingsRate];
       const dataMixer = [redeemData];
 
       await stratIlliquid.connect(alice).approve(router.address, parseEther('1300'));
@@ -680,7 +664,7 @@ contract('BaseAngleRouterSidechain - ERC4626 functionalities', () => {
         [stratIlliquid.address, bob.address, []],
       );
 
-      const actions = [ActionTypeSidechain.claimRedeemSavingsRate];
+      const actions = [ActionType.claimRedeemSavingsRate];
       const dataMixer = [redeemData];
       await router.connect(alice).mixer([], actions, dataMixer);
       expect(await USDC.balanceOf(bob.address)).to.be.equal(parseUnits('300', 6));
@@ -694,7 +678,7 @@ contract('BaseAngleRouterSidechain - ERC4626 functionalities', () => {
         [stratIlliquid.address, alice.address, [alice.address]],
       );
 
-      const actions = [ActionTypeSidechain.claimRedeemSavingsRate];
+      const actions = [ActionType.claimRedeemSavingsRate];
       const dataMixer = [redeemData];
       await router.connect(alice).mixer([], actions, dataMixer);
       expect(await USDC.balanceOf(bob.address)).to.be.equal(parseUnits('0', 6));

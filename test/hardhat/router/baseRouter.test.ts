@@ -18,17 +18,16 @@ import {
   MockTokenPermit__factory,
   MockUniswapV3Router,
   MockUniswapV3Router__factory,
-} from '../../../../typechain';
-import { expect } from '../../../../utils/chai-setup';
-import { inReceipt } from '../../../../utils/expectEvent';
-import { ActionTypeSidechain, TypePermit } from '../../../../utils/helpers';
-import { deployUpgradeable, MAX_UINT256, ZERO_ADDRESS } from '../../utils/helpers';
+} from '../../../typechain';
+import { expect } from '../../../utils/chai-setup';
+import { inReceipt } from '../../../utils/expectEvent';
+import { ActionType, TypePermit } from '../../../utils/helpers';
+import { deployUpgradeable, MAX_UINT256, ZERO_ADDRESS } from '../utils/helpers';
 
-contract('BaseAngleRouterSidechain', () => {
-  // As a proxy for the AngleRouter sidechain we're using a mock Ethereum implementation of it
+contract('BaseRouter', () => {
+  // As a proxy for the BaseRouter we're using a mock Ethereum implementation of it
   let deployer: SignerWithAddress;
   let USDC: MockTokenPermit;
-  let lzAgEUR: MockTokenPermit;
   let agEUR: MockAgToken;
   let core: MockCoreBorrow;
   let alice: SignerWithAddress;
@@ -69,7 +68,6 @@ contract('BaseAngleRouterSidechain', () => {
     // If the forked-network state needs to be reset between each test, run this
     router = (await deployUpgradeable(new MockRouterSidechain__factory(deployer))) as MockRouterSidechain;
     USDC = (await new MockTokenPermit__factory(deployer).deploy('USDC', 'USDC', USDCdecimal)) as MockTokenPermit;
-    lzAgEUR = (await new MockTokenPermit__factory(deployer).deploy('lzAgEUR', 'lzAgEUR', '18')) as MockTokenPermit;
     agEUR = (await deployUpgradeable(new MockAgToken__factory(deployer))) as MockAgToken;
     await agEUR.initialize('agEUR', 'agEUR', ZERO_ADDRESS, ZERO_ADDRESS);
     uniswap = (await new MockUniswapV3Router__factory(deployer).deploy(
@@ -84,44 +82,6 @@ contract('BaseAngleRouterSidechain', () => {
     await router.initializeRouter(core.address, uniswap.address, oneInch.address);
   });
 
-  describe('initializeRouter', () => {
-    it('success - variables correctly set', async () => {
-      expect(await router.core()).to.be.equal(core.address);
-      expect(await router.uniswapV3Router()).to.be.equal(uniswap.address);
-      expect(await router.oneInch()).to.be.equal(oneInch.address);
-    });
-    it('reverts - already initialized', async () => {
-      await expect(router.initializeRouter(core.address, uniswap.address, oneInch.address)).to.be.revertedWith(
-        'Initializable: contract is already initialized',
-      );
-    });
-    it('reverts - zero address', async () => {
-      const router2 = (await deployUpgradeable(new MockRouterSidechain__factory(deployer))) as MockRouterSidechain;
-      await expect(router2.initializeRouter(ZERO_ADDRESS, uniswap.address, oneInch.address)).to.be.revertedWith(
-        'ZeroAddress',
-      );
-    });
-  });
-  describe('setCore', () => {
-    it('reverts - not governor', async () => {
-      await expect(router.connect(bob).setCore(governor)).to.be.revertedWith('NotGovernor');
-    });
-    it('reverts - invalid core contract', async () => {
-      const core2 = (await new MockCoreBorrow__factory(deployer).deploy()) as MockCoreBorrow;
-      await expect(router.connect(impersonatedSigners[governor]).setCore(core2.address)).to.be.revertedWith(
-        'NotGovernor',
-      );
-    });
-    it('success - valid core contract', async () => {
-      const core2 = (await new MockCoreBorrow__factory(deployer).deploy()) as MockCoreBorrow;
-      await core2.toggleGovernor(governor);
-      const receipt = await (await router.connect(impersonatedSigners[governor]).setCore(core2.address)).wait();
-      inReceipt(receipt, 'CoreUpdated', {
-        _core: core2.address,
-      });
-      expect(await router.core()).to.be.equal(core2.address);
-    });
-  });
   describe('changeAllowance', () => {
     it('reverts - non governor nor guardian', async () => {
       await expect(
@@ -196,10 +156,12 @@ contract('BaseAngleRouterSidechain', () => {
       expect(await agEUR.allowance(router.address, alice.address)).to.be.equal(parseEther('2'));
     });
   });
-  describe('claimRewards', () => {
-    it('success - when one gauge', async () => {
-      const gauge = (await new MockLiquidityGauge__factory(deployer).deploy(USDC.address)) as MockLiquidityGauge;
-      await router.claimRewards(bob.address, [gauge.address]);
+  describe('setRouter', () => {
+    it('reverts - non governor nor guardian or zero address', async () => {
+      await expect(router.connect(deployer).setRouter(bob.address, 0)).to.be.revertedWith('NotGovernorOrGuardian');
+      await expect(router.connect(impersonatedSigners[governor]).setRouter(ZERO_ADDRESS, 0)).to.be.revertedWith(
+        'ZeroAddress',
+      );
     });
   });
   describe('mixer', () => {
@@ -212,7 +174,7 @@ contract('BaseAngleRouterSidechain', () => {
           ['address', 'address', 'uint256'],
           [USDC.address, router.address, parseUnits('0.3', USDCdecimal)],
         );
-        const actions = [ActionTypeSidechain.transfer];
+        const actions = [ActionType.transfer];
         const dataMixer = [transferData];
 
         await router.connect(alice).mixer(permits, actions, dataMixer);
@@ -232,7 +194,7 @@ contract('BaseAngleRouterSidechain', () => {
           ['address', 'uint256', 'address'],
           [USDC.address, parseUnits('0', USDCdecimal), bob.address],
         );
-        const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.sweep];
+        const actions = [ActionType.transfer, ActionType.sweep];
         const dataMixer = [transferData, sweepData];
 
         await router.connect(alice).mixer(permits, actions, dataMixer);
@@ -250,7 +212,7 @@ contract('BaseAngleRouterSidechain', () => {
           ['address', 'uint256', 'address'],
           [USDC.address, parseUnits('0', USDCdecimal), bob.address],
         );
-        const actions = [ActionTypeSidechain.sweep];
+        const actions = [ActionType.sweep];
         const dataMixer = [sweepData];
         await router.connect(alice).mixer(permits, actions, dataMixer);
         expect(await USDC.balanceOf(bob.address)).to.be.equal(0);
@@ -263,7 +225,7 @@ contract('BaseAngleRouterSidechain', () => {
           ['address', 'address', 'uint256'],
           [USDC.address, router.address, parseUnits('0.3', USDCdecimal)],
         );
-        const actions = [ActionTypeSidechain.transfer];
+        const actions = [ActionType.transfer];
         const dataMixer = [transferData];
 
         await router.connect(alice).mixer(permits, actions, dataMixer);
@@ -274,7 +236,7 @@ contract('BaseAngleRouterSidechain', () => {
           ['address', 'uint256', 'address'],
           [USDC.address, parseUnits('0', USDCdecimal), bob.address],
         );
-        const actions2 = [ActionTypeSidechain.sweep];
+        const actions2 = [ActionType.sweep];
         const dataMixer2 = [sweepData];
         await router.connect(alice).mixer(permits, actions2, dataMixer2);
         expect(await USDC.balanceOf(alice.address)).to.be.equal(parseUnits('0.7', USDCdecimal));
@@ -288,7 +250,7 @@ contract('BaseAngleRouterSidechain', () => {
           ['address', 'address', 'uint256'],
           [USDC.address, router.address, parseUnits('0.3', USDCdecimal)],
         );
-        const actions = [ActionTypeSidechain.transfer];
+        const actions = [ActionType.transfer];
         const dataMixer = [transferData];
 
         await router.connect(alice).mixer(permits, actions, dataMixer);
@@ -299,63 +261,23 @@ contract('BaseAngleRouterSidechain', () => {
           ['address', 'uint256', 'address'],
           [USDC.address, parseUnits('1', USDCdecimal), bob.address],
         );
-        const actions2 = [ActionTypeSidechain.sweep];
+        const actions2 = [ActionType.sweep];
         const dataMixer2 = [sweepData];
         await expect(router.connect(alice).mixer(permits, actions2, dataMixer2)).to.be.revertedWith(
           'TooSmallAmountOut',
         );
       });
     });
-    describe('wrap', () => {
-      it('success - when there is nothing in the action', async () => {
-        const actions = [ActionTypeSidechain.wrap];
-
-        const wrapData = ethers.utils.defaultAbiCoder.encode(
-          ['uint256', 'uint256'],
-          [parseEther('10'), parseUnits('0.3', USDCdecimal)],
-        );
-
-        const dataMixer = [wrapData];
-        await router.connect(alice).mixer(permits, actions, dataMixer);
-
-        const wrapData2 = ethers.utils.defaultAbiCoder.encode(
-          ['uint256', 'uint256'],
-          [parseUnits('0.3', USDCdecimal), parseUnits('100', USDCdecimal)],
-        );
-        const dataMixer2 = [wrapData2];
-        await router.connect(alice).mixer(permits, actions, dataMixer2);
-      });
-    });
     describe('wrapNative', () => {
       it('success - when there is nothing in the action', async () => {
-        const actions = [ActionTypeSidechain.wrapNative];
+        const actions = [ActionType.wrapNative];
         const dataMixer: BytesLike[] = [];
         await router.connect(alice).mixer(permits, actions, dataMixer);
       });
     });
-    describe('unwrap', () => {
-      it('success - when there is nothing in the action', async () => {
-        const actions = [ActionTypeSidechain.unwrap];
-
-        const unwrapData = ethers.utils.defaultAbiCoder.encode(
-          ['uint256', 'uint256', 'address'],
-          [parseEther('10'), parseUnits('0.3', USDCdecimal), bob.address],
-        );
-
-        const dataMixer = [unwrapData];
-        await router.connect(alice).mixer(permits, actions, dataMixer);
-
-        const unwrapData2 = ethers.utils.defaultAbiCoder.encode(
-          ['uint256', 'uint256', 'address'],
-          [parseUnits('0.3', USDCdecimal), parseUnits('100', USDCdecimal), bob.address],
-        );
-        const dataMixer2 = [unwrapData2];
-        await router.connect(alice).mixer(permits, actions, dataMixer2);
-      });
-    });
     describe('unwrapNative', () => {
       it('success - when there is nothing in the action', async () => {
-        const actions = [ActionTypeSidechain.unwrapNative];
+        const actions = [ActionType.unwrapNative];
         const wrapData = ethers.utils.defaultAbiCoder.encode(
           ['uint256', 'address'],
           [parseUnits('0.3', USDCdecimal), bob.address],
@@ -364,255 +286,12 @@ contract('BaseAngleRouterSidechain', () => {
         await router.connect(alice).mixer(permits, actions, dataMixer);
       });
     });
-    describe('swapIn', () => {
-      it('reverts - without approval from the contract', async () => {
-        const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.swapIn];
-        const transferData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'address', 'uint256'],
-          [lzAgEUR.address, router.address, parseEther('1')],
-        );
 
-        const swapInData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'address', 'uint256', 'uint256', 'address'],
-          [agEUR.address, lzAgEUR.address, parseEther('1'), parseEther('1'), bob.address],
-        );
-        await lzAgEUR.mint(alice.address, parseEther('1'));
-        await lzAgEUR.connect(alice).approve(router.address, parseEther('1'));
-
-        const dataMixer = [transferData, swapInData];
-
-        await expect(router.connect(alice).mixer(permits, actions, dataMixer)).to.be.reverted;
-      });
-      it('success - with approval from the contract', async () => {
-        const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.swapIn];
-        const transferData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'address', 'uint256'],
-          [lzAgEUR.address, router.address, parseEther('1')],
-        );
-
-        const swapInData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'address', 'uint256', 'uint256', 'address'],
-          [agEUR.address, lzAgEUR.address, parseEther('1'), parseEther('1'), bob.address],
-        );
-        await lzAgEUR.mint(alice.address, parseEther('1'));
-        await lzAgEUR.connect(alice).approve(router.address, parseEther('1'));
-
-        const dataMixer = [transferData, swapInData];
-        await router
-          .connect(impersonatedSigners[governor])
-          .changeAllowance([lzAgEUR.address], [agEUR.address], [MAX_UINT256]);
-
-        await router.connect(alice).mixer(permits, actions, dataMixer);
-        expect(await agEUR.balanceOf(bob.address)).to.be.equal(parseEther('1'));
-        expect(await lzAgEUR.balanceOf(agEUR.address)).to.be.equal(parseEther('1'));
-      });
-      it('success - with approval from the contract and fees', async () => {
-        const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.swapIn];
-        const transferData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'address', 'uint256'],
-          [lzAgEUR.address, router.address, parseEther('1')],
-        );
-
-        await agEUR.setFees(parseUnits('0.5', 9), parseUnits('1', 9));
-
-        const swapInData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'address', 'uint256', 'uint256', 'address'],
-          [agEUR.address, lzAgEUR.address, parseEther('1'), parseEther('0.5'), bob.address],
-        );
-        await lzAgEUR.mint(alice.address, parseEther('1'));
-        await lzAgEUR.connect(alice).approve(router.address, parseEther('1'));
-
-        const dataMixer = [transferData, swapInData];
-        await router
-          .connect(impersonatedSigners[governor])
-          .changeAllowance([lzAgEUR.address], [agEUR.address], [MAX_UINT256]);
-
-        await router.connect(alice).mixer(permits, actions, dataMixer);
-        expect(await agEUR.balanceOf(bob.address)).to.be.equal(parseEther('0.5'));
-        expect(await lzAgEUR.balanceOf(agEUR.address)).to.be.equal(parseEther('1'));
-      });
-      it('reverts - when slippage from the contract and fees', async () => {
-        const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.swapIn];
-        const transferData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'address', 'uint256'],
-          [lzAgEUR.address, router.address, parseEther('1')],
-        );
-        await agEUR.setFees(parseUnits('0.5', 9), parseUnits('1', 9));
-
-        const swapInData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'address', 'uint256', 'uint256', 'address'],
-          [agEUR.address, lzAgEUR.address, parseEther('1'), parseEther('1'), bob.address],
-        );
-        await lzAgEUR.mint(alice.address, parseEther('1'));
-        await lzAgEUR.connect(alice).approve(router.address, parseEther('1'));
-
-        const dataMixer = [transferData, swapInData];
-        await router
-          .connect(impersonatedSigners[governor])
-          .changeAllowance([lzAgEUR.address], [agEUR.address], [MAX_UINT256]);
-
-        await expect(router.connect(alice).mixer(permits, actions, dataMixer)).to.be.revertedWith('TooSmallAmountOut');
-      });
-      it('reverts - when slippage', async () => {
-        const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.swapIn];
-        const transferData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'address', 'uint256'],
-          [lzAgEUR.address, router.address, parseEther('1')],
-        );
-
-        const swapInData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'address', 'uint256', 'uint256', 'address'],
-          [agEUR.address, lzAgEUR.address, parseEther('1'), parseEther('2'), bob.address],
-        );
-        await lzAgEUR.mint(alice.address, parseEther('1'));
-        await lzAgEUR.connect(alice).approve(router.address, parseEther('1'));
-
-        const dataMixer = [transferData, swapInData];
-        await router
-          .connect(impersonatedSigners[governor])
-          .changeAllowance([lzAgEUR.address], [agEUR.address], [MAX_UINT256]);
-
-        await expect(router.connect(alice).mixer(permits, actions, dataMixer)).to.be.revertedWith('TooSmallAmountOut');
-      });
-    });
-    describe('swapOut', () => {
-      it('reverts - when there are no bridge tokens in the contract', async () => {
-        const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.swapOut];
-        const transferData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'address', 'uint256'],
-          [agEUR.address, router.address, parseEther('1')],
-        );
-
-        const swapInData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'address', 'uint256', 'uint256', 'address'],
-          [agEUR.address, lzAgEUR.address, parseEther('1'), parseEther('1'), bob.address],
-        );
-        await agEUR.mint(alice.address, parseEther('1'));
-        await agEUR.connect(alice).approve(router.address, parseEther('1'));
-
-        const dataMixer = [transferData, swapInData];
-
-        await expect(router.connect(alice).mixer(permits, actions, dataMixer)).to.be.reverted;
-      });
-      it('success - with bridge tokens on the contract', async () => {
-        const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.swapOut];
-        const transferData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'address', 'uint256'],
-          [agEUR.address, router.address, parseEther('1')],
-        );
-
-        const swapInData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'address', 'uint256', 'uint256', 'address'],
-          [agEUR.address, lzAgEUR.address, parseEther('1'), parseEther('1'), bob.address],
-        );
-        await agEUR.mint(alice.address, parseEther('1'));
-        await agEUR.connect(alice).approve(router.address, parseEther('1'));
-        await lzAgEUR.mint(agEUR.address, parseEther('1'));
-
-        const dataMixer = [transferData, swapInData];
-
-        await router.connect(alice).mixer(permits, actions, dataMixer);
-        expect(await agEUR.balanceOf(alice.address)).to.be.equal(parseEther('0'));
-        expect(await lzAgEUR.balanceOf(bob.address)).to.be.equal(parseEther('1'));
-      });
-      it('success - with approval from the contract and fees', async () => {
-        const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.swapOut];
-        const transferData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'address', 'uint256'],
-          [agEUR.address, router.address, parseEther('1')],
-        );
-        await agEUR.setFees(parseUnits('1', 9), parseUnits('0.5', 9));
-
-        const swapInData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'address', 'uint256', 'uint256', 'address'],
-          [agEUR.address, lzAgEUR.address, parseEther('1'), parseEther('0.5'), bob.address],
-        );
-        await agEUR.mint(alice.address, parseEther('1'));
-        await agEUR.connect(alice).approve(router.address, parseEther('1'));
-        await lzAgEUR.mint(agEUR.address, parseEther('1'));
-
-        const dataMixer = [transferData, swapInData];
-        await router.connect(alice).mixer(permits, actions, dataMixer);
-        expect(await agEUR.balanceOf(alice.address)).to.be.equal(parseEther('0'));
-        expect(await lzAgEUR.balanceOf(bob.address)).to.be.equal(parseEther('0.5'));
-      });
-      it('reverts - when slippage from the contract and fees', async () => {
-        const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.swapOut];
-        const transferData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'address', 'uint256'],
-          [agEUR.address, router.address, parseEther('1')],
-        );
-        await agEUR.setFees(parseUnits('1', 9), parseUnits('0.5', 9));
-
-        const swapInData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'address', 'uint256', 'uint256', 'address'],
-          [agEUR.address, lzAgEUR.address, parseEther('1'), parseEther('1'), bob.address],
-        );
-        await agEUR.mint(alice.address, parseEther('1'));
-        await agEUR.connect(alice).approve(router.address, parseEther('1'));
-        await lzAgEUR.mint(agEUR.address, parseEther('1'));
-
-        const dataMixer = [transferData, swapInData];
-        await expect(router.connect(alice).mixer(permits, actions, dataMixer)).to.be.revertedWith('TooSmallAmountOut');
-      });
-      it('reverts - when slippage', async () => {
-        const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.swapOut];
-        const transferData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'address', 'uint256'],
-          [agEUR.address, router.address, parseEther('1')],
-        );
-
-        const swapInData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'address', 'uint256', 'uint256', 'address'],
-          [agEUR.address, lzAgEUR.address, parseEther('1'), parseEther('2'), bob.address],
-        );
-        await agEUR.mint(alice.address, parseEther('1'));
-        await agEUR.connect(alice).approve(router.address, parseEther('1'));
-        await lzAgEUR.mint(agEUR.address, parseEther('1'));
-
-        const dataMixer = [transferData, swapInData];
-        await expect(router.connect(alice).mixer(permits, actions, dataMixer)).to.be.revertedWith('TooSmallAmountOut');
-      });
-    });
-    describe('claimRewards', () => {
-      it('success - nothing happens and one gauge', async () => {
-        const gauge = (await new MockLiquidityGauge__factory(deployer).deploy(USDC.address)) as MockLiquidityGauge;
-
-        const actions = [ActionTypeSidechain.claimRewards];
-        const claimData = ethers.utils.defaultAbiCoder.encode(['address', 'address[]'], [bob.address, [gauge.address]]);
-        const dataMixer = [claimData];
-        await router.connect(alice).mixer(permits, actions, dataMixer);
-      });
-      it('success - nothing happens and two gauges', async () => {
-        const gauge = (await new MockLiquidityGauge__factory(deployer).deploy(USDC.address)) as MockLiquidityGauge;
-        const gauge2 = (await new MockLiquidityGauge__factory(deployer).deploy(USDC.address)) as MockLiquidityGauge;
-
-        const actions = [ActionTypeSidechain.claimRewards];
-        const claimData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'address[]'],
-          [bob.address, [gauge.address, gauge2.address]],
-        );
-        const dataMixer = [claimData];
-        await router.connect(alice).mixer(permits, actions, dataMixer);
-      });
-      it('success - nothing happens because no gauge', async () => {
-        const actions = [ActionTypeSidechain.claimRewards];
-        const claimData = ethers.utils.defaultAbiCoder.encode(['address', 'address[]'], [bob.address, []]);
-        const dataMixer = [claimData];
-        await router.connect(alice).mixer(permits, actions, dataMixer);
-      });
-      it('reverts - when invalid gauge', async () => {
-        const actions = [ActionTypeSidechain.claimRewards];
-        const claimData = ethers.utils.defaultAbiCoder.encode(['address', 'address[]'], [bob.address, [bob.address]]);
-        const dataMixer = [claimData];
-        await expect(router.connect(alice).mixer(permits, actions, dataMixer)).to.be.reverted;
-      });
-    });
     describe('gaugeDeposit', () => {
       it('success - nothing happens when correct gauge', async () => {
         const gauge = (await new MockLiquidityGauge__factory(deployer).deploy(USDC.address)) as MockLiquidityGauge;
 
-        const actions = [ActionTypeSidechain.gaugeDeposit];
+        const actions = [ActionType.gaugeDeposit];
         const depositData = ethers.utils.defaultAbiCoder.encode(
           ['address', 'uint256', 'address', 'bool'],
           [bob.address, 1, gauge.address, true],
@@ -621,7 +300,7 @@ contract('BaseAngleRouterSidechain', () => {
         await router.connect(alice).mixer(permits, actions, dataMixer);
       });
       it('reverts - when wrong interface', async () => {
-        const actions = [ActionTypeSidechain.gaugeDeposit];
+        const actions = [ActionType.gaugeDeposit];
         const depositData = ethers.utils.defaultAbiCoder.encode(
           ['address', 'uint256', 'address', 'bool'],
           [bob.address, 1, bob.address, true],
@@ -638,7 +317,7 @@ contract('BaseAngleRouterSidechain', () => {
           [USDC.address, parseUnits('1', USDCdecimal), 0, '0x'],
         );
         const dataMixer = [swapData];
-        const actions = [ActionTypeSidechain.uniswapV3];
+        const actions = [ActionType.uniswapV3];
         await expect(router.connect(alice).mixer(permits, actions, dataMixer)).to.be.reverted;
       });
       it('success - swap successfully performed', async () => {
@@ -654,7 +333,7 @@ contract('BaseAngleRouterSidechain', () => {
           [USDC.address, parseUnits('1', USDCdecimal), 0, '0x'],
         );
         const dataMixer = [transferData, swapData];
-        const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.uniswapV3];
+        const actions = [ActionType.transfer, ActionType.uniswapV3];
         await router.connect(alice).mixer(permits, actions, dataMixer);
         expect(await USDC.balanceOf(uniswap.address)).to.be.equal(parseUnits('1', USDCdecimal));
         expect(await agEUR.balanceOf(router.address)).to.be.equal(parseEther('1'));
@@ -677,7 +356,7 @@ contract('BaseAngleRouterSidechain', () => {
           [agEUR.address, parseUnits('0', USDCdecimal), bob.address],
         );
         const dataMixer = [transferData, swapData, sweepData];
-        const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.uniswapV3, ActionTypeSidechain.sweep];
+        const actions = [ActionType.transfer, ActionType.uniswapV3, ActionType.sweep];
         await router.connect(alice).mixer(permits, actions, dataMixer);
         expect(await USDC.balanceOf(uniswap.address)).to.be.equal(parseUnits('1', USDCdecimal));
         expect(await agEUR.balanceOf(bob.address)).to.be.equal(parseEther('1'));
@@ -701,7 +380,7 @@ contract('BaseAngleRouterSidechain', () => {
           [agEUR.address, parseUnits('0', USDCdecimal), bob.address],
         );
         const dataMixer = [transferData, swapData, sweepData];
-        const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.uniswapV3, ActionTypeSidechain.sweep];
+        const actions = [ActionType.transfer, ActionType.uniswapV3, ActionType.sweep];
         await router.connect(alice).mixer(permits, actions, dataMixer);
         expect(await USDC.balanceOf(uniswap.address)).to.be.equal(parseUnits('1', USDCdecimal));
         expect(await agEUR.balanceOf(bob.address)).to.be.equal(parseEther('0.3'));
@@ -736,7 +415,7 @@ contract('BaseAngleRouterSidechain', () => {
           [USDC.address, parseUnits('1', USDCdecimal), payload1inch],
         );
         const dataMixer = [transferData, swapData];
-        const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.oneInch];
+        const actions = [ActionType.transfer, ActionType.oneInch];
         await router.connect(alice).mixer(permits, actions, dataMixer);
         expect(await USDC.balanceOf(oneInch.address)).to.be.equal(parseUnits('1', USDCdecimal));
         expect(await agEUR.balanceOf(router.address)).to.be.equal(parseEther('1'));
@@ -774,7 +453,7 @@ contract('BaseAngleRouterSidechain', () => {
           [agEUR.address, parseUnits('0', USDCdecimal), bob.address],
         );
         const dataMixer = [transferData, swapData, sweepData];
-        const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.oneInch, ActionTypeSidechain.sweep];
+        const actions = [ActionType.transfer, ActionType.oneInch, ActionType.sweep];
         await router.connect(alice).mixer(permits, actions, dataMixer);
         expect(await USDC.balanceOf(oneInch.address)).to.be.equal(parseUnits('1', USDCdecimal));
         expect(await agEUR.balanceOf(bob.address)).to.be.equal(parseEther('0.3'));
@@ -808,7 +487,7 @@ contract('BaseAngleRouterSidechain', () => {
         );
         await oneInch.updateExchangeRate(parseEther('0.3'));
         const dataMixer = [transferData, swapData];
-        const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.oneInch];
+        const actions = [ActionType.transfer, ActionType.oneInch];
         await router.connect(alice).mixer(permits, actions, dataMixer);
         expect(await USDC.balanceOf(oneInch.address)).to.be.equal(parseUnits('1', USDCdecimal));
         expect(await agEUR.balanceOf(router.address)).to.be.equal(parseEther('0.3'));
@@ -842,7 +521,7 @@ contract('BaseAngleRouterSidechain', () => {
         );
         await oneInch.updateExchangeRate(parseEther('0.3'));
         const dataMixer = [transferData, swapData];
-        const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.oneInch];
+        const actions = [ActionType.transfer, ActionType.oneInch];
         await expect(router.connect(alice).mixer(permits, actions, dataMixer)).to.be.revertedWith('TooSmallAmountOut');
       });
       it('reverts - swap reverted with no error message', async () => {
@@ -858,7 +537,7 @@ contract('BaseAngleRouterSidechain', () => {
           ['address', 'uint256', 'bytes'],
           [USDC.address, parseUnits('1', USDCdecimal), payload1inch],
         );
-        const actions = [ActionTypeSidechain.oneInch];
+        const actions = [ActionType.oneInch];
         const dataMixer = [swapData];
         await expect(router.connect(alice).mixer(permits, actions, dataMixer)).to.be.revertedWith(
           'InvalidReturnMessage',
@@ -877,7 +556,7 @@ contract('BaseAngleRouterSidechain', () => {
           ['address', 'uint256', 'bytes'],
           [USDC.address, parseUnits('1', USDCdecimal), payload1inch],
         );
-        const actions = [ActionTypeSidechain.oneInch];
+        const actions = [ActionType.oneInch];
         const dataMixer = [swapData];
         await expect(router.connect(alice).mixer(permits, actions, dataMixer)).to.be.revertedWith('wrong swap');
       });

@@ -25,13 +25,13 @@ const testStorage = async (name: string, file: string, nameUpgrade: string, file
 };
 
 async function main() {
-  testUpgradeability('AngleRouter', 'contracts/AngleRouter01.sol');
+  testUpgradeability('AngleRouterMainnet', 'contracts/AngleRouterMainnet.sol');
 
   testStorage(
     'OldRouterMainnet',
     'contracts/deprecated/OldRouterMainnet.sol',
-    'AngleRouter',
-    'contracts/AngleRouter01.sol',
+    'AngleRouterMainnet',
+    'contracts/AngleRouterMainnet.sol',
   );
 
   testStorage(

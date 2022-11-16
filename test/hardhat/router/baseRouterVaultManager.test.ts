@@ -10,9 +10,9 @@ import {
   MockTokenPermit,
   MockVaultManagerPermit,
   MockVaultManagerPermit__factory,
-} from '../../../../typechain';
-import { expect } from '../../../../utils/chai-setup';
-import { ActionTypeSidechain, initToken, TypePermit } from '../../../../utils/helpers';
+} from '../../../typechain';
+import { expect } from '../../../utils/chai-setup';
+import { ActionType, initToken, TypePermit } from '../../../utils/helpers';
 import {
   addCollateral,
   borrow,
@@ -23,12 +23,12 @@ import {
   permit,
   removeCollateral,
   repayDebt,
-} from '../../../../utils/helpersEncoding';
-import { signPermit } from '../../../../utils/sign';
-import { signPermitNFT } from '../../../../utils/sigUtilsNFT';
-import { deployUpgradeable, latestTime, ZERO_ADDRESS } from '../../utils/helpers';
+} from '../../../utils/helpersEncoding';
+import { signPermit } from '../../../utils/sign';
+import { signPermitNFT } from '../../../utils/sigUtilsNFT';
+import { deployUpgradeable, latestTime, ZERO_ADDRESS } from '../utils/helpers';
 
-contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
+contract('BaseRouter - VaultManager functionalities', () => {
   // As a proxy for the AngleRouter sidechain we're using the Polygon implementation of it
   let deployer: SignerWithAddress;
   let USDC: MockTokenPermit;
@@ -119,7 +119,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         callsBorrow,
       );
 
-      const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.borrower];
+      const actions = [ActionType.transfer, ActionType.borrower];
       const dataMixer = [transferData, dataBorrow];
 
       await router.connect(alice).mixer(permits, actions, dataMixer);
@@ -160,7 +160,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         callsBorrow,
       );
 
-      const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.borrower];
+      const actions = [ActionType.transfer, ActionType.borrower];
       const dataMixer = [transferData, dataBorrow];
 
       await router.connect(alice).mixer(permits, actions, dataMixer);
@@ -197,7 +197,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         ['address', 'address', 'uint256'],
         [USDC.address, router.address, UNIT_USDC.mul(2)],
       );
-      const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.borrower];
+      const actions = [ActionType.transfer, ActionType.borrower];
       const dataMixer = [transferData, dataBorrow];
 
       await router.connect(alice).mixer(permits, actions, dataMixer);
@@ -217,7 +217,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         callsBorrow,
       );
 
-      const actions = [ActionTypeSidechain.borrower];
+      const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await expect(router.connect(alice).mixer(permits, actions, dataMixer)).to.be.revertedWith('NotApprovedOrOwner');
     });
@@ -234,7 +234,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         callsBorrow,
       );
 
-      const actions = [ActionTypeSidechain.borrower];
+      const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await vaultManager.approveSpenderVault(alice.address, 1, true);
       await router.connect(alice).mixer(permits, actions, dataMixer);
@@ -254,7 +254,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         callsBorrow,
       );
 
-      const actions = [ActionTypeSidechain.borrower];
+      const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixer(permits, actions, dataMixer);
     });
@@ -271,7 +271,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         callsBorrow,
       );
 
-      const actions = [ActionTypeSidechain.borrower];
+      const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixer(permits, actions, dataMixer);
     });
@@ -290,7 +290,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         callsBorrow,
       );
 
-      const actions = [ActionTypeSidechain.borrower];
+      const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixer(permits, actions, dataMixer);
     });
@@ -320,7 +320,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         callsBorrow,
       );
 
-      const actions = [ActionTypeSidechain.borrower];
+      const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await expect(router.connect(alice).mixer(permits, actions, dataMixer)).to.be.revertedWith('NotApprovedOrOwner');
     });
@@ -339,7 +339,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         callsBorrow,
       );
 
-      const actions = [ActionTypeSidechain.borrower];
+      const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixer(permits, actions, dataMixer);
     });
@@ -371,7 +371,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         callsBorrow,
       );
 
-      const actions = [ActionTypeSidechain.borrower];
+      const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixer(permits, actions, dataMixer);
     });
@@ -407,7 +407,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         callsBorrow,
       );
 
-      const actions = [ActionTypeSidechain.borrower];
+      const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await expect(router.connect(alice).mixer(permits, actions, dataMixer)).to.be.revertedWith('IncompatibleLengths');
     });
@@ -426,7 +426,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         callsBorrow,
       );
 
-      const actions = [ActionTypeSidechain.borrower];
+      const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixer(permits, actions, dataMixer);
     });
@@ -444,7 +444,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         callsBorrow,
       );
 
-      const actions = [ActionTypeSidechain.borrower];
+      const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixer(permits, actions, dataMixer);
     });
@@ -462,7 +462,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         callsBorrow,
       );
 
-      const actions = [ActionTypeSidechain.borrower];
+      const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await expect(router.connect(alice).mixer(permits, actions, dataMixer)).to.be.revertedWith('NotApprovedOrOwner');
     });
@@ -481,7 +481,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         callsBorrow,
       );
 
-      const actions = [ActionTypeSidechain.borrower];
+      const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixer(permits, actions, dataMixer);
     });
@@ -499,7 +499,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         callsBorrow,
       );
 
-      const actions = [ActionTypeSidechain.borrower];
+      const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixer(permits, actions, dataMixer);
     });
@@ -517,7 +517,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         callsBorrow,
       );
 
-      const actions = [ActionTypeSidechain.borrower];
+      const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await expect(router.connect(alice).mixer(permits, actions, dataMixer)).to.be.revertedWith('NotApprovedOrOwner');
     });
@@ -536,7 +536,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         callsBorrow,
       );
 
-      const actions = [ActionTypeSidechain.borrower];
+      const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixer(permits, actions, dataMixer);
     });
@@ -554,7 +554,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         callsBorrow,
       );
 
-      const actions = [ActionTypeSidechain.borrower];
+      const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixer(permits, actions, dataMixer);
     });
@@ -572,7 +572,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         callsBorrow,
       );
 
-      const actions = [ActionTypeSidechain.borrower];
+      const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await expect(router.connect(alice).mixer(permits, actions, dataMixer)).to.be.revertedWith('NotApprovedOrOwner');
     });
@@ -590,7 +590,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         callsBorrow,
       );
 
-      const actions = [ActionTypeSidechain.borrower];
+      const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixer(permits, actions, dataMixer);
     });
@@ -608,7 +608,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         callsBorrow,
       );
 
-      const actions = [ActionTypeSidechain.borrower];
+      const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixer(permits, actions, dataMixer);
     });
@@ -626,7 +626,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         callsBorrow,
       );
 
-      const actions = [ActionTypeSidechain.borrower];
+      const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixer(permits, actions, dataMixer);
     });
@@ -653,7 +653,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         callsBorrow,
       );
 
-      const actions = [ActionTypeSidechain.borrower];
+      const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixer(permits, actions, dataMixer);
     });
@@ -680,7 +680,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         callsBorrow,
       );
 
-      const actions = [ActionTypeSidechain.borrower];
+      const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixer(permits, actions, dataMixer);
     });
@@ -707,7 +707,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         callsBorrow,
       );
 
-      const actions = [ActionTypeSidechain.borrower];
+      const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixer(permits, actions, dataMixer);
     });
@@ -739,7 +739,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         callsBorrow,
       );
 
-      const actions = [ActionTypeSidechain.borrower];
+      const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixer(permits, actions, dataMixer);
     });
@@ -771,7 +771,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         callsBorrow,
       );
 
-      const actions = [ActionTypeSidechain.borrower];
+      const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await expect(router.connect(alice).mixer(permits, actions, dataMixer)).to.be.revertedWith('NotApprovedOrOwner');
     });
@@ -799,7 +799,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         s: permitData.s,
       };
       const permits: TypePermit[] = [];
-      const actions: ActionTypeSidechain[] = [];
+      const actions: ActionType[] = [];
       const dataMixer: BytesLike[] = [];
       await router.mixerVaultManagerPermit([permitParam], permits, actions, dataMixer);
       expect(await vaultManager.operatorApprovals(bob.address, router.address)).to.be.equal(1);
@@ -825,7 +825,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         s: permitData.s,
       };
       const permits: TypePermit[] = [];
-      const actions: ActionTypeSidechain[] = [];
+      const actions: ActionType[] = [];
       const dataMixer: BytesLike[] = [];
       await router.mixerVaultManagerPermit([permitParam], permits, actions, dataMixer);
       expect(await vaultManager.operatorApprovals(bob.address, router.address)).to.be.equal(0);
@@ -851,7 +851,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         s: permitData.s,
       };
       const permits: TypePermit[] = [];
-      const actions: ActionTypeSidechain[] = [];
+      const actions: ActionType[] = [];
       const dataMixer: BytesLike[] = [];
       await expect(router.mixerVaultManagerPermit([permitParam], permits, actions, dataMixer)).to.be.revertedWith(
         'InvalidSignature',
@@ -896,7 +896,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         s: permitData2.s,
       };
       const permits: TypePermit[] = [];
-      const actions: ActionTypeSidechain[] = [];
+      const actions: ActionType[] = [];
       const dataMixer: BytesLike[] = [];
       await router.mixerVaultManagerPermit([permitParam, permitParam2], permits, actions, dataMixer);
       expect(await vaultManager.operatorApprovals(bob.address, router.address)).to.be.equal(0);
@@ -940,7 +940,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         s: permitData2.s,
       };
       const permits: TypePermit[] = [];
-      const actions: ActionTypeSidechain[] = [];
+      const actions: ActionType[] = [];
       const dataMixer: BytesLike[] = [];
       await router.mixerVaultManagerPermit([permitParam], permits, actions, dataMixer);
       expect(await vaultManager.operatorApprovals(bob.address, router.address)).to.be.equal(1);
@@ -986,7 +986,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         s: permitData2.s,
       };
       const permits: TypePermit[] = [];
-      const actions: ActionTypeSidechain[] = [];
+      const actions: ActionType[] = [];
       const dataMixer: BytesLike[] = [];
       await expect(
         router.mixerVaultManagerPermit([permitParam, permitParam2], permits, actions, dataMixer),
@@ -1041,7 +1041,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         callsBorrow,
       );
 
-      const actions = [ActionTypeSidechain.borrower];
+      const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixerVaultManagerPermit([permitParam], permits, actions, dataMixer);
       expect(await vaultManager.operatorApprovals(bob.address, router.address)).to.be.equal(1);
@@ -1081,7 +1081,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         callsBorrow,
       );
 
-      const actions = [ActionTypeSidechain.borrower];
+      const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixerVaultManagerPermit([permitParam], permits, actions, dataMixer);
       expect(await vaultManager.operatorApprovals(bob.address, router.address)).to.be.equal(1);
@@ -1123,7 +1123,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         callsBorrow,
       );
 
-      const actions = [ActionTypeSidechain.borrower];
+      const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixerVaultManagerPermit([permitParam], permits, actions, dataMixer);
       // Nothing is transferred to the msg.sender
@@ -1170,7 +1170,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         ['address', 'address', 'uint256'],
         [USDC.address, router.address, UNIT_USDC],
       );
-      const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.borrower];
+      const actions = [ActionType.transfer, ActionType.borrower];
       const dataMixer = [transferData, dataBorrow];
       await router.connect(alice).mixerVaultManagerPermit([permitParam], permits, actions, dataMixer);
       // Leftover transferred to the msg.sender
@@ -1218,7 +1218,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         '0x',
         callsBorrow,
       );
-      const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.borrower];
+      const actions = [ActionType.transfer, ActionType.borrower];
       const dataMixer = [transferData, dataBorrow];
       await router.connect(alice).mixerVaultManagerPermit([permitParam], permits, actions, dataMixer);
       // Leftover transferred to the msg.sender
@@ -1268,7 +1268,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         '0x',
         callsBorrow,
       );
-      const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.borrower];
+      const actions = [ActionType.transfer, ActionType.borrower];
       const dataMixer = [transferData, dataBorrow];
       await router.connect(alice).mixerVaultManagerPermit([permitParam], permits, actions, dataMixer);
       // Leftover transferred to the msg.sender
@@ -1319,7 +1319,7 @@ contract('BaseAngleRouterSidechain - VaultManager functionalities', () => {
         '0x',
         callsBorrow,
       );
-      const actions = [ActionTypeSidechain.transfer, ActionTypeSidechain.borrower];
+      const actions = [ActionType.transfer, ActionType.borrower];
       const dataMixer = [transferData, dataBorrow];
       await router.connect(alice).mixerVaultManagerPermit([permitParam], permits, actions, dataMixer);
       // Leftover transferred to the msg.sender

@@ -56,48 +56,12 @@ const config: HardhatUserConfig = {
       },
     ],
     overrides: {
-      'contracts/AngleRouter01.sol': {
+      'contracts/implementations/mainnet/AngleRouterMainnet.sol': {
         version: '0.8.12',
         settings: {
           optimizer: {
             enabled: true,
             runs: 1,
-          },
-        },
-      },
-      'contracts/AngleRouterArbitrum.sol': {
-        version: '0.8.12',
-        settings: {
-          optimizer: {
-            enabled: true,
-            runs: 1000000,
-          },
-        },
-      },
-      'contracts/AngleRouterAvalanche.sol': {
-        version: '0.8.12',
-        settings: {
-          optimizer: {
-            enabled: true,
-            runs: 1000000,
-          },
-        },
-      },
-      'contracts/AngleRouterOptimism.sol': {
-        version: '0.8.12',
-        settings: {
-          optimizer: {
-            enabled: true,
-            runs: 1000000,
-          },
-        },
-      },
-      'contracts/AngleRouterPolygon.sol': {
-        version: '0.8.12',
-        settings: {
-          optimizer: {
-            enabled: true,
-            runs: 1000000,
           },
         },
       },

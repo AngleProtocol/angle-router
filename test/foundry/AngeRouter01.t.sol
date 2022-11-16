@@ -10,7 +10,7 @@ import "../../contracts/interfaces/IStableMasterFront.sol";
 import "../../contracts/mock/MockTokenPermit.sol";
 import { MockStableMaster } from "../../contracts/mock/MockStableMaster.sol";
 import { MockSavingsRate } from "../../contracts/mock/MockSavingsRate.sol";
-import { IUniswapV3Router, PermitType, ActionType, PermitType, TransferType, ParamsSwapType, AngleRouter } from "../../contracts/AngleRouter01.sol";
+import { IUniswapV3Router, PermitType, ActionType, PermitType, TransferType, ParamsSwapType, AngleRouterMainnet } from "../../contracts/AngleRouterMainnet.sol";
 
 contract AngleRouter01Test is BaseTest {
     uint256 private _ethereum;

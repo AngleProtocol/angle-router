@@ -19,7 +19,6 @@ import "./interfaces/IVaultManager.sol";
 // =========================== Structs and Enums ===============================
 
 /// @notice Action types
-/// @dev Some actions are only possible on Ethereum mainnet
 enum ActionType {
     transfer,
     wrapNative,
@@ -60,6 +59,7 @@ struct PermitType {
     bytes32 s;
 }
 
+/// @notice Data to grant permit to the router for a vault
 struct PermitVaultManagerType {
     address vaultManager;
     address owner;
@@ -70,9 +70,9 @@ struct PermitVaultManagerType {
     bytes32 s;
 }
 
-/// @title BaseAngleRouterSidechain
+/// @title BaseRouter
 /// @author Angle Core Team
-/// @notice The `BaseAngleRouterSidechain` contract is a base contract for routing on the Angle Protocol in a given chain
+/// @notice Base contract that Angle router contracts on different chains should override
 abstract contract BaseRouter is Initializable {
     using SafeERC20 for IERC20;
 
@@ -355,8 +355,11 @@ abstract contract BaseRouter is Initializable {
     ) internal returns (uint256 amountOut) {
         // Approve transfer to the `uniswapV3Router`
         // Since this router is supposed to be a trusted contract, we can leave the allowance to the token
-        _checkAllowance(IERC20(inToken), address(_getUniswapRouter()), amount);
-        amountOut = _getUniswapRouter().exactInput(
+        address uniRouter = address(_getUniswapRouter());
+        uint256 currentAllowance = IERC20(inToken).allowance(address(this), uniRouter);
+        if (currentAllowance < amount)
+            IERC20(inToken).safeIncreaseAllowance(uniRouter, type(uint256).max - currentAllowance);
+        amountOut = IUniswapV3Router(uniRouter).exactInput(
             ExactInputParams(path, address(this), block.timestamp, amount, minAmountOut)
         );
     }
@@ -371,9 +374,10 @@ abstract contract BaseRouter is Initializable {
     ) internal returns (uint256 amountOut) {
         // Approve transfer to the `oneInch` address
         // Since this router is supposed to be a trusted contract, we can leave the allowance to the token
-        _changeAllowance(IERC20(inToken), _get1InchRouter(), type(uint256).max);
+        address oneInchRouter = _get1InchRouter();
+        _changeAllowance(IERC20(inToken), oneInchRouter, type(uint256).max);
         //solhint-disable-next-line
-        (bool success, bytes memory result) = _get1InchRouter().call(payload);
+        (bool success, bytes memory result) = oneInchRouter.call(payload);
         if (!success) _revertBytes(result);
 
         amountOut = abi.decode(result, (uint256));
@@ -488,6 +492,41 @@ abstract contract BaseRouter is Initializable {
     /// @notice Gets the official wrapper of the native token on a chain (like wETH on Ethereum)
     function _getNativeWrapper() internal pure virtual returns (IWETH9);
 
+    /// @notice Returns true if `user` is governor or guardian
+    function _isGovernorOrGuardian(address user) internal view virtual returns (bool);
+
+    /// @notice Internal version of the `setRouter` function
+    function _setRouter(address router, uint8 who) internal virtual;
+
+    // ============================ GOVERNANCE FUNCTION ============================
+
+    /// @notice Checks whether the `msg.sender` has the governor role or the guardian role
+    modifier onlyGovernorOrGuardian() {
+        if (!_isGovernorOrGuardian(msg.sender)) revert NotGovernorOrGuardian();
+        _;
+    }
+
+    /// @notice Changes allowances for different tokens
+    /// @param tokens Addresses of the tokens to allow
+    /// @param spenders Addresses to allow transfer
+    /// @param amounts Amounts to allow
+    function changeAllowance(
+        IERC20[] calldata tokens,
+        address[] calldata spenders,
+        uint256[] calldata amounts
+    ) external onlyGovernorOrGuardian {
+        if (tokens.length != spenders.length || tokens.length != amounts.length) revert IncompatibleLengths();
+        for (uint256 i = 0; i < tokens.length; i++) {
+            _changeAllowance(tokens[i], spenders[i], amounts[i]);
+        }
+    }
+
+    /// @notice Sets a new router variable
+    function setRouter(address router, uint8 who) external onlyGovernorOrGuardian {
+        if (router == address(0)) revert ZeroAddress();
+        _setRouter(router, who);
+    }
+
     // ========================= INTERNAL UTILITY FUNCTIONS ========================
 
     /// @notice Changes allowance of this contract for a given token
@@ -507,30 +546,15 @@ abstract contract BaseRouter is Initializable {
         }
     }
 
-    /// @notice Checks the allowance for a contract and updates it to the max if it is not big enough
-    /// @param token Token for which allowance should be checked
-    /// @param spender Address to grant allowance to
-    /// @param amount Minimum amount of tokens needed for the allowance
-    function _checkAllowance(
-        IERC20 token,
-        address spender,
-        uint256 amount
-    ) internal {
-        uint256 currentAllowance = token.allowance(address(this), spender);
-        if (currentAllowance < amount) token.safeIncreaseAllowance(spender, type(uint256).max - currentAllowance);
-    }
-
     /// @notice Transfer amount of the native token to the `to` address
     /// @dev Forked from Solmate: https://github.com/Rari-Capital/solmate/blob/main/src/utils/SafeTransferLib.sol
     function _safeTransferNative(address to, uint256 amount) internal {
         bool success;
-
         //solhint-disable-next-line
         assembly {
             // Transfer the ETH and store if it succeeded or not.
             success := call(gas(), to, amount, 0, 0, 0, 0)
         }
-
         if (!success) revert TransferFailed();
     }
 

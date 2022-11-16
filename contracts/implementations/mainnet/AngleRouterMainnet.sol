@@ -4,17 +4,17 @@ pragma solidity 0.8.12;
 
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 
-import "./interfaces/external/IWETH9.sol";
-import "./interfaces/external/lido/ISteth.sol";
-import "./interfaces/external/lido/IWStETH.sol";
+import "../../interfaces/external/IWETH9.sol";
+import "../../interfaces/external/lido/ISteth.sol";
+import "../../interfaces/external/lido/IWStETH.sol";
 
-import "./interfaces/IFeeDistributor.sol";
-import "./interfaces/ISanToken.sol";
-import "./interfaces/IStableMaster.sol";
-import "./interfaces/IStableMasterFront.sol";
-import "./interfaces/IVeANGLE.sol";
+import "../../interfaces/IFeeDistributor.sol";
+import "../../interfaces/ISanToken.sol";
+import "../../interfaces/IStableMaster.sol";
+import "../../interfaces/IStableMasterFront.sol";
+import "../../interfaces/IVeANGLE.sol";
 
-import "./BaseRouter.sol";
+import "../../BaseRouter.sol";
 
 // ============================= STRUCTS AND ENUMS =============================
 
@@ -26,15 +26,13 @@ struct Pairs {
     ILiquidityGauge gauge;
 }
 
-/// @title Angle Router
+/// @title AngleRouterMainnet
 /// @author Angle Core Team
-/// @notice The `AngleRouter` contract facilitates interactions for users with the protocol. It was built to reduce the number
-/// of approvals required to users and the number of transactions needed to perform some complex actions: like deposit and stake
-/// in just one transaction
+/// @notice The `AngleRouterMainnet` contract facilitates interactions for users with the protocol
 /// @dev Interfaces were designed for both advanced users which know the addresses of the protocol's contract, but most of the time
 /// users which only know addresses of the stablecoins and collateral types of the protocol can perform the actions they want without
 /// needing to understand what's happening under the hood
-contract AngleRouter is BaseRouter, ReentrancyGuardUpgradeable {
+contract AngleRouterMainnet is BaseRouter, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
 
     /// @notice ANGLE contract
@@ -81,8 +79,8 @@ contract AngleRouter is BaseRouter, ReentrancyGuardUpgradeable {
 
     uint256[50] private __gap;
 
-    /// @dev We Removed the `initialize` function in this implementation since it has already been called
-    /// and can not be called again. You can check it for context at the end of this contract
+    /// @dev We removed the `initialize` function in this implementation since it has already been called
+    /// and can not be called again
     constructor() initializer {}
 
     // =========================== ROUTER FUNCTIONALITIES ==========================
@@ -471,12 +469,15 @@ contract AngleRouter is BaseRouter, ReentrancyGuardUpgradeable {
         IPerpetualManagerFrontWithClaim(stablecoinOrPerpetualManager).addToPerpetual(perpetualID, margin);
     }
 
-    // ================================== MODIFIER =================================
+    /// @inheritdoc BaseRouter
+    function _isGovernorOrGuardian(address user) internal view override returns (bool) {
+        return user == governor || msg.sender == guardian;
+    }
 
-    /// @notice Checks to see if it is the `governor` or `guardian` calling this contract
-    modifier onlyGovernorOrGuardian() {
-        if (msg.sender != governor && msg.sender != guardian) revert NotGovernorOrGuardian();
-        _;
+    /// @inheritdoc BaseRouter
+    function _setRouter(address router, uint8 who) internal virtual override {
+        if (who == 0) uniswapV3Router = IUniswapV3Router(router);
+        else oneInch = router;
     }
 
     // ============================ GOVERNANCE UTILITIES ===========================
@@ -554,39 +555,6 @@ contract AngleRouter is BaseRouter, ReentrancyGuardUpgradeable {
             }
             emit SanTokenLiquidityGaugeUpdated(address(sanToken), address(newLiquidityGauges[i]));
         }
-    }
-
-    /// @notice Change allowance for a contract.
-    /// @param tokens Addresses of the tokens to allow
-    /// @param spenders Addresses to allow transfer
-    /// @param amounts Amounts to allow
-    /// @dev Approvals are normally given in the `addGauges` method, in the initializer and in
-    /// the internal functions to process swaps with Uniswap and 1Inch
-    function changeAllowance(
-        IERC20[] calldata tokens,
-        address[] calldata spenders,
-        uint256[] calldata amounts
-    ) external onlyGovernorOrGuardian {
-        if (tokens.length != spenders.length || tokens.length != amounts.length) revert IncompatibleLengths();
-        for (uint256 i = 0; i < tokens.length; i++) {
-            _changeAllowance(tokens[i], spenders[i], amounts[i]);
-        }
-    }
-
-    /// @notice Supports recovering any tokens as the router does not own any other tokens than
-    /// the one mistakenly sent
-    /// @param tokenAddress Address of the token to transfer
-    /// @param to Address to give tokens to
-    /// @param tokenAmount Amount of tokens to transfer
-    /// @dev If tokens are mistakenly sent to this contract, any address can take advantage of the `mixer` function
-    /// below to get the funds back
-    function recoverERC20(
-        address tokenAddress,
-        address to,
-        uint256 tokenAmount
-    ) external onlyGovernorOrGuardian {
-        IERC20(tokenAddress).safeTransfer(to, tokenAmount);
-        emit Recovered(tokenAddress, to, tokenAmount);
     }
 
     // ========================= INTERNAL UTILITY FUNCTIONS ========================
@@ -669,42 +637,4 @@ contract AngleRouter is BaseRouter, ReentrancyGuardUpgradeable {
         _changeAllowance(collateral, address(perpetualManager), type(uint256).max);
         emit CollateralToggled(address(stableMaster), address(poolManager), address(liquidityGauge));
     }
-
-    /// For context, we give here the initialize function that was used for this contract in another implementation
-    // function initialize(
-    //     address _governor,
-    //     address _guardian,
-    //     IUniswapV3Router _uniswapV3Router,
-    //     address _oneInch,
-    //     IStableMasterFront existingStableMaster,
-    //     IPoolManager[] calldata existingPoolManagers,
-    //     ILiquidityGauge[] calldata existingLiquidityGauges
-    // ) public initializer {
-    //     // Checking the parameters passed
-    //     require(
-    //         address(_uniswapV3Router) != address(0) &&
-    //             _oneInch != address(0) &&
-    //             _governor != address(0) &&
-    //             _guardian != address(0),
-    //         "0"
-    //     );
-    //     require(_governor != _guardian, "49");
-    //     require(existingPoolManagers.length == existingLiquidityGauges.length, "104");
-    //     // Fetching the stablecoin and mapping it to the `StableMaster`
-    //     mapStableMasters[
-    //         IERC20(address(IStableMaster(address(existingStableMaster)).agToken()))
-    //     ] = existingStableMaster;
-    //     // Setting roles
-    //     governor = _governor;
-    //     guardian = _guardian;
-    //     uniswapV3Router = _uniswapV3Router;
-    //     oneInch = _oneInch;
-
-    //     // for veANGLEDeposit action
-    //     ANGLE.safeApprove(address(VEANGLE), type(uint256).max);
-
-    //     for (uint256 i = 0; i < existingPoolManagers.length; i++) {
-    //         _addPair(existingStableMaster, existingPoolManagers[i], existingLiquidityGauges[i]);
-    //     }
-    // }
 }

@@ -1,7 +1,5 @@
-import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { BigNumberish, BytesLike, ethers } from 'ethers';
-import { AngleRouter } from '../typechain';
-import { ParamsSwapTypeStruct, PermitTypeStruct, TransferTypeStruct } from '../typechain/AngleRouter';
+
 import { TypePermit } from './helpers';
 
 type Call = {
@@ -100,19 +98,3 @@ export function encodeAngleBorrowSidechain(
     [collateral, vaultManager, to, who, actions, data, repayData],
   );
 }
-
-// export async function mixer(
-//   router: AngleRouter,
-//   signer: SignerWithAddress,
-//   paramsPermit: PermitTypeStruct[],
-//   paramsTransfer: TransferTypeStruct[],
-//   paramsSwap: ParamsSwapTypeStruct[],
-//   calls: Call[],
-// ): Promise<void> {
-//   const actions: number[] = [];
-//   const datas: BytesLike[] = [];
-//   calls.forEach(o => {
-//     actions.push(o.action);
-//     datas.push(o.data);
-//   });
-// }

@@ -8,7 +8,7 @@ import "./BaseRouter.sol";
 
 /// @title BaseAngleRouterSidechain
 /// @author Angle Core Team
-/// @notice The `BaseAngleRouterSidechain` contract is a base contract for routing on the Angle Protocol in a given chain
+/// @notice Extension of the `BaseRouter` contract for sidechains beyond Ethereum
 abstract contract BaseAngleRouterSidechain is BaseRouter {
     // ============================== EVENTS / ERRORS ==============================
 
@@ -34,7 +34,7 @@ abstract contract BaseAngleRouterSidechain is BaseRouter {
         address _core,
         address _uniswapRouter,
         address _oneInch
-    ) public virtual {
+    ) public virtual initializer {
         if (_core == address(0)) revert ZeroAddress();
         core = ICoreBorrow(_core);
         uniswapV3Router = IUniswapV3Router(_uniswapRouter);
@@ -102,41 +102,23 @@ abstract contract BaseAngleRouterSidechain is BaseRouter {
         return uniswapV3Router;
     }
 
-    // ================================= MODIFIERS =================================
-
-    /// @notice Checks whether the `msg.sender` has the governor role or not
-    modifier onlyGovernor() {
-        if (!core.isGovernor(msg.sender)) revert NotGovernor();
-        _;
+    /// @inheritdoc BaseRouter
+    function _isGovernorOrGuardian(address user) internal view override returns (bool) {
+        return core.isGovernorOrGuardian(user);
     }
 
-    /// @notice Checks whether the `msg.sender` has the governor role or the guardian role
-    modifier onlyGovernorOrGuardian() {
-        if (!core.isGovernorOrGuardian(msg.sender)) revert NotGovernorOrGuardian();
-        _;
+    /// @inheritdoc BaseRouter
+    function _setRouter(address router, uint8 who) internal virtual override {
+        if (who == 0) uniswapV3Router = IUniswapV3Router(router);
+        else oneInch = router;
     }
 
     // ============================ GOVERNANCE UTILITIES ===========================
 
     /// @notice Sets a new `core` contract
-    function setCore(ICoreBorrow _core) external onlyGovernor {
-        if (!_core.isGovernor(msg.sender)) revert NotGovernor();
+    function setCore(ICoreBorrow _core) external {
+        if (!core.isGovernor(msg.sender) || !_core.isGovernor(msg.sender)) revert NotGovernor();
         core = ICoreBorrow(_core);
         emit CoreUpdated(address(_core));
-    }
-
-    /// @notice Changes allowances for different tokens
-    /// @param tokens Addresses of the tokens to allow
-    /// @param spenders Addresses to allow transfer
-    /// @param amounts Amounts to allow
-    function changeAllowance(
-        IERC20[] calldata tokens,
-        address[] calldata spenders,
-        uint256[] calldata amounts
-    ) external onlyGovernorOrGuardian {
-        if (tokens.length != spenders.length || tokens.length != amounts.length) revert IncompatibleLengths();
-        for (uint256 i = 0; i < tokens.length; i++) {
-            _changeAllowance(tokens[i], spenders[i], amounts[i]);
-        }
     }
 }

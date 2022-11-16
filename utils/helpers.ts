@@ -597,41 +597,11 @@ export async function impersonate(
 }
 
 export enum ActionType {
-  claimRewards,
-  claimWeeklyInterest,
-  gaugeDeposit,
-  withdraw,
-  mint,
-  deposit,
-  openPerpetual,
-  addToPerpetual,
-  veANGLEDeposit,
-  borrower,
-  mintSavingsRate,
-  depositSavingsRate,
-  redeemSavingsRate,
-  withdrawSavingsRate,
-  prepareRedeemSavingsRate,
-  claimRedeemSavingsRate,
-  swapper,
-}
-export enum SwapType {
-  UniswapV3,
-  oneINCH,
-  WrapStETH,
-  None,
-}
-
-export enum ActionTypeSidechain {
   transfer,
-  wrap,
   wrapNative,
+  unwrapNative,
   sweep,
   sweepNative,
-  unwrap,
-  unwrapNative,
-  swapIn,
-  swapOut,
   uniswapV3,
   oneInch,
   claimRewards,
@@ -643,5 +613,14 @@ export enum ActionTypeSidechain {
   withdrawSavingsRate,
   prepareRedeemSavingsRate,
   claimRedeemSavingsRate,
-  swapper,
+  swapIn,
+  swapOut,
+  claimWeeklyInterest,
+  withdraw,
+  mint,
+  deposit,
+  openPerpetual,
+  addToPerpetual,
+  veANGLEDeposit,
+  claimRewardsWithPerps,
 }
