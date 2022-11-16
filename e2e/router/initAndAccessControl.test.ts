@@ -1,46 +1,44 @@
-import hre, { ethers } from 'hardhat';
-import { expect } from '../../utils/chai-setup';
+import { BASE_18, ChainId, CONTRACTS_ADDRESSES } from '@angleprotocol/sdk';
+import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { BigNumber, ContractFactory } from 'ethers';
-
-// we import our utilities
-import {
-  // functions
-  initRouter,
-  initCollateral,
-  initToken,
-  initGaugeFork,
-} from '../../utils/helpers';
+import hre, { ethers } from 'hardhat';
 
 import {
   AngleRouter,
+  AngleRouter__factory,
+  Mock1Inch,
   MockANGLE,
   MockTokenPermit,
   MockUniswapV3Router,
-  Mock1Inch,
-  AngleRouter__factory,
 } from '../../typechain';
-
 import {
   AgToken,
-  AngleDistributor,
-  LiquidityGaugeV4,
+  AgToken__factory,
   ANGLE as ANGLEType,
+  ANGLE__factory,
+  AngleDistributor,
+  AngleDistributor__factory,
+  LiquidityGaugeV4,
   PerpetualManagerFront,
   PoolManager,
   SanToken,
   StableMasterFront,
-  VeANGLE,
-  VeBoostProxy,
-  VeANGLE__factory,
-  VeBoostProxy__factory,
-  AngleDistributor__factory,
   StableMasterFront__factory,
-  AgToken__factory,
-  ANGLE__factory,
+  VeANGLE,
+  VeANGLE__factory,
+  VeBoostProxy,
+  VeBoostProxy__factory,
 } from '../../typechain/core';
-import { BASE_18, ChainId, CONTRACTS_ADDRESSES } from '@angleprotocol/sdk';
+import { expect } from '../../utils/chai-setup';
+// we import our utilities
+import {
+  initCollateral,
+  initGaugeFork,
+  // functions
+  initRouter,
+  initToken,
+} from '../../utils/helpers';
 import { impersonate } from '../../utils/helpers';
-import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 
 let ANGLE: ANGLEType;
 let veANGLE: VeANGLE;
@@ -477,44 +475,6 @@ describe('AngleRouter - init & access control', () => {
       });
     });
     describe('AccessControl', () => {
-      it('governorOrGuardianRole - governor', async () => {
-        expect(await angleRouter.governor()).to.be.equal(governor.address);
-      });
-      it('governorOrGuardianRole - guardian', async () => {
-        expect(await angleRouter.guardian()).to.be.equal(guardian.address);
-      });
-      describe('setGovernorOrGuardian', () => {
-        it('setGovernorOrGuardian - revert - onlyGovernorOrGuardian', async () => {
-          await expect(angleRouter.connect(user).setGovernorOrGuardian(user.address, false)).to.be.revertedWith('115');
-        });
-        it('setGovernorOrGuardian - revert - zero address', async () => {
-          await expect(
-            angleRouter.connect(governor).setGovernorOrGuardian(ethers.constants.AddressZero, false),
-          ).to.be.revertedWith('0');
-        });
-        it('setGovernorOrGuardian - revert - same guardian', async () => {
-          await expect(angleRouter.connect(governor).setGovernorOrGuardian(guardian.address, false)).to.be.revertedWith(
-            '49',
-          );
-        });
-        it('setGovernorOrGuardian - revert - different than governor', async () => {
-          await expect(angleRouter.connect(governor).setGovernorOrGuardian(governor.address, false)).to.be.revertedWith(
-            '49',
-          );
-        });
-        it('setGovernorOrGuardian - success - guardian', async () => {
-          await (await angleRouter.connect(governor).setGovernorOrGuardian(user.address, false)).wait();
-          expect(await angleRouter.guardian()).to.be.equal(user.address);
-          await (await angleRouter.connect(user).setGovernorOrGuardian(guardian.address, false)).wait();
-          expect(await angleRouter.guardian()).to.be.equal(guardian.address);
-        });
-        it('setGovernorOrGuardian - success - governor', async () => {
-          await (await angleRouter.connect(governor).setGovernorOrGuardian(user.address, true)).wait();
-          expect(await angleRouter.governor()).to.be.equal(user.address);
-          await (await angleRouter.connect(user).setGovernorOrGuardian(governor.address, true)).wait();
-          expect(await angleRouter.governor()).to.be.equal(governor.address);
-        });
-      });
       describe('Add and Remove - Collaterals ', () => {
         it('addPairs - revert - governor', async () => {
           await expect(
@@ -739,119 +699,6 @@ describe('AngleRouter - init & access control', () => {
             ethers.constants.MaxUint256,
           );
           expect(await wBTC.allowance(angleRouter.address, gaugeSanEURWBTC2.address)).to.be.equal(BigNumber.from(0));
-        });
-      });
-      describe('approve', () => {
-        it('revert - governor ', async () => {
-          await expect(
-            angleRouter
-              .connect(user)
-              .changeAllowance(
-                [wBTC.address, DAI.address],
-                [governor.address, governor.address],
-                [ethers.constants.MaxUint256, ethers.constants.MaxUint256],
-              ),
-          ).to.be.revertedWith(governorOrGuardianError);
-        });
-        it('revert - invalid arrays ', async () => {
-          await expect(
-            angleRouter
-              .connect(governor)
-              .changeAllowance(
-                [wBTC.address],
-                [governor.address, governor.address],
-                [ethers.constants.MaxUint256, ethers.constants.MaxUint256],
-              ),
-          ).to.be.revertedWith('104');
-        });
-        it('success - from no approval to full approval ', async () => {
-          await angleRouter
-            .connect(governor)
-            .changeAllowance(
-              [wBTC.address, DAI.address],
-              [governor.address, governor.address],
-              [ethers.constants.MaxUint256, ethers.constants.MaxUint256],
-            );
-          expect(await wBTC.allowance(angleRouter.address, governor.address)).to.be.equal(ethers.constants.MaxUint256);
-          expect(await DAI.allowance(angleRouter.address, governor.address)).to.be.equal(ethers.constants.MaxUint256);
-        });
-        it('success - remove approval ', async () => {
-          await angleRouter
-            .connect(governor)
-            .changeAllowance(
-              [wBTC.address, DAI.address],
-              [governor.address, governor.address],
-              [ethers.constants.Zero, ethers.constants.Zero],
-            );
-          expect(await wBTC.allowance(angleRouter.address, governor.address)).to.be.equal(ethers.constants.Zero);
-          expect(await DAI.allowance(angleRouter.address, governor.address)).to.be.equal(ethers.constants.Zero);
-        });
-        it('success - partial approval ', async () => {
-          const partialAmount = ethers.constants.MaxUint256.div(BASE_18);
-          await angleRouter
-            .connect(governor)
-            .changeAllowance(
-              [wBTC.address, DAI.address],
-              [governor.address, governor.address],
-              [partialAmount, partialAmount],
-            );
-          expect(await wBTC.allowance(angleRouter.address, governor.address)).to.be.equal(partialAmount);
-          expect(await DAI.allowance(angleRouter.address, governor.address)).to.be.equal(partialAmount);
-        });
-        it('success - same allowance ', async () => {
-          const partialAmount = ethers.constants.MaxUint256.div(BASE_18);
-          await angleRouter
-            .connect(governor)
-            .changeAllowance(
-              [wBTC.address, DAI.address],
-              [governor.address, governor.address],
-              [partialAmount, partialAmount],
-            );
-          expect(await wBTC.allowance(angleRouter.address, governor.address)).to.be.equal(partialAmount);
-          expect(await DAI.allowance(angleRouter.address, governor.address)).to.be.equal(partialAmount);
-        });
-        it('success - from partial approval to full approval ', async () => {
-          await angleRouter
-            .connect(governor)
-            .changeAllowance(
-              [wBTC.address, DAI.address],
-              [governor.address, governor.address],
-              [ethers.constants.MaxUint256, ethers.constants.MaxUint256],
-            );
-          expect(await wBTC.allowance(angleRouter.address, governor.address)).to.be.equal(ethers.constants.MaxUint256);
-          expect(await DAI.allowance(angleRouter.address, governor.address)).to.be.equal(ethers.constants.MaxUint256);
-        });
-      });
-      describe('Recover ERC20', () => {
-        it('revert - onlyGovernorOrGuardian', async () => {
-          expect(await DAI.balanceOf(governor.address)).to.be.equal(BigNumber.from(0));
-          const amountLost = UNIT_DAI;
-          await DAI.connect(governor).mint(angleRouter.address, amountLost);
-          await expect(
-            angleRouter.connect(user).recoverERC20(DAI.address, governor.address, amountLost),
-          ).to.be.revertedWith('115');
-          // set back to no funds
-          await angleRouter.connect(governor).recoverERC20(DAI.address, governor.address, amountLost);
-          await DAI.connect(governor).burn(governor.address, amountLost);
-        });
-        it('success', async () => {
-          expect(await DAI.balanceOf(governor.address)).to.be.equal(BigNumber.from(0));
-          const amountLost = UNIT_DAI;
-          await DAI.mint(angleRouter.address, amountLost);
-          await angleRouter.connect(governor).recoverERC20(DAI.address, governor.address, amountLost);
-          expect(await DAI.balanceOf(governor.address)).to.be.equal(amountLost);
-          await DAI.connect(governor).burn(governor.address, amountLost);
-        });
-      });
-      describe('Change allowances', () => {
-        it('success', async () => {
-          angleRouter
-            .connect(governor)
-            .changeAllowance(
-              [wETH.address, wETH.address],
-              [uniswapRouter.address, oneInchRouter.address],
-              [ethers.constants.MaxUint256, ethers.constants.MaxUint256],
-            );
         });
       });
     });

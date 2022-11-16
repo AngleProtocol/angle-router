@@ -3,7 +3,7 @@ import { BigNumber, Contract, ContractFactory } from 'ethers';
 import hre, { ethers, network, web3 } from 'hardhat';
 
 import {
-  AngleRouter,
+  AngleRouterMainnet,
   Mock1Inch,
   Mock1Inch__factory,
   MockAgToken,
@@ -96,29 +96,6 @@ export type TypeTransfer = {
   amountIn: BigNumber;
 };
 
-export async function setupUsers<T extends { [contractName: string]: Contract }>(
-  addresses: string[],
-  contracts: T,
-): Promise<({ address: string } & T)[]> {
-  const users: ({ address: string } & T)[] = [];
-  for (const address of addresses) {
-    users.push(await setupUser(address, contracts));
-  }
-  return users;
-}
-
-export async function setupUser<T extends { [contractName: string]: Contract }>(
-  address: string,
-  contracts: T,
-): Promise<{ address: string } & T> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const user: any = { address };
-  for (const key of Object.keys(contracts)) {
-    user[key] = contracts[key].connect(await ethers.getSigner(address));
-  }
-  return user as { address: string } & T;
-}
-
 // eslint-disable-next-line
 async function deployUpgradeable(factory: ContractFactory, ...args: any[]): Promise<Contract> {
   const { deployer, proxyAdmin, alice } = await ethers.getNamedSigners();
@@ -198,7 +175,7 @@ export async function initRouter(
   oracleUni: BigNumber,
   oracle1Inch: BigNumber,
 ): Promise<{
-  angleRouter: AngleRouter;
+  angleRouter: AngleRouterMainnet;
   uniswapRouter: MockUniswapV3Router;
   oneInchRouter: Mock1Inch;
 }> {
@@ -210,8 +187,8 @@ export async function initRouter(
   const oneInchRouter = (await new Mock1Inch__factory(governor).deploy(tokenB.address, tokenC.address)) as Mock1Inch;
   await oneInchRouter.updateExchangeRate(parseAmount.ether(oracle1Inch));
 
-  const AngleRouterArtifacts = await ethers.getContractFactory('AngleRouter');
-  const angleRouter = (await AngleRouterArtifacts.deploy()) as unknown as AngleRouter;
+  const AngleRouterArtifacts = await ethers.getContractFactory('AngleRouterMainnet');
+  const angleRouter = (await AngleRouterArtifacts.deploy()) as unknown as AngleRouterMainnet;
   /*
   await angleRouter.initialize(
     governor.address,

@@ -6,7 +6,7 @@ import { ERC4626 } from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.
 import "./BaseTest.t.sol";
 import "../../contracts/mock/MockTokenPermit.sol";
 import { MockSavingsRate } from "../../contracts/mock/MockSavingsRate.sol";
-import { MockRouterSidechain, IUniswapV3Router, PermitType, ActionType, PermitType, BaseAngleRouterSidechain } from "../../contracts/mock/MockRouterSidechain.sol";
+import { MockRouterSidechain, IUniswapV3Router, PermitType, ActionType, PermitType, BaseAngleRouterSidechain, BaseRouter } from "../../contracts/mock/MockRouterSidechain.sol";
 
 contract RouterSidechainSavingsRateActionsTest is BaseTest {
     IUniswapV3Router public constant uniswapV3Router = IUniswapV3Router(0xE592427A0AEce92De3Edee1F18E0157C05861564);
@@ -144,7 +144,7 @@ contract RouterSidechainSavingsRateActionsTest is BaseTest {
         token.approve(address(router), type(uint256).max);
         // as this is a mock vault, previewMint is exactly what is needed to mint
         if (previewDeposit < minSharesOut) {
-            vm.expectRevert(BaseAngleRouterSidechain.TooSmallAmountOut.selector);
+            vm.expectRevert(BaseRouter.TooSmallAmountOut.selector);
             router.mixer(paramsPermit, actionType, data);
             return;
         } else {
@@ -222,7 +222,7 @@ contract RouterSidechainSavingsRateActionsTest is BaseTest {
         savingsRate.approve(address(router), type(uint256).max);
         // as this is a mock vault, previewRedeem is exactly what should be received
         if (previewRedeem < minAmount) {
-            vm.expectRevert(BaseAngleRouterSidechain.TooSmallAmountOut.selector);
+            vm.expectRevert(BaseRouter.TooSmallAmountOut.selector);
             router.mixer(paramsPermit, actionType, data);
             return;
         } else {
@@ -298,7 +298,7 @@ contract RouterSidechainSavingsRateActionsTest is BaseTest {
             router.mixer(paramsPermit, actionType, data);
             return;
         } else if (previewWithdraw > maxAmountBurn) {
-            vm.expectRevert(BaseAngleRouterSidechain.TooSmallAmountOut.selector);
+            vm.expectRevert(BaseRouter.TooSmallAmountOut.selector);
             router.mixer(paramsPermit, actionType, data);
             return;
         } else {

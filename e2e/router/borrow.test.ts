@@ -1,32 +1,31 @@
-import yargs from 'yargs';
-import { ethers, network, deployments, web3 } from 'hardhat';
-import { expect } from '../../utils/chai-setup';
-import { BigNumber } from 'ethers';
-import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
-import { CONTRACTS_ADDRESSES, ChainId } from '@angleprotocol/sdk';
-
-const argv = yargs.env('').boolean('ci').parseSync();
-
+import { ChainId, CONTRACTS_ADDRESSES } from '@angleprotocol/sdk';
 // we import our utilities
-import { ActionType, TypeTransfer, TypeSwap, SwapType, BASE_PARAMS, initToken, TypePermit } from '../../utils/helpers';
+import { JsonRpcSigner } from '@ethersproject/providers';
+import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
+import { BigNumber } from 'ethers';
+import { deployments, ethers, network, web3 } from 'hardhat';
+import yargs from 'yargs';
 
 import {
   AngleRouter,
-  MockANGLE,
-  MockVaultManager,
-  MockVaultManager__factory,
   AngleRouter__factory,
   ERC20,
-  IWStETH__factory,
   IStETH__factory,
-  MockTokenPermit,
+  IWStETH__factory,
   MockAgToken,
   MockAgToken__factory,
+  MockANGLE,
+  MockTokenPermit,
+  MockVaultManager,
+  MockVaultManager__factory,
 } from '../../typechain';
 import { AgToken, AgToken__factory } from '../../typechain/core';
+import { expect } from '../../utils/chai-setup';
+import { ActionType, BASE_PARAMS, initToken, SwapType, TypePermit, TypeSwap, TypeTransfer } from '../../utils/helpers';
 import { addCollateral, borrow, createVault, encodeAngleBorrow } from '../../utils/helpersEncoding';
-import { JsonRpcSigner } from '@ethersproject/providers';
 import { signPermit } from '../../utils/sign';
+
+const argv = yargs.env('').boolean('ci').parseSync();
 
 let ANGLE: MockANGLE;
 let agEUR: MockAgToken;
@@ -175,63 +174,6 @@ describe('AngleRouter - borrower', () => {
         const dataMixer = [dataBorrow1, dataBorrow2];
         dataMixer;
         actions;
-      });
-    });
-    describe('WSTETH', () => {
-      it('success - ETH -> wSTETH', async () => {
-        const stETHContract = new ethers.Contract(STETH, IStETH__factory.createInterface(), user);
-        const supposedAmountToReceive: BigNumber = await stETHContract.getSharesByPooledEth(UNIT_ETH);
-        const minAmountOut = supposedAmountToReceive.mul(BigNumber.from(95).div(BigNumber.from(100)));
-
-        const transfers: TypeTransfer[] = [];
-        const swaps: TypeSwap[] = [
-          {
-            inToken: WSTETHAddress,
-            collateral: WSTETHAddress,
-            amountIn: UNIT_ETH,
-            minAmountOut: BigNumber.from(0),
-            args: '0x',
-            swapType: SwapType.None,
-          },
-        ];
-        const actions: ActionType[] = [];
-        const datas: string[] = [];
-        const receipt = await (
-          await angleRouter.connect(user).mixer([], transfers, swaps, actions, datas, { value: UNIT_ETH })
-        ).wait();
-
-        const wSTETHContract = new ethers.Contract(WSTETHAddress, IWStETH__factory.createInterface(), user);
-        const balanceWSTETH: BigNumber = await wSTETHContract.balanceOf(user.address);
-        expect(balanceWSTETH.gte(minAmountOut)).to.be.true;
-      });
-      it('success - stETH -> wSTETH', async () => {
-        // first get some stETH
-        const stETHContract = new ethers.Contract(STETH, IStETH__factory.createInterface(), user);
-        await (await stETHContract.connect(user).submit(ethers.constants.AddressZero, { value: UNIT_ETH })).wait();
-        const balanceStETHBefore: BigNumber = await stETHContract.balanceOf(user.address);
-
-        await (await stETHContract.connect(user).approve(angleRouter.address, ethers.constants.MaxUint256)).wait();
-        const supposedAmountToReceive: BigNumber = await stETHContract.getSharesByPooledEth(balanceStETHBefore);
-        const minAmountOut = supposedAmountToReceive.mul(BigNumber.from(95).div(BigNumber.from(100)));
-
-        const transfers: TypeTransfer[] = [];
-        const swaps: TypeSwap[] = [
-          {
-            inToken: STETH,
-            collateral: WSTETHAddress,
-            amountIn: balanceStETHBefore,
-            minAmountOut: minAmountOut,
-            args: '0x',
-            swapType: SwapType.WrapStETH,
-          },
-        ];
-        const actions: ActionType[] = [];
-        const datas: string[] = [];
-        await (await angleRouter.connect(user).mixer([], transfers, swaps, actions, datas)).wait();
-
-        const wSTETHContract = new ethers.Contract(WSTETHAddress, IWStETH__factory.createInterface(), user);
-        const balanceWSTETH: BigNumber = await wSTETHContract.balanceOf(user.address);
-        expect(balanceWSTETH.gte(minAmountOut)).to.be.true;
       });
     });
     describe('VaultManager', () => {
