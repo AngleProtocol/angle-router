@@ -286,6 +286,21 @@ contract('BaseRouter', () => {
         await router.connect(alice).mixer(permits, actions, dataMixer);
       });
     });
+    describe('claimRewards', () => {
+      it('success - claiming rewards from a gauge', async () => {
+        const gauge = (await new MockLiquidityGauge__factory(deployer).deploy(USDC.address)) as MockLiquidityGauge;
+        const claimData = ethers.utils.defaultAbiCoder.encode(['address', 'address[]'], [bob.address, [gauge.address]]);
+        const actions = [ActionType.transfer];
+        const dataMixer = [claimData];
+        await router.connect(alice).mixer(permits, actions, dataMixer);
+      });
+      it('reverts - when gauge address is invalid', async () => {
+        const claimData = ethers.utils.defaultAbiCoder.encode(['address', 'address[]'], [bob.address, [bob.address]]);
+        const actions = [ActionType.transfer];
+        const dataMixer = [claimData];
+        await expect(router.connect(alice).mixer(permits, actions, dataMixer)).to.be.reverted;
+      });
+    });
 
     describe('gaugeDeposit', () => {
       it('success - nothing happens when correct gauge', async () => {

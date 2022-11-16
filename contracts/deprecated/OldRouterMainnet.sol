@@ -17,7 +17,6 @@ import "../interfaces/IFeeDistributor.sol";
 import "../interfaces/ILiquidityGauge.sol";
 import "../interfaces/ISanToken.sol";
 import "../interfaces/ISavingsRateIlliquid.sol";
-import "../interfaces/IStableMaster.sol";
 import "../interfaces/IStableMasterFront.sol";
 import "../interfaces/ISwapper.sol";
 import "../interfaces/IVaultManager.sol";
@@ -1286,9 +1285,17 @@ contract OldRouterMainnet is Initializable, ReentrancyGuardUpgradeable {
         ILiquidityGauge liquidityGauge
     ) internal {
         // Fetching the associated `sanToken` and `perpetualManager` from the contract
-        (IERC20 collateral, ISanToken sanToken, IPerpetualManager perpetualManager, , , , , , ) = IStableMaster(
-            address(stableMaster)
-        ).collateralMap(poolManager);
+        (
+            IERC20 collateral,
+            ISanToken sanToken,
+            IPerpetualManagerFrontWithClaim perpetualManager,
+            ,
+            ,
+            ,
+            ,
+            ,
+
+        ) = IStableMasterFront(address(stableMaster)).collateralMap(poolManager);
 
         Pairs storage _pairs = mapPoolManagers[stableMaster][collateral];
         // Checking if the pair has not already been initialized: if yes we need to make the function revert

@@ -8,39 +8,8 @@ import "./BaseRouter.sol";
 
 /// @title BaseAngleRouterSidechain
 /// @author Angle Core Team
-/// @notice Extension of the `BaseRouter` contract for sidechains beyond Ethereum
+/// @notice Extension of the `BaseRouter` contract for sidechains
 abstract contract BaseAngleRouterSidechain is BaseRouter {
-    // ============================== EVENTS / ERRORS ==============================
-
-    event CoreUpdated(address indexed _core);
-
-    error NotGovernor();
-
-    // ================================= REFERENCES ================================
-
-    /// @notice Core Borrow address
-    ICoreBorrow public core;
-    /// @notice Address of the Uniswap V3 router potentially used for swaps
-    IUniswapV3Router public uniswapV3Router;
-    /// @notice Address of the 1Inch router potentially used for swaps
-    address public oneInch;
-
-    uint256[47] private __gap;
-
-    constructor() initializer {}
-
-    /// @notice Deploys the router contract on a chain
-    function initializeRouter(
-        address _core,
-        address _uniswapRouter,
-        address _oneInch
-    ) public virtual initializer {
-        if (_core == address(0)) revert ZeroAddress();
-        core = ICoreBorrow(_core);
-        uniswapV3Router = IUniswapV3Router(_uniswapRouter);
-        oneInch = _oneInch;
-    }
-
     // =========================== ROUTER FUNCTIONALITIES ==========================
 
     /// @notice Wrapper built on top of the `_claimRewards` function. It allows to claim rewards for multiple
@@ -90,35 +59,5 @@ abstract contract BaseAngleRouterSidechain is BaseRouter {
         amount = IAgTokenMultiChain(canonicalToken).swapOut(bridgeToken, amount, to);
         _slippageCheck(amount, minAmountOut);
         return amount;
-    }
-
-    /// @inheritdoc BaseRouter
-    function _get1InchRouter() internal view virtual override returns (address) {
-        return oneInch;
-    }
-
-    /// @inheritdoc BaseRouter
-    function _getUniswapRouter() internal view virtual override returns (IUniswapV3Router) {
-        return uniswapV3Router;
-    }
-
-    /// @inheritdoc BaseRouter
-    function _isGovernorOrGuardian(address user) internal view override returns (bool) {
-        return core.isGovernorOrGuardian(user);
-    }
-
-    /// @inheritdoc BaseRouter
-    function _setRouter(address router, uint8 who) internal virtual override {
-        if (who == 0) uniswapV3Router = IUniswapV3Router(router);
-        else oneInch = router;
-    }
-
-    // ============================ GOVERNANCE UTILITIES ===========================
-
-    /// @notice Sets a new `core` contract
-    function setCore(ICoreBorrow _core) external {
-        if (!core.isGovernor(msg.sender) || !_core.isGovernor(msg.sender)) revert NotGovernor();
-        core = ICoreBorrow(_core);
-        emit CoreUpdated(address(_core));
     }
 }

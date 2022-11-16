@@ -4,8 +4,7 @@ pragma solidity 0.8.12;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-import "../interfaces/mock/IERC20MINT.sol";
-import "../interfaces/mock/IMockUniswapV3Pool.sol";
+import "./MockTokenPermit.sol";
 
 struct SwapDescription {
     IERC20 srcToken;
@@ -38,7 +37,7 @@ contract Mock1Inch {
         tokenB = _tokenB;
         decimalsA = _tokenA.decimals();
         decimalsB = _tokenB.decimals();
-        IERC20MINT(address(tokenB)).mint(address(this), type(uint256).max / 1000);
+        MockTokenPermit(address(tokenB)).mint(address(this), type(uint256).max / 1000);
     }
 
     function swap(
@@ -69,10 +68,6 @@ contract Mock1Inch {
 
     function revertingSwap() external payable {
         revert("wrong swap");
-    }
-
-    function revertingSwap2() external payable {
-        IMockUniswapV3Pool(address(tokenA)).increaseObservationCardinalityNext(12);
     }
 
     function updateExchangeRate(uint256 newExchangeRate) external {

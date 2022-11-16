@@ -73,21 +73,46 @@ struct PermitVaultManagerType {
 /// @title BaseRouter
 /// @author Angle Core Team
 /// @notice Base contract that Angle router contracts on different chains should override
+/// @dev Router contracts are designed to facilitate the composition of actions on the different modules of the protocol
 abstract contract BaseRouter is Initializable {
     using SafeERC20 for IERC20;
 
     /// @notice How many actions can be performed on a given `VaultManager` contract
     uint256 private constant _MAX_BORROW_ACTIONS = 10;
 
+    // ================================= REFERENCES ================================
+
+    /// @notice Core address handling access control
+    ICoreBorrow public core;
+    /// @notice Address of the router used for swaps
+    IUniswapV3Router public uniswapV3Router;
+    /// @notice Address of 1Inch router used for swaps
+    address public oneInch;
+
+    uint256[47] private __gap;
+
     // ============================== EVENTS / ERRORS ==============================
 
     error IncompatibleLengths();
     error InvalidReturnMessage();
     error NotApprovedOrOwner();
+    error NotGovernor();
     error NotGovernorOrGuardian();
     error TooSmallAmountOut();
     error TransferFailed();
     error ZeroAddress();
+
+    /// @notice Deploys the router contract on a chain
+    function initializeRouter(
+        address _core,
+        address _uniswapRouter,
+        address _oneInch
+    ) public initializer {
+        if (_core == address(0)) revert ZeroAddress();
+        core = ICoreBorrow(_core);
+        uniswapV3Router = IUniswapV3Router(_uniswapRouter);
+        oneInch = _oneInch;
+    }
 
     constructor() initializer {}
 
@@ -125,6 +150,7 @@ abstract contract BaseRouter is Initializable {
         for (uint256 i = 0; i < actions.length; i++) {
             if (actions[i] == ActionType.transfer) {
                 (address inToken, address receiver, uint256 amount) = abi.decode(data[i], (address, address, uint256));
+                if (amount == type(uint256).max) amount = IERC20(inToken).balanceOf(msg.sender);
                 IERC20(inToken).safeTransferFrom(msg.sender, receiver, amount);
             } else if (actions[i] == ActionType.wrapNative) {
                 _wrapNative();
@@ -286,6 +312,8 @@ abstract contract BaseRouter is Initializable {
     }
 
     /// @notice Internal version of the `claimRewards` function
+    /// @dev If the caller wants to send the rewards to another account than `gaugeUser`, it first needs to
+    /// call `set_rewards_receiver(otherAccount)` on each `liquidityGauge`
     function _claimRewards(address gaugeUser, address[] memory liquidityGauges) internal virtual {
         for (uint256 i = 0; i < liquidityGauges.length; i++) {
             ILiquidityGauge(liquidityGauges[i]).claim_rewards(gaugeUser);
@@ -355,7 +383,7 @@ abstract contract BaseRouter is Initializable {
     ) internal returns (uint256 amountOut) {
         // Approve transfer to the `uniswapV3Router`
         // Since this router is supposed to be a trusted contract, we can leave the allowance to the token
-        address uniRouter = address(_getUniswapRouter());
+        address uniRouter = address(uniswapV3Router);
         uint256 currentAllowance = IERC20(inToken).allowance(address(this), uniRouter);
         if (currentAllowance < amount)
             IERC20(inToken).safeIncreaseAllowance(uniRouter, type(uint256).max - currentAllowance);
@@ -374,7 +402,7 @@ abstract contract BaseRouter is Initializable {
     ) internal returns (uint256 amountOut) {
         // Approve transfer to the `oneInch` address
         // Since this router is supposed to be a trusted contract, we can leave the allowance to the token
-        address oneInchRouter = _get1InchRouter();
+        address oneInchRouter = oneInch;
         _changeAllowance(IERC20(inToken), oneInchRouter, type(uint256).max);
         //solhint-disable-next-line
         (bool success, bytes memory result) = oneInchRouter.call(payload);
@@ -483,27 +511,21 @@ abstract contract BaseRouter is Initializable {
 
     // ======================= VIRTUAL FUNCTIONS TO OVERRIDE =======================
 
-    /// @notice Returns the 1Inch router address on the desired chain
-    function _get1InchRouter() internal view virtual returns (address);
-
-    /// @notice Returns the Uniswap router address on a chain
-    function _getUniswapRouter() internal view virtual returns (IUniswapV3Router);
-
     /// @notice Gets the official wrapper of the native token on a chain (like wETH on Ethereum)
     function _getNativeWrapper() internal pure virtual returns (IWETH9);
-
-    /// @notice Returns true if `user` is governor or guardian
-    function _isGovernorOrGuardian(address user) internal view virtual returns (bool);
-
-    /// @notice Internal version of the `setRouter` function
-    function _setRouter(address router, uint8 who) internal virtual;
 
     // ============================ GOVERNANCE FUNCTION ============================
 
     /// @notice Checks whether the `msg.sender` has the governor role or the guardian role
     modifier onlyGovernorOrGuardian() {
-        if (!_isGovernorOrGuardian(msg.sender)) revert NotGovernorOrGuardian();
+        if (!core.isGovernorOrGuardian(msg.sender)) revert NotGovernorOrGuardian();
         _;
+    }
+
+    /// @notice Sets a new `core` contract
+    function setCore(ICoreBorrow _core) external {
+        if (!core.isGovernor(msg.sender) || !_core.isGovernor(msg.sender)) revert NotGovernor();
+        core = ICoreBorrow(_core);
     }
 
     /// @notice Changes allowances for different tokens
@@ -524,7 +546,8 @@ abstract contract BaseRouter is Initializable {
     /// @notice Sets a new router variable
     function setRouter(address router, uint8 who) external onlyGovernorOrGuardian {
         if (router == address(0)) revert ZeroAddress();
-        _setRouter(router, who);
+        if (who == 0) uniswapV3Router = IUniswapV3Router(router);
+        else oneInch = router;
     }
 
     // ========================= INTERNAL UTILITY FUNCTIONS ========================
