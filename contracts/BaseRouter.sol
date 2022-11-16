@@ -22,19 +22,17 @@ import "./interfaces/IVaultManager.sol";
 /// @dev Some actions are only possible on Ethereum mainnet
 enum ActionType {
     transfer,
-    wrap,
     wrapNative,
+    unwrapNative,
     sweep,
     sweepNative,
-    unwrap,
-    unwrapNative,
-    swapIn,
-    swapOut,
     uniswapV3,
     oneInch,
     claimRewards,
     gaugeDeposit,
     borrower,
+    swapIn,
+    swapOut,
     mintSavingsRate,
     depositSavingsRate,
     redeemSavingsRate,
@@ -48,8 +46,7 @@ enum ActionType {
     openPerpetual,
     addToPerpetual,
     veANGLEDeposit,
-    claimRewardsWithPerps,
-    wrapMultiple
+    claimRewardsWithPerps
 }
 
 /// @notice Data needed to get permits
@@ -129,14 +126,8 @@ abstract contract BaseRouter is Initializable {
             if (actions[i] == ActionType.transfer) {
                 (address inToken, address receiver, uint256 amount) = abi.decode(data[i], (address, address, uint256));
                 IERC20(inToken).safeTransferFrom(msg.sender, receiver, amount);
-            } else if (actions[i] == ActionType.wrap) {
-                (uint256 amount, uint256 minAmountOut) = abi.decode(data[i], (uint256, uint256));
-                _wrap(amount, minAmountOut);
             } else if (actions[i] == ActionType.wrapNative) {
                 _wrapNative();
-            } else if (actions[i] == ActionType.unwrap) {
-                (uint256 amount, uint256 minAmountOut, address to) = abi.decode(data[i], (uint256, uint256, address));
-                _unwrap(amount, minAmountOut, to);
             } else if (actions[i] == ActionType.unwrapNative) {
                 (uint256 minAmountOut, address to) = abi.decode(data[i], (uint256, address));
                 _unwrapNative(minAmountOut, to);
@@ -496,18 +487,6 @@ abstract contract BaseRouter is Initializable {
 
     /// @notice Gets the official wrapper of the native token on a chain (like wETH on Ethereum)
     function _getNativeWrapper() internal pure virtual returns (IWETH9);
-
-    /// @notice Wraps a token to another wrapped version of it
-    /// @dev It can be used to get wstETH from stETH
-    function _wrap(uint256 amount, uint256 minAmountOut) internal virtual returns (uint256);
-
-    /// @notice Unwraps a wrapped token to another version of it
-    /// @dev It can be used to get stETH from wstETH
-    function _unwrap(
-        uint256 amount,
-        uint256 minAmountOut,
-        address to
-    ) internal virtual returns (uint256);
 
     // ========================= INTERNAL UTILITY FUNCTIONS ========================
 

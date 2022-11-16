@@ -93,20 +93,6 @@ abstract contract BaseAngleRouterSidechain is BaseRouter {
     }
 
     /// @inheritdoc BaseRouter
-    function _wrap(uint256, uint256) internal pure virtual override returns (uint256) {
-        return 0;
-    }
-
-    /// @inheritdoc BaseRouter
-    function _unwrap(
-        uint256,
-        uint256,
-        address
-    ) internal pure virtual override returns (uint256) {
-        return 0;
-    }
-
-    /// @inheritdoc BaseRouter
     function _get1InchRouter() internal view virtual override returns (address) {
         return oneInch;
     }

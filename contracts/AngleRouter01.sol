@@ -37,16 +37,10 @@ struct Pairs {
 contract AngleRouter is BaseRouter, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
 
-    /// @notice Wrapped ETH contract
-    IWETH9 public constant WETH9 = IWETH9(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     /// @notice ANGLE contract
     IERC20 public constant ANGLE = IERC20(0x31429d1856aD1377A8A0079410B297e1a9e214c2);
     /// @notice veANGLE contract
     IVeANGLE public constant VEANGLE = IVeANGLE(0x0C462Dbb9EC8cD1630f1728B2CFD2769d09f0dd5);
-    /// @notice StETH contract
-    IStETH public constant STETH = IStETH(0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84);
-    /// @notice Wrapped StETH contract
-    IWStETH public constant WSTETH = IWStETH(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0);
 
     // =================================== EVENTS ==================================
 
@@ -105,9 +99,7 @@ contract AngleRouter is BaseRouter, ReentrancyGuardUpgradeable {
                 address[] memory stablecoins,
                 address[] memory collateralsOrPerpetualManagers
             ) = abi.decode(data, (address, uint256, address[], uint256[], bool, address[], address[]));
-
             uint256 amount = ANGLE.balanceOf(user);
-
             _claimRewardsWithPerps(
                 user,
                 claimLiquidityGauges,
@@ -213,9 +205,6 @@ contract AngleRouter is BaseRouter, ReentrancyGuardUpgradeable {
                 address collateral
             ) = abi.decode(data, (uint256, uint256, bool, address, address));
             _addToPerpetual(amount, perpetualID, addressProcessed, stablecoinOrPerpetualManager, collateral);
-        } else if (action == ActionType.wrapMultiple) {
-            uint256 minAmountOut = abi.decode(data, (uint256));
-            _wrapMultiple(minAmountOut);
         }
     }
 
@@ -231,33 +220,7 @@ contract AngleRouter is BaseRouter, ReentrancyGuardUpgradeable {
 
     /// @inheritdoc BaseRouter
     function _getNativeWrapper() internal pure override returns (IWETH9) {
-        return WETH9;
-    }
-
-    /// @inheritdoc BaseRouter
-    function _wrap(uint256 amount, uint256 minAmountOut) internal override returns (uint256 amountOut) {
-        amountOut = WSTETH.wrap(amount);
-        _slippageCheck(amountOut, minAmountOut);
-    }
-
-    /// @inheritdoc BaseRouter
-    function _unwrap(
-        uint256 amount,
-        uint256 minAmountOut,
-        address to
-    ) internal override returns (uint256 amountOut) {
-        amountOut = WSTETH.unwrap(amount);
-        _slippageCheck(amountOut, minAmountOut);
-        if (to != address(0)) IERC20(address(STETH)).safeTransfer(to, amountOut);
-    }
-
-    /// @notice Wraps ETH directly to wstETH in one transaction
-    function _wrapMultiple(uint256 minAmountOut) internal {
-        uint256 amountOut = STETH.getSharesByPooledEth(msg.value);
-        _slippageCheck(amountOut, minAmountOut);
-        //solhint-disable-next-line
-        (bool success, bytes memory result) = address(WSTETH).call{ value: msg.value }("");
-        if (!success) _revertBytes(result);
+        return IWETH9(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     }
 
     /// @notice Internal version of the `claimRewards` function
