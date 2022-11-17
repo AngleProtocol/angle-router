@@ -65,6 +65,15 @@ const config: HardhatUserConfig = {
           },
         },
       },
+      'contracts/mock/MockAngleRouterMainnet.sol': {
+        version: '0.8.12',
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 1,
+          },
+        },
+      },
       'contracts/mock/OldRouter.sol': {
         version: '0.8.12',
         settings: {

@@ -20,7 +20,6 @@ import {
   MockUniswapV3Router__factory,
 } from '../../../typechain';
 import { expect } from '../../../utils/chai-setup';
-import { inReceipt } from '../../../utils/expectEvent';
 import { ActionType, TypePermit } from '../../../utils/helpers';
 import { deployUpgradeable, MAX_UINT256, ZERO_ADDRESS } from '../utils/helpers';
 
@@ -80,6 +79,24 @@ contract('BaseRouter', () => {
     await core.toggleGuardian(governor);
     await core.toggleGuardian(guardian);
     await router.initializeRouter(core.address, uniswap.address, oneInch.address);
+  });
+  describe('initializeRouter', () => {
+    it('success - variables correctly set', async () => {
+      expect(await router.core()).to.be.equal(core.address);
+      expect(await router.uniswapV3Router()).to.be.equal(uniswap.address);
+      expect(await router.oneInch()).to.be.equal(oneInch.address);
+    });
+    it('reverts - already initialized', async () => {
+      await expect(router.initializeRouter(core.address, uniswap.address, oneInch.address)).to.be.revertedWith(
+        'Initializable: contract is already initialized',
+      );
+    });
+    it('reverts - zero address', async () => {
+      const router2 = (await deployUpgradeable(new MockRouterSidechain__factory(deployer))) as MockRouterSidechain;
+      await expect(router2.initializeRouter(ZERO_ADDRESS, uniswap.address, oneInch.address)).to.be.revertedWith(
+        'ZeroAddress',
+      );
+    });
   });
 
   describe('changeAllowance', () => {
@@ -156,12 +173,37 @@ contract('BaseRouter', () => {
       expect(await agEUR.allowance(router.address, alice.address)).to.be.equal(parseEther('2'));
     });
   });
+  describe('setCore', () => {
+    it('reverts - not governor', async () => {
+      const core2 = (await new MockCoreBorrow__factory(deployer).deploy()) as MockCoreBorrow;
+      await expect(router.connect(bob).setCore(core2.address)).to.be.revertedWith('NotGovernor');
+    });
+    it('reverts - invalid core contract', async () => {
+      const core2 = (await new MockCoreBorrow__factory(deployer).deploy()) as MockCoreBorrow;
+      await expect(router.connect(impersonatedSigners[governor]).setCore(core2.address)).to.be.revertedWith(
+        'NotGovernor',
+      );
+    });
+    it('success - valid core contract', async () => {
+      const core2 = (await new MockCoreBorrow__factory(deployer).deploy()) as MockCoreBorrow;
+      await core2.toggleGovernor(governor);
+      await (await router.connect(impersonatedSigners[governor]).setCore(core2.address)).wait();
+      expect(await router.core()).to.be.equal(core2.address);
+    });
+  });
+
   describe('setRouter', () => {
     it('reverts - non governor nor guardian or zero address', async () => {
       await expect(router.connect(deployer).setRouter(bob.address, 0)).to.be.revertedWith('NotGovernorOrGuardian');
       await expect(router.connect(impersonatedSigners[governor]).setRouter(ZERO_ADDRESS, 0)).to.be.revertedWith(
         'ZeroAddress',
       );
+    });
+    it('success - addresses updated', async () => {
+      await router.connect(impersonatedSigners[governor]).setRouter(bob.address, 0);
+      expect(await router.uniswapV3Router()).to.be.equal(bob.address);
+      await router.connect(impersonatedSigners[governor]).setRouter(alice.address, 1);
+      expect(await router.oneInch()).to.be.equal(alice.address);
     });
   });
   describe('mixer', () => {
@@ -201,6 +243,22 @@ contract('BaseRouter', () => {
         expect(await USDC.balanceOf(alice.address)).to.be.equal(parseUnits('0.7', USDCdecimal));
         expect(await USDC.balanceOf(router.address)).to.be.equal(parseUnits('0', USDCdecimal));
         expect(await USDC.balanceOf(bob.address)).to.be.equal(parseUnits('0.3', USDCdecimal));
+      });
+      it('success - max uint is transferred but only balance is taken', async () => {
+        await USDC.mint(alice.address, parseUnits('1', USDCdecimal));
+        await USDC.connect(alice).approve(router.address, parseUnits('1', USDCdecimal));
+
+        const transferData = ethers.utils.defaultAbiCoder.encode(
+          ['address', 'address', 'uint256'],
+          [USDC.address, router.address, MAX_UINT256],
+        );
+
+        const actions = [ActionType.transfer];
+        const dataMixer = [transferData];
+
+        await router.connect(alice).mixer(permits, actions, dataMixer);
+        expect(await USDC.balanceOf(alice.address)).to.be.equal(parseUnits('0', USDCdecimal));
+        expect(await USDC.balanceOf(router.address)).to.be.equal(parseUnits('1', USDCdecimal));
       });
     });
     describe('sweep', () => {
@@ -290,13 +348,13 @@ contract('BaseRouter', () => {
       it('success - claiming rewards from a gauge', async () => {
         const gauge = (await new MockLiquidityGauge__factory(deployer).deploy(USDC.address)) as MockLiquidityGauge;
         const claimData = ethers.utils.defaultAbiCoder.encode(['address', 'address[]'], [bob.address, [gauge.address]]);
-        const actions = [ActionType.transfer];
+        const actions = [ActionType.claimRewards];
         const dataMixer = [claimData];
         await router.connect(alice).mixer(permits, actions, dataMixer);
       });
       it('reverts - when gauge address is invalid', async () => {
         const claimData = ethers.utils.defaultAbiCoder.encode(['address', 'address[]'], [bob.address, [bob.address]]);
-        const actions = [ActionType.transfer];
+        const actions = [ActionType.claimRewards];
         const dataMixer = [claimData];
         await expect(router.connect(alice).mixer(permits, actions, dataMixer)).to.be.reverted;
       });
@@ -352,6 +410,29 @@ contract('BaseRouter', () => {
         await router.connect(alice).mixer(permits, actions, dataMixer);
         expect(await USDC.balanceOf(uniswap.address)).to.be.equal(parseUnits('1', USDCdecimal));
         expect(await agEUR.balanceOf(router.address)).to.be.equal(parseEther('1'));
+        expect(await USDC.allowance(router.address, uniswap.address)).to.be.equal(MAX_UINT256);
+      });
+      it('success - multiple swaps performed', async () => {
+        await USDC.mint(alice.address, parseUnits('10', USDCdecimal));
+        await USDC.connect(alice).approve(router.address, parseUnits('10', USDCdecimal));
+
+        const transferData = ethers.utils.defaultAbiCoder.encode(
+          ['address', 'address', 'uint256'],
+          [USDC.address, router.address, parseUnits('10', USDCdecimal)],
+        );
+        const swapData = ethers.utils.defaultAbiCoder.encode(
+          ['address', 'uint256', 'uint256', 'bytes'],
+          [USDC.address, parseUnits('9', USDCdecimal), 0, '0x'],
+        );
+        const swapData2 = ethers.utils.defaultAbiCoder.encode(
+          ['address', 'uint256', 'uint256', 'bytes'],
+          [USDC.address, parseUnits('1', USDCdecimal), 0, '0x'],
+        );
+        const dataMixer = [transferData, swapData, swapData2];
+        const actions = [ActionType.transfer, ActionType.uniswapV3, ActionType.uniswapV3];
+        await router.connect(alice).mixer(permits, actions, dataMixer);
+        expect(await USDC.balanceOf(uniswap.address)).to.be.equal(parseUnits('10', USDCdecimal));
+        expect(await agEUR.balanceOf(router.address)).to.be.equal(parseEther('10'));
         expect(await USDC.allowance(router.address, uniswap.address)).to.be.equal(MAX_UINT256);
       });
       it('success - swap performed and then swept', async () => {
@@ -574,6 +655,17 @@ contract('BaseRouter', () => {
         const actions = [ActionType.oneInch];
         const dataMixer = [swapData];
         await expect(router.connect(alice).mixer(permits, actions, dataMixer)).to.be.revertedWith('wrong swap');
+      });
+    });
+    describe('chainSpecificAction', () => {
+      it('success - call on a chain specific action has no effect', async () => {
+        const actions = [ActionType.claimRewardsWithPerps];
+        const actionData = ethers.utils.defaultAbiCoder.encode(
+          ['address', 'uint256', 'address', 'bool'],
+          [bob.address, 1, ZERO_ADDRESS, true],
+        );
+        const dataMixer = [actionData];
+        await router.connect(alice).mixer(permits, actions, dataMixer);
       });
     });
   });

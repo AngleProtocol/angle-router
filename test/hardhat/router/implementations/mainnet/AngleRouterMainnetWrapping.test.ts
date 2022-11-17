@@ -26,7 +26,6 @@ import { ActionType, TypePermit } from '../../../../../utils/helpers';
 import { deployUpgradeable, expectApprox, ZERO_ADDRESS } from '../../../utils/helpers';
 
 contract('AngleRouterMainnet - Wrapping logic', () => {
-  // TODO do a mock contract which overwrites the necessary logic
   let deployer: SignerWithAddress;
   let USDC: MockTokenPermit;
   let agEUR: MockAgToken;

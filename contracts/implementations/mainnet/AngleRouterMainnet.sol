@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.12;
 
-import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
-
 import "../../interfaces/external/IWETH9.sol";
 
 import "../../interfaces/IFeeDistributor.sol";
@@ -29,13 +27,8 @@ struct Pairs {
 /// @dev Interfaces were designed for both advanced users which know the addresses of the protocol's contract,
 /// but most of the time users which only know addresses of the stablecoins and collateral types of the protocol
 /// can perform the actions they want without needing to understand what's happening under the hood
-contract AngleRouterMainnet is BaseRouter, ReentrancyGuardUpgradeable {
+contract AngleRouterMainnet is BaseRouter {
     using SafeERC20 for IERC20;
-
-    /// @notice ANGLE contract
-    IERC20 public constant ANGLE = IERC20(0x31429d1856aD1377A8A0079410B297e1a9e214c2);
-    /// @notice veANGLE contract
-    IVeANGLE public constant VEANGLE = IVeANGLE(0x0C462Dbb9EC8cD1630f1728B2CFD2769d09f0dd5);
 
     // =================================== ERRORS ==================================
 
@@ -54,13 +47,14 @@ contract AngleRouterMainnet is BaseRouter, ReentrancyGuardUpgradeable {
         address _core,
         address _uniswapRouter,
         address _oneInch,
+        IERC20 angleAddress,
         IERC20[] calldata stablecoins,
         IPoolManager[] calldata poolManagers,
         ILiquidityGauge[] calldata liquidityGauges,
         bool[] calldata justLiquidityGauges
     ) public {
         initializeRouter(_core, _uniswapRouter, _oneInch);
-        ANGLE.safeIncreaseAllowance(address(VEANGLE), type(uint256).max);
+        angleAddress.safeIncreaseAllowance(address(_getVeANGLE()), type(uint256).max);
         // agEUR and StableMaster for agEUR
         mapStableMasters[IERC20(0x1a7e4e63778B4f12a199C062f3eFdD288afCBce8)] = IStableMasterFront(
             0x5adDc89785D75C86aB939E9e15bfBBb7Fc086A87
@@ -222,7 +216,7 @@ contract AngleRouterMainnet is BaseRouter, ReentrancyGuardUpgradeable {
     /// @param user Address to deposit for
     /// @param amount Amount to deposit
     function _depositOnLocker(address user, uint256 amount) internal {
-        VEANGLE.deposit_for(user, amount);
+        _getVeANGLE().deposit_for(user, amount);
     }
 
     /// @notice Claims weekly interest distribution and if wanted transfers it to the contract for future use
@@ -490,5 +484,10 @@ contract AngleRouterMainnet is BaseRouter, ReentrancyGuardUpgradeable {
             if (address(sanToken) != liquidityGauge.staking_token()) revert InvalidParams();
             sanToken.approve(address(liquidityGauge), type(uint256).max);
         }
+    }
+
+    /// @notice Returns the veANGLE address
+    function _getVeANGLE() internal view virtual returns (IVeANGLE) {
+        return IVeANGLE(0x0C462Dbb9EC8cD1630f1728B2CFD2769d09f0dd5);
     }
 }

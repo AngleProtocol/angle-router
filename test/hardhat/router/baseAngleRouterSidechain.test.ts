@@ -1,7 +1,7 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
-import { BigNumber, BytesLike, Signer } from 'ethers';
+import { BigNumber, Signer } from 'ethers';
 import { parseEther, parseUnits } from 'ethers/lib/utils';
-import hre, { contract, ethers, web3 } from 'hardhat';
+import hre, { contract, ethers } from 'hardhat';
 
 import {
   Mock1Inch,
@@ -20,7 +20,6 @@ import {
   MockUniswapV3Router__factory,
 } from '../../../typechain';
 import { expect } from '../../../utils/chai-setup';
-import { inReceipt } from '../../../utils/expectEvent';
 import { ActionType, TypePermit } from '../../../utils/helpers';
 import { deployUpgradeable, MAX_UINT256, ZERO_ADDRESS } from '../utils/helpers';
 
@@ -36,7 +35,6 @@ contract('BaseAngleRouterSideChain', () => {
   let uniswap: MockUniswapV3Router;
   let oneInch: Mock1Inch;
   let router: MockRouterSidechain;
-  let UNIT_USDC: BigNumber;
   let USDCdecimal: BigNumber;
   let governor: string;
   let guardian: string;
@@ -61,7 +59,6 @@ contract('BaseAngleRouterSideChain', () => {
     }
     USDCdecimal = BigNumber.from('6');
 
-    UNIT_USDC = BigNumber.from(10).pow(USDCdecimal);
     permits = [];
   });
 
@@ -84,54 +81,6 @@ contract('BaseAngleRouterSideChain', () => {
     await router.initializeRouter(core.address, uniswap.address, oneInch.address);
   });
 
-  describe('initializeRouter', () => {
-    it('success - variables correctly set', async () => {
-      expect(await router.core()).to.be.equal(core.address);
-      expect(await router.uniswapV3Router()).to.be.equal(uniswap.address);
-      expect(await router.oneInch()).to.be.equal(oneInch.address);
-    });
-    it('reverts - already initialized', async () => {
-      await expect(router.initializeRouter(core.address, uniswap.address, oneInch.address)).to.be.revertedWith(
-        'Initializable: contract is already initialized',
-      );
-    });
-    it('reverts - zero address', async () => {
-      const router2 = (await deployUpgradeable(new MockRouterSidechain__factory(deployer))) as MockRouterSidechain;
-      await expect(router2.initializeRouter(ZERO_ADDRESS, uniswap.address, oneInch.address)).to.be.revertedWith(
-        'ZeroAddress',
-      );
-    });
-  });
-  describe('setCore', () => {
-    it('reverts - not governor', async () => {
-      const core2 = (await new MockCoreBorrow__factory(deployer).deploy()) as MockCoreBorrow;
-      await expect(router.connect(bob).setCore(core2.address)).to.be.revertedWith('NotGovernor');
-    });
-    it('reverts - invalid core contract', async () => {
-      const core2 = (await new MockCoreBorrow__factory(deployer).deploy()) as MockCoreBorrow;
-      await expect(router.connect(impersonatedSigners[governor]).setCore(core2.address)).to.be.revertedWith(
-        'NotGovernor',
-      );
-    });
-    it('success - valid core contract', async () => {
-      const core2 = (await new MockCoreBorrow__factory(deployer).deploy()) as MockCoreBorrow;
-      await core2.toggleGovernor(governor);
-      const receipt = await (await router.connect(impersonatedSigners[governor]).setCore(core2.address)).wait();
-      inReceipt(receipt, 'CoreUpdated', {
-        _core: core2.address,
-      });
-      expect(await router.core()).to.be.equal(core2.address);
-    });
-  });
-  describe('setRouter', () => {
-    it('success - addresses updated', async () => {
-      await router.connect(impersonatedSigners[governor]).setRouter(bob.address, 0);
-      expect(await router.uniswapV3Router()).to.be.equal(bob.address);
-      await router.connect(impersonatedSigners[governor]).setRouter(alice.address, 1);
-      expect(await router.oneInch()).to.be.equal(alice.address);
-    });
-  });
-
   describe('claimRewards', () => {
     it('success - when one gauge', async () => {
       const gauge = (await new MockLiquidityGauge__factory(deployer).deploy(USDC.address)) as MockLiquidityGauge;
@@ -139,6 +88,16 @@ contract('BaseAngleRouterSideChain', () => {
     });
   });
   describe('mixer', () => {
+    describe('non supported action', () => {
+      it('success - nothing happens', async () => {
+        const actions = [ActionType.veANGLEDeposit, ActionType.addToPerpetual];
+        const data1 = ethers.utils.defaultAbiCoder.encode(
+          ['address', 'address', 'uint256'],
+          [lzAgEUR.address, router.address, parseEther('1')],
+        );
+        await router.connect(alice).mixer(permits, actions, [data1, data1]);
+      });
+    });
     describe('swapIn', () => {
       it('reverts - without approval from the contract', async () => {
         const actions = [ActionType.transfer, ActionType.swapIn];

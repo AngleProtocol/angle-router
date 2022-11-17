@@ -23,10 +23,9 @@ import {
 } from '../../../../../typechain';
 import { expect } from '../../../../../utils/chai-setup';
 import { ActionType, TypePermit } from '../../../../../utils/helpers';
-import { deployUpgradeable, expectApprox, ZERO_ADDRESS } from '../../../utils/helpers';
+import { deployUpgradeable, expectApprox, MAX_UINT256, ZERO_ADDRESS } from '../../../utils/helpers';
 
 contract('AngleRouterMainnet - Actions', () => {
-  // TODO do a mock contract which overwrites the necessary logic
   let deployer: SignerWithAddress;
   let USDC: MockTokenPermit;
   let agEUR: MockAgToken;
@@ -39,13 +38,15 @@ contract('AngleRouterMainnet - Actions', () => {
   let router: AngleRouterMainnet;
   let USDCdecimal: BigNumber;
   let permits: TypePermit[];
+  let ANGLE: ERC20;
+  let veANGLE: ERC20;
 
   before(async () => {
     ({ deployer, alice, bob } = await ethers.getNamedSigners());
     USDCdecimal = BigNumber.from('6');
-    wETH = (await ethers.getContractAt(ERC20__factory.abi, '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')) as ERC20;
-
     permits = [];
+    ANGLE = (await ethers.getContractAt(ERC20__factory.abi, '0x31429d1856aD1377A8A0079410B297e1a9e214c2')) as ERC20;
+    veANGLE = (await ethers.getContractAt(ERC20__factory.abi, '0x0C462Dbb9EC8cD1630f1728B2CFD2769d09f0dd5')) as ERC20;
   });
 
   beforeEach(async () => {
@@ -61,7 +62,6 @@ contract('AngleRouterMainnet - Actions', () => {
         },
       ],
     });
-    await hre.network.provider.send('hardhat_setBalance', [alice.address, '0x10000000000000000000000000000']);
     // If the forked-network state needs to be reset between each test, run this
     router = (await deployUpgradeable(new AngleRouterMainnet__factory(deployer))) as AngleRouterMainnet;
     USDC = (await new MockTokenPermit__factory(deployer).deploy('USDC', 'USDC', USDCdecimal)) as MockTokenPermit;
@@ -76,71 +76,24 @@ contract('AngleRouterMainnet - Actions', () => {
     await core.toggleGovernor(alice.address);
     await core.toggleGuardian(alice.address);
     await core.toggleGuardian(bob.address);
+    await router.initialize(core.address, uniswap.address, oneInch.address, [], [], [], []);
   });
 
-  describe('mixer', () => {
-    describe('sweepNative', () => {
-      it('success - amount transferred to the vault', async () => {
-        await USDC.mint(alice.address, parseUnits('1', USDCdecimal));
-        await USDC.connect(alice).approve(router.address, parseUnits('1', USDCdecimal));
-
-        const transferData = ethers.utils.defaultAbiCoder.encode(
-          ['address', 'address', 'uint256'],
-          [USDC.address, router.address, parseUnits('0.3', USDCdecimal)],
-        );
-        const actions = [ActionType.transfer];
-        const dataMixer = [transferData];
-        await router.connect(alice).mixer(permits, actions, dataMixer, { value: parseEther('1') });
-
-        const actions2 = [ActionType.sweepNative];
-        const balance = await ethers.provider.getBalance(alice.address);
-        await router.connect(alice).mixer(permits, actions2, []);
-        expectApprox((await ethers.provider.getBalance(alice.address)).sub(balance), parseEther('1'), 0.1);
-      });
-      it('success - when there is no ETH balance', async () => {
-        const actions = [ActionType.sweepNative];
-        const balance = await ethers.provider.getBalance(alice.address);
-        await router.connect(alice).mixer(permits, actions, []);
-        expectApprox(await ethers.provider.getBalance(alice.address), balance, 0.1);
-      });
-    });
-
-    describe('wrapNative', () => {
-      it('success - when there is nothing in the action', async () => {
-        const actions = [ActionType.wrapNative];
-        const dataMixer: BytesLike[] = [];
-        await router.connect(alice).mixer(permits, actions, dataMixer, { value: parseEther('1') });
-        expect(await wETH.balanceOf(router.address)).to.be.equal(parseEther('1'));
-      });
-    });
-    describe('unwrapNative', () => {
-      it('success - when there are no wETH', async () => {
-        const actions = [ActionType.unwrapNative];
-        const unwrapData = ethers.utils.defaultAbiCoder.encode(['uint256', 'address'], [0, bob.address]);
-        await router.connect(alice).mixer(permits, actions, [unwrapData]);
-        expect(await wETH.balanceOf(router.address)).to.be.equal(parseEther('0'));
-        expect(await wETH.balanceOf(bob.address)).to.be.equal(parseEther('0'));
-      });
-      it('reverts - because of slippage wETH', async () => {
-        const actions = [ActionType.unwrapNative];
-        const unwrapData = ethers.utils.defaultAbiCoder.encode(['uint256', 'address'], [parseEther('1'), bob.address]);
-        await expect(router.connect(alice).mixer(permits, actions, [unwrapData])).to.be.revertedWith(
-          'TooSmallAmountOut',
-        );
-      });
-      it('success - when there are some wETH', async () => {
-        const actions = [ActionType.wrapNative];
-        const dataMixer: BytesLike[] = [];
-        await router.connect(alice).mixer(permits, actions, dataMixer, { value: parseEther('1') });
-        expect(await wETH.balanceOf(router.address)).to.be.equal(parseEther('1'));
-        const actions2 = [ActionType.unwrapNative];
-        const unwrapData = ethers.utils.defaultAbiCoder.encode(['uint256', 'address'], [0, bob.address]);
-        const balance = await ethers.provider.getBalance(bob.address);
-        await router.connect(alice).mixer(permits, actions2, [unwrapData]);
-        expect(await wETH.balanceOf(router.address)).to.be.equal(parseEther('0'));
-        expect(await wETH.balanceOf(bob.address)).to.be.equal(parseEther('0'));
-        expect(await ethers.provider.getBalance(bob.address)).to.be.equal(parseEther('1').add(balance));
-      });
+  describe('initialize', () => {
+    it('success - correctly initialized', async () => {
+      expect(await router.core()).to.be.equal(core.address);
+      expect(await router.uniswapV3Router()).to.be.equal(uniswap.address);
+      expect(await router.oneInch()).to.be.equal(oneInch.address);
+      expect(await router.mapStableMasters('0x1a7e4e63778B4f12a199C062f3eFdD288afCBce8')).to.be.equal(
+        '0x5adDc89785D75C86aB939E9e15bfBBb7Fc086A87',
+      );
+      expect(await ANGLE.allowance(router.address, veANGLE.address)).to.be.equal(MAX_UINT256);
+      await expect(router.initializeRouter(core.address, uniswap.address, oneInch.address)).to.be.revertedWith(
+        'Initializable: contract is already initialized',
+      );
+      await expect(
+        router.initialize(core.address, uniswap.address, oneInch.address, [], [], [], []),
+      ).to.be.revertedWith('Initializable: contract is already initialized');
     });
   });
 });

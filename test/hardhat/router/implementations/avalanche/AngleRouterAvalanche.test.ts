@@ -14,8 +14,6 @@ import {
   MockAgToken__factory,
   MockCoreBorrow,
   MockCoreBorrow__factory,
-  MockRouterSidechain,
-  MockRouterSidechain__factory,
   MockTokenPermit,
   MockTokenPermit__factory,
   MockUniswapV3Router,
