@@ -14,8 +14,6 @@ import {
   MockAgToken__factory,
   MockCoreBorrow,
   MockCoreBorrow__factory,
-  MockRouterSidechain,
-  MockRouterSidechain__factory,
   MockTokenPermit,
   MockTokenPermit__factory,
   MockUniswapV3Router,
@@ -36,12 +34,10 @@ contract('AngleRouterMainnet - Wrapping logic', () => {
   let uniswap: MockUniswapV3Router;
   let oneInch: Mock1Inch;
   let router: AngleRouterMainnet;
-  let USDCdecimal: BigNumber;
   let permits: TypePermit[];
 
   before(async () => {
     ({ deployer, alice, bob } = await ethers.getNamedSigners());
-    USDCdecimal = BigNumber.from('6');
     wETH = (await ethers.getContractAt(ERC20__factory.abi, '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')) as ERC20;
 
     permits = [];
@@ -63,7 +59,7 @@ contract('AngleRouterMainnet - Wrapping logic', () => {
     await hre.network.provider.send('hardhat_setBalance', [alice.address, '0x10000000000000000000000000000']);
     // If the forked-network state needs to be reset between each test, run this
     router = (await deployUpgradeable(new AngleRouterMainnet__factory(deployer))) as AngleRouterMainnet;
-    USDC = (await new MockTokenPermit__factory(deployer).deploy('USDC', 'USDC', USDCdecimal)) as MockTokenPermit;
+    USDC = (await new MockTokenPermit__factory(deployer).deploy('USDC', 'USDC', 6)) as MockTokenPermit;
     agEUR = (await deployUpgradeable(new MockAgToken__factory(deployer))) as MockAgToken;
     await agEUR.initialize('agEUR', 'agEUR', ZERO_ADDRESS, ZERO_ADDRESS);
     uniswap = (await new MockUniswapV3Router__factory(deployer).deploy(
@@ -80,12 +76,12 @@ contract('AngleRouterMainnet - Wrapping logic', () => {
   describe('mixer', () => {
     describe('sweepNative', () => {
       it('success - amount transferred to the vault', async () => {
-        await USDC.mint(alice.address, parseUnits('1', USDCdecimal));
-        await USDC.connect(alice).approve(router.address, parseUnits('1', USDCdecimal));
+        await USDC.mint(alice.address, parseUnits('1', 6));
+        await USDC.connect(alice).approve(router.address, parseUnits('1', 6));
 
         const transferData = ethers.utils.defaultAbiCoder.encode(
           ['address', 'address', 'uint256'],
-          [USDC.address, router.address, parseUnits('0.3', USDCdecimal)],
+          [USDC.address, router.address, parseUnits('0.3', 6)],
         );
         const actions = [ActionType.transfer];
         const dataMixer = [transferData];

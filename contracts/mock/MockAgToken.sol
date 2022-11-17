@@ -113,7 +113,7 @@ contract MockAgToken is IAgToken, ERC20PermitUpgradeable {
     // ======================= Minter Role Only Functions ==========================
 
     /// @inheritdoc IAgToken
-    function burnSelf(uint256 amount, address burner) external override onlyMinter {
+    function burnSelf(uint256 amount, address burner) external override {
         _burn(burner, amount);
     }
 

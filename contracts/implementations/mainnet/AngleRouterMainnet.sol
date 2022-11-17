@@ -191,8 +191,10 @@ contract AngleRouterMainnet is BaseRouter {
         address[] memory stablecoins,
         address[] memory collateralsOrPerpetualManagers
     ) internal {
-        if (stablecoins.length != perpetualIDs.length || collateralsOrPerpetualManagers.length != perpetualIDs.length)
-            revert IncompatibleLengths();
+        if (
+            perpetualIDs.length != 0 &&
+            (stablecoins.length != perpetualIDs.length || collateralsOrPerpetualManagers.length != perpetualIDs.length)
+        ) revert IncompatibleLengths();
 
         for (uint256 i = 0; i < liquidityGauges.length; i++) {
             ILiquidityGauge(liquidityGauges[i]).claim_rewards(gaugeUser);
@@ -460,7 +462,9 @@ contract AngleRouterMainnet is BaseRouter {
             ,
             ,
 
-        ) = IStableMasterFront(address(stableMaster)).collateralMap(poolManager);
+        ) = stableMaster.collateralMap(poolManager);
+        // Reverting if the poolManager is not a valid `poolManager`
+        if (address(collateral) == address(0)) revert InvalidParams();
         Pairs storage _pairs = mapPoolManagers[stableMaster][collateral];
         if (justLiquidityGauge) {
             // Cannot specify a liquidity gauge if the associated poolManager does not exist
@@ -472,7 +476,7 @@ contract AngleRouterMainnet is BaseRouter {
         } else {
             // Checking if the pair has not already been initialized: if yes we need to make the function revert
             // otherwise we could end up with still approved `PoolManager` and `PerpetualManager` contracts
-            if (address(collateral) == address(0) || address(_pairs.poolManager) != address(0)) revert InvalidParams();
+            if (address(_pairs.poolManager) != address(0)) revert InvalidParams();
             _pairs.poolManager = poolManager;
             _pairs.perpetualManager = IPerpetualManagerFrontWithClaim(address(perpetualManager));
             _pairs.sanToken = sanToken;

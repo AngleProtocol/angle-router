@@ -9,11 +9,11 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 /// @notice MockLiquidityGauge contract
 contract MockLiquidityGauge is ILiquidityGauge {
     using SafeERC20 for IERC20;
-    mapping(address => uint256) public checkpoints;
+
     uint256 public factor = 10**18;
-    event NotifiedAmount(address _gauge, uint256 amount);
 
     IERC20 public token;
+    mapping(address => uint256) public counter;
 
     constructor(address _token) {
         token = IERC20(_token);
@@ -26,10 +26,6 @@ contract MockLiquidityGauge is ILiquidityGauge {
 
     function setFactor(uint256 _factor) external {
         factor = _factor;
-    }
-
-    function notifyReward(address _gauge, uint256 amount) external {
-        emit NotifiedAmount(_gauge, amount);
     }
 
     // solhint-disable-next-line
@@ -50,8 +46,9 @@ contract MockLiquidityGauge is ILiquidityGauge {
     }
 
     // solhint-disable-next-line
-    function claim_rewards(address _addr) external pure override {
+    function claim_rewards(address _addr) external override {
         _addr;
+        counter[_addr] += 1;
         return;
     }
 
