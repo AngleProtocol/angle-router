@@ -9,11 +9,12 @@ import "../../contracts/interfaces/IPoolManager.sol";
 import "../../contracts/interfaces/IStableMasterFront.sol";
 import "../../contracts/mock/MockTokenPermit.sol";
 import { MockStableMaster } from "../../contracts/mock/MockStableMaster.sol";
+import { MockCoreBorrow } from "../../contracts/mock/MockCoreBorrow.sol";
 import { MockSavingsRate } from "../../contracts/mock/MockSavingsRate.sol";
-import { AngleRouterMainnet } from "../../contracts/implementations/mainnet/AngleRouterMainnet.sol";
+import { AngleRouterMainnet, IERC20, IPoolManager, ILiquidityGauge } from "../../contracts/implementations/mainnet/AngleRouterMainnet.sol";
 import { IUniswapV3Router, PermitType, ActionType, PermitType, BaseRouter } from "../../contracts/BaseRouter.sol";
 
-contract AngleRouter01Test is BaseTest {
+contract AngleRouterMainnetTest is BaseTest {
     uint256 private _ethereum;
 
     IUniswapV3Router public constant uniswapV3Router = IUniswapV3Router(0xE592427A0AEce92De3Edee1F18E0157C05861564);
@@ -21,10 +22,10 @@ contract AngleRouter01Test is BaseTest {
     uint64 public constant BASE_PARAMS = 1e9;
     uint256 public constant BASE_TOKENS = 1 ether;
 
-    ProxyAdmin public proxyAdminRouter = ProxyAdmin(0x1D941EF0D3Bba4ad67DBfBCeE5262F4CEE53A32b);
     AngleRouterMainnet public router;
     MockTokenPermit public token;
     MockSavingsRate public savingsRate;
+    MockCoreBorrow public core;
 
     // can be played with to test for different decimal tokens
     uint8 public TOKEN_DECIMAL = 18;
@@ -35,6 +36,23 @@ contract AngleRouter01Test is BaseTest {
         token = new MockTokenPermit("token", "token", TOKEN_DECIMAL);
         router = new AngleRouterMainnet();
         savingsRate = new MockSavingsRate(IERC20Metadata(address(token)));
+        /*
+        core = new MockCoreBorrow();
+        savingsRate = new MockSavingsRate(IERC20Metadata(address(token)));
+        IERC20[] memory stablecoins;
+        IPoolManager[] memory poolManagers;
+        ILiquidityGauge[] memory liquidityGauges;
+        bool[] memory justLiquidityGauges;
+        router.initialize(
+            address(core),
+            address(uniswapV3Router),
+            oneInch,
+            stablecoins,
+            poolManagers,
+            liquidityGauges,
+            justLiquidityGauges
+        );
+        */
     }
 
     function _randomizeSavingsRate(uint256 initShares, uint256 gainOrLoss) internal {
@@ -70,8 +88,6 @@ contract AngleRouter01Test is BaseTest {
         uint256 previewMint = savingsRate.previewMint(shares);
         vm.assume(previewMint < balanceUsers);
 
-        // this can be done with foundry though
-        // https://book.getfoundry.sh/tutorials/testing-eip712?highlight=permit#diving-in
         PermitType[] memory paramsPermit = new PermitType[](0);
         ActionType[] memory actionType = new ActionType[](2);
         bytes[] memory data = new bytes[](2);
@@ -141,11 +157,11 @@ contract AngleRouter01Test is BaseTest {
         }
         vm.stopPrank();
 
-        assertEq(savingsRate.balanceOf(address(router)), 0);
-        assertEq(savingsRate.balanceOf(address(_alice)), shares);
+        assertEq(savingsRate.balanceOf(address(to)), shares);
 
         assertEq(token.balanceOf(address(router)), 0);
         assertEq(token.balanceOf(address(_alice)), balanceUsers - previewMint);
+        assertEq(token.balanceOf(address(to)), 0);
     }
 
     function testDepositSavingsRateGoodPractice(
@@ -172,7 +188,7 @@ contract AngleRouter01Test is BaseTest {
         actionType[0] = ActionType.transfer;
         data[0] = abi.encode(token, router, amount);
         actionType[1] = ActionType.depositSavingsRate;
-        data[1] = abi.encode(token, savingsRate, BASE_PARAMS, to, minSharesOut);
+        data[1] = abi.encode(token, savingsRate, amount, to, minSharesOut);
 
         vm.startPrank(_alice);
         token.approve(address(router), type(uint256).max);
@@ -218,7 +234,7 @@ contract AngleRouter01Test is BaseTest {
         actionType[0] = ActionType.transfer;
         data[0] = abi.encode(token, router, amount);
         actionType[1] = ActionType.depositSavingsRate;
-        data[1] = abi.encode(token, savingsRate, BASE_PARAMS, to, minSharesOut);
+        data[1] = abi.encode(token, savingsRate, amount, to, minSharesOut);
 
         vm.startPrank(_alice);
         token.approve(address(router), type(uint256).max);
@@ -232,8 +248,7 @@ contract AngleRouter01Test is BaseTest {
         }
         vm.stopPrank();
 
-        assertEq(savingsRate.balanceOf(address(router)), 0);
-        assertEq(savingsRate.balanceOf(address(_alice)), previewDeposit);
+        assertEq(savingsRate.balanceOf(address(to)), previewDeposit);
 
         assertEq(token.balanceOf(address(router)), 0);
         assertEq(token.balanceOf(address(_alice)), balanceUsers - amount);
@@ -269,7 +284,7 @@ contract AngleRouter01Test is BaseTest {
             actionType[0] = ActionType.transfer;
             data[0] = abi.encode(token, router, aliceAmount);
             actionType[1] = ActionType.depositSavingsRate;
-            data[1] = abi.encode(token, savingsRate, BASE_PARAMS, _alice, previewDeposit);
+            data[1] = abi.encode(token, savingsRate, aliceAmount, _alice, previewDeposit);
 
             vm.startPrank(_alice);
             token.approve(address(router), type(uint256).max);
@@ -295,7 +310,7 @@ contract AngleRouter01Test is BaseTest {
             data = new bytes[](1);
 
             actionType[0] = ActionType.redeemSavingsRate;
-            data[0] = abi.encode(IERC20(address(token)), savingsRate, sharesToBurn, to, minAmount);
+            data[0] = abi.encode(savingsRate, sharesToBurn, to, minAmount);
 
             uint256 previewRedeem = savingsRate.previewRedeem(sharesToBurn);
             vm.startPrank(_alice);
@@ -309,7 +324,6 @@ contract AngleRouter01Test is BaseTest {
                 router.mixer(paramsPermit, actionType, data);
             }
             vm.stopPrank();
-
             assertEq(token.balanceOf(address(to)), previewRedeem);
         }
 
@@ -349,7 +363,7 @@ contract AngleRouter01Test is BaseTest {
             actionType[0] = ActionType.transfer;
             data[0] = abi.encode(token, router, aliceAmount);
             actionType[1] = ActionType.depositSavingsRate;
-            data[1] = abi.encode(token, savingsRate, BASE_PARAMS, _alice, previewDeposit);
+            data[1] = abi.encode(token, savingsRate, aliceAmount, _alice, previewDeposit);
 
             vm.startPrank(_alice);
             token.approve(address(router), type(uint256).max);
@@ -373,7 +387,7 @@ contract AngleRouter01Test is BaseTest {
             data = new bytes[](1);
 
             actionType[0] = ActionType.redeemSavingsRate;
-            data[0] = abi.encode(IERC20(address(token)), savingsRate, sharesToBurn, address(router), minAmount);
+            data[0] = abi.encode(savingsRate, sharesToBurn, address(router), minAmount);
 
             previewRedeem = savingsRate.previewRedeem(sharesToBurn);
             vm.startPrank(_alice);
@@ -391,14 +405,14 @@ contract AngleRouter01Test is BaseTest {
         }
 
         assertEq(savingsRate.balanceOf(address(router)), 0);
-        assertEq(token.balanceOf(address(router)), 0);
-        assertEq(token.balanceOf(address(_alice)), balanceUsers - aliceAmount + previewRedeem);
+        assertEq(token.balanceOf(address(router)), previewRedeem);
+        assertEq(token.balanceOf(address(_alice)), balanceUsers - aliceAmount);
     }
 
     function testWithdrawSavingsRateGoodPractice(
         uint256 initShares,
         uint256 aliceAmount,
-        uint256 propWithdraw,
+        uint256 withdraw,
         uint256 maxAmountBurn,
         address to,
         uint256 gainOrLoss,
@@ -412,10 +426,10 @@ contract AngleRouter01Test is BaseTest {
 
         aliceAmount = bound(aliceAmount, 0, balanceUsers);
         uint256 previewDeposit = savingsRate.previewDeposit(aliceAmount);
-        {
-            // otherwise there could be overflows
-            vm.assume(previewDeposit < type(uint256).max / BASE_PARAMS);
+        // otherwise there could be overflows
+        vm.assume(previewDeposit < type(uint256).max / BASE_PARAMS);
 
+        {
             // do a first deposit
             PermitType[] memory paramsPermit = new PermitType[](0);
             ActionType[] memory actionType = new ActionType[](2);
@@ -424,29 +438,39 @@ contract AngleRouter01Test is BaseTest {
             actionType[0] = ActionType.transfer;
             data[0] = abi.encode(token, router, aliceAmount);
             actionType[1] = ActionType.depositSavingsRate;
-            data[1] = abi.encode(token, savingsRate, BASE_PARAMS, _alice, previewDeposit);
+            data[1] = abi.encode(token, savingsRate, aliceAmount, _alice, previewDeposit);
 
             vm.startPrank(_alice);
             token.approve(address(router), type(uint256).max);
             router.mixer(paramsPermit, actionType, data);
             vm.stopPrank();
 
+            assertEq(savingsRate.balanceOf(address(router)), 0);
+            assertEq(savingsRate.balanceOf(address(_alice)), previewDeposit);
+            assertEq(savingsRate.balanceOf(address(to)), 0);
+            assertEq(token.balanceOf(address(router)), 0);
+            assertEq(token.balanceOf(address(_alice)), balanceUsers - aliceAmount);
+            assertEq(token.balanceOf(address(to)), 0);
+
             // make the savings rate have a loss / gain
             gainOrLoss2 = bound(gainOrLoss2, 1, 1 ether * 1 ether);
             deal(address(token), address(savingsRate), gainOrLoss2);
 
+            uint256 maxWithdraw = savingsRate.maxWithdraw(_alice);
+
             // then withdraw
-            propWithdraw = bound(propWithdraw, 0, BASE_PARAMS);
-            uint256 withdraw = (propWithdraw * aliceAmount) / BASE_PARAMS;
+            withdraw = bound(withdraw, 0, maxWithdraw);
             // overflow in the `previewWithdraw` function
             vm.assume(savingsRate.totalSupply() > 0);
             if (withdraw > 0) vm.assume(savingsRate.totalSupply() < type(uint256).max / withdraw);
 
+            actionType = new ActionType[](1);
+            data = new bytes[](1);
+
             actionType[0] = ActionType.withdrawSavingsRate;
-            data[0] = abi.encode(IERC20(address(token)), savingsRate, withdraw, to, maxAmountBurn);
+            data[0] = abi.encode(savingsRate, withdraw, to, maxAmountBurn);
 
             uint256 previewWithdraw = savingsRate.previewWithdraw(withdraw);
-
             vm.startPrank(_alice);
             savingsRate.approve(address(router), type(uint256).max);
             if (withdraw > savingsRate.maxWithdraw(_alice)) {
@@ -461,7 +485,6 @@ contract AngleRouter01Test is BaseTest {
                 router.mixer(paramsPermit, actionType, data);
             }
             vm.stopPrank();
-
             assertEq(savingsRate.balanceOf(address(_alice)), previewDeposit - previewWithdraw);
             assertEq(token.balanceOf(address(to)), withdraw);
         }
@@ -476,7 +499,7 @@ contract AngleRouter01Test is BaseTest {
     function testWithdrawSavingsRateForgotFunds(
         uint256 initShares,
         uint256 aliceAmount,
-        uint256 propWithdraw,
+        uint256 withdraw,
         uint256 maxAmountBurn,
         uint256 gainOrLoss,
         uint256 gainOrLoss2
@@ -500,7 +523,7 @@ contract AngleRouter01Test is BaseTest {
             actionType[0] = ActionType.transfer;
             data[0] = abi.encode(token, router, aliceAmount);
             actionType[1] = ActionType.depositSavingsRate;
-            data[1] = abi.encode(token, savingsRate, BASE_PARAMS, _alice, previewDeposit);
+            data[1] = abi.encode(token, savingsRate, aliceAmount, _alice, previewDeposit);
 
             vm.startPrank(_alice);
             token.approve(address(router), type(uint256).max);
@@ -512,14 +535,17 @@ contract AngleRouter01Test is BaseTest {
             deal(address(token), address(savingsRate), gainOrLoss2);
 
             // then withdraw
-            propWithdraw = bound(propWithdraw, 0, BASE_PARAMS);
-            uint256 withdraw = (propWithdraw * aliceAmount) / BASE_PARAMS;
+            uint256 maxWithdraw = savingsRate.maxWithdraw(_alice);
+            withdraw = bound(withdraw, 0, maxWithdraw);
             // overflow in the `previewWithdraw` function
             vm.assume(savingsRate.totalSupply() > 0);
             if (withdraw > 0) vm.assume(savingsRate.totalSupply() < type(uint256).max / withdraw);
 
+            actionType = new ActionType[](1);
+            data = new bytes[](1);
+
             actionType[0] = ActionType.withdrawSavingsRate;
-            data[0] = abi.encode(IERC20(address(token)), savingsRate, withdraw, address(router), maxAmountBurn);
+            data[0] = abi.encode(savingsRate, withdraw, address(router), maxAmountBurn);
 
             {
                 uint256 previewWithdraw = savingsRate.previewWithdraw(withdraw);
@@ -541,10 +567,9 @@ contract AngleRouter01Test is BaseTest {
 
                 assertEq(savingsRate.balanceOf(address(_alice)), previewDeposit - previewWithdraw);
             }
-            assertEq(token.balanceOf(address(_alice)), balanceUsers - aliceAmount + withdraw);
+            assertEq(token.balanceOf(address(_alice)), balanceUsers - aliceAmount);
+            assertEq(token.balanceOf(address(router)), withdraw);
+            assertEq(savingsRate.balanceOf(address(router)), 0);
         }
-
-        assertEq(savingsRate.balanceOf(address(router)), 0);
-        assertEq(token.balanceOf(address(router)), 0);
     }
 }

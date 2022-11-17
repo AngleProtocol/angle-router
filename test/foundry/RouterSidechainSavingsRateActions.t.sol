@@ -87,7 +87,7 @@ contract RouterSidechainSavingsRateActionsTest is BaseTest {
         actionType[1] = ActionType.mintSavingsRate;
         actionType[2] = ActionType.sweep;
 
-        data[0] = abi.encode(address(token), previewMint);
+        data[0] = abi.encode(address(token), address(router), previewMint);
         data[1] = abi.encode(token, savingsRate, shares, to, maxAmount);
         data[2] = abi.encode(address(token), 0, to);
 
@@ -137,7 +137,7 @@ contract RouterSidechainSavingsRateActionsTest is BaseTest {
         actionType[0] = ActionType.transfer;
         actionType[1] = ActionType.depositSavingsRate;
 
-        data[0] = abi.encode(address(token), amount);
+        data[0] = abi.encode(address(token), address(router), amount);
         data[1] = abi.encode(token, savingsRate, amount, to, minSharesOut);
 
         vm.startPrank(_alice);
@@ -189,7 +189,7 @@ contract RouterSidechainSavingsRateActionsTest is BaseTest {
         actionType[0] = ActionType.transfer;
         actionType[1] = ActionType.depositSavingsRate;
 
-        data[0] = abi.encode(address(token), aliceAmount);
+        data[0] = abi.encode(address(token), address(router), aliceAmount);
         data[1] = abi.encode(token, savingsRate, aliceAmount, _alice, previewDeposit);
 
         vm.startPrank(_alice);
@@ -265,7 +265,7 @@ contract RouterSidechainSavingsRateActionsTest is BaseTest {
         actionType[0] = ActionType.transfer;
         actionType[1] = ActionType.depositSavingsRate;
 
-        data[0] = abi.encode(address(token), aliceAmount);
+        data[0] = abi.encode(address(token), address(router), aliceAmount);
         data[1] = abi.encode(token, savingsRate, aliceAmount, _alice, previewDeposit);
 
         vm.startPrank(_alice);

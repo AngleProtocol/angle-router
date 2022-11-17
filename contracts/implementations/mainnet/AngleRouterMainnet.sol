@@ -75,14 +75,12 @@ contract AngleRouterMainnet is BaseRouter, ReentrancyGuardUpgradeable {
         if (action == ActionType.claimRewardsWithPerps) {
             (
                 address user,
-                uint256 proportionToBeTransferred,
                 address[] memory claimLiquidityGauges,
                 uint256[] memory claimPerpetualIDs,
                 bool addressProcessed,
                 address[] memory stablecoins,
                 address[] memory collateralsOrPerpetualManagers
-            ) = abi.decode(data, (address, uint256, address[], uint256[], bool, address[], address[]));
-            uint256 amount = ANGLE.balanceOf(user);
+            ) = abi.decode(data, (address, address[], uint256[], bool, address[], address[]));
             _claimRewardsWithPerps(
                 user,
                 claimLiquidityGauges,
@@ -91,11 +89,6 @@ contract AngleRouterMainnet is BaseRouter, ReentrancyGuardUpgradeable {
                 stablecoins,
                 collateralsOrPerpetualManagers
             );
-            if (proportionToBeTransferred > 0) {
-                amount = ANGLE.balanceOf(user) - amount;
-                amount = (amount * proportionToBeTransferred) / 10**9;
-                ANGLE.safeTransferFrom(msg.sender, address(this), amount);
-            }
         } else if (action == ActionType.claimWeeklyInterest) {
             (address user, address feeDistributor, bool letInContract) = abi.decode(data, (address, address, bool));
             _claimWeeklyInterest(user, IFeeDistributorFront(feeDistributor), letInContract);
