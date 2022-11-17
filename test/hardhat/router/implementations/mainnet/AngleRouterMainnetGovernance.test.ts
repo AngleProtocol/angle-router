@@ -2,8 +2,6 @@ import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { contract, ethers } from 'hardhat';
 
 import {
-  ERC20,
-  ERC20__factory,
   Mock1Inch,
   Mock1Inch__factory,
   MockAgToken,
@@ -26,7 +24,6 @@ import {
   MockVeANGLE__factory,
 } from '../../../../../typechain';
 import { expect } from '../../../../../utils/chai-setup';
-import { TypePermit } from '../../../../../utils/helpers';
 import { deployUpgradeable, MAX_UINT256, ZERO_ADDRESS } from '../../../utils/helpers';
 
 contract('AngleRouterMainnet - Governance', () => {
@@ -45,11 +42,9 @@ contract('AngleRouterMainnet - Governance', () => {
   let stableMaster: MockStableMaster;
   let perpetual: MockPerpetualManager;
   let sanToken: MockTokenPermit;
-  let permits: TypePermit[];
 
   before(async () => {
     ({ deployer, alice, bob } = await ethers.getNamedSigners());
-    permits = [];
   });
 
   beforeEach(async () => {

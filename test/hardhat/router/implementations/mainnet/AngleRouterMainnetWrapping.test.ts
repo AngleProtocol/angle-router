@@ -1,5 +1,5 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
-import { BigNumber, BytesLike } from 'ethers';
+import { BytesLike } from 'ethers';
 import { parseEther, parseUnits } from 'ethers/lib/utils';
 import hre, { contract, ethers } from 'hardhat';
 
@@ -8,31 +8,22 @@ import {
   AngleRouterMainnet__factory,
   ERC20,
   ERC20__factory,
-  Mock1Inch,
-  Mock1Inch__factory,
-  MockAgToken,
-  MockAgToken__factory,
   MockCoreBorrow,
   MockCoreBorrow__factory,
   MockTokenPermit,
   MockTokenPermit__factory,
-  MockUniswapV3Router,
-  MockUniswapV3Router__factory,
 } from '../../../../../typechain';
 import { expect } from '../../../../../utils/chai-setup';
 import { ActionType, TypePermit } from '../../../../../utils/helpers';
-import { deployUpgradeable, expectApprox, ZERO_ADDRESS } from '../../../utils/helpers';
+import { deployUpgradeable, expectApprox } from '../../../utils/helpers';
 
 contract('AngleRouterMainnet - Wrapping logic', () => {
   let deployer: SignerWithAddress;
   let USDC: MockTokenPermit;
-  let agEUR: MockAgToken;
   let wETH: ERC20;
   let core: MockCoreBorrow;
   let alice: SignerWithAddress;
   let bob: SignerWithAddress;
-  let uniswap: MockUniswapV3Router;
-  let oneInch: Mock1Inch;
   let router: AngleRouterMainnet;
   let permits: TypePermit[];
 
@@ -60,13 +51,6 @@ contract('AngleRouterMainnet - Wrapping logic', () => {
     // If the forked-network state needs to be reset between each test, run this
     router = (await deployUpgradeable(new AngleRouterMainnet__factory(deployer))) as AngleRouterMainnet;
     USDC = (await new MockTokenPermit__factory(deployer).deploy('USDC', 'USDC', 6)) as MockTokenPermit;
-    agEUR = (await deployUpgradeable(new MockAgToken__factory(deployer))) as MockAgToken;
-    await agEUR.initialize('agEUR', 'agEUR', ZERO_ADDRESS, ZERO_ADDRESS);
-    uniswap = (await new MockUniswapV3Router__factory(deployer).deploy(
-      USDC.address,
-      agEUR.address,
-    )) as MockUniswapV3Router;
-    oneInch = (await new Mock1Inch__factory(deployer).deploy(USDC.address, agEUR.address)) as Mock1Inch;
     core = (await new MockCoreBorrow__factory(deployer).deploy()) as MockCoreBorrow;
     await core.toggleGovernor(alice.address);
     await core.toggleGuardian(alice.address);

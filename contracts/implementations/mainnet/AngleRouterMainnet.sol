@@ -4,7 +4,7 @@ pragma solidity 0.8.12;
 
 import "../../interfaces/external/IWETH9.sol";
 
-import "../../interfaces/IFeeDistributor.sol";
+import "../../interfaces/IFeeDistributorFront.sol";
 import "../../interfaces/ISanToken.sol";
 import "../../interfaces/IStableMasterFront.sol";
 import "../../interfaces/IVeANGLE.sol";
@@ -89,13 +89,6 @@ contract AngleRouterMainnet is BaseRouter {
         } else if (action == ActionType.veANGLEDeposit) {
             (address user, uint256 amount) = abi.decode(data, (address, uint256));
             _depositOnLocker(user, amount);
-        } else if (action == ActionType.gaugeDeposit) {
-            (address user, uint256 amount, address stakedToken, address gauge, bool shouldClaimRewards) = abi.decode(
-                data,
-                (address, uint256, address, address, bool)
-            );
-            if (amount == type(uint256).max) amount = IERC20(stakedToken).balanceOf(address(this));
-            _gaugeDeposit(user, amount, ILiquidityGauge(gauge), shouldClaimRewards);
         } else if (action == ActionType.deposit) {
             (
                 address user,

@@ -36,23 +36,6 @@ contract AngleRouterMainnetTest is BaseTest {
         token = new MockTokenPermit("token", "token", TOKEN_DECIMAL);
         router = new AngleRouterMainnet();
         savingsRate = new MockSavingsRate(IERC20Metadata(address(token)));
-        /*
-        core = new MockCoreBorrow();
-        savingsRate = new MockSavingsRate(IERC20Metadata(address(token)));
-        IERC20[] memory stablecoins;
-        IPoolManager[] memory poolManagers;
-        ILiquidityGauge[] memory liquidityGauges;
-        bool[] memory justLiquidityGauges;
-        router.initialize(
-            address(core),
-            address(uniswapV3Router),
-            oneInch,
-            stablecoins,
-            poolManagers,
-            liquidityGauges,
-            justLiquidityGauges
-        );
-        */
     }
 
     function _randomizeSavingsRate(uint256 initShares, uint256 gainOrLoss) internal {
