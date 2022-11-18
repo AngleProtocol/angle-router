@@ -57,7 +57,7 @@ contract AngleRouterMainnet is BaseRouter {
         mapStableMasters[IERC20(0x1a7e4e63778B4f12a199C062f3eFdD288afCBce8)] = IStableMasterFront(
             0x5adDc89785D75C86aB939E9e15bfBBb7Fc086A87
         );
-        addPairs(stablecoins, poolManagers, liquidityGauges, justLiquidityGauges);
+        _addPairs(stablecoins, poolManagers, liquidityGauges, justLiquidityGauges);
     }
 
     // =========================== ROUTER FUNCTIONALITIES ==========================
@@ -400,16 +400,8 @@ contract AngleRouterMainnet is BaseRouter {
         IPoolManager[] calldata poolManagers,
         ILiquidityGauge[] calldata liquidityGauges,
         bool[] calldata justLiquidityGauges
-    ) public onlyGovernorOrGuardian {
-        if (
-            poolManagers.length != stablecoins.length ||
-            liquidityGauges.length != stablecoins.length ||
-            justLiquidityGauges.length != stablecoins.length
-        ) revert IncompatibleLengths();
-        for (uint256 i = 0; i < stablecoins.length; i++) {
-            IStableMasterFront stableMaster = mapStableMasters[stablecoins[i]];
-            _addPair(stableMaster, poolManagers[i], liquidityGauges[i], justLiquidityGauges[i]);
-        }
+    ) external onlyGovernorOrGuardian {
+        _addPairs(stablecoins, poolManagers, liquidityGauges, justLiquidityGauges);
     }
 
     // ========================= INTERNAL UTILITY FUNCTIONS ========================
@@ -428,6 +420,24 @@ contract AngleRouterMainnet is BaseRouter {
         pairs = mapPoolManagers[stableMaster][collateral];
         if (address(stableMaster) == address(0) || address(pairs.poolManager) == address(0)) revert ZeroAddress();
         return (stableMaster, pairs);
+    }
+
+    /// @notice Internal version of the `addPairs` function
+    function _addPairs(
+        IERC20[] calldata stablecoins,
+        IPoolManager[] calldata poolManagers,
+        ILiquidityGauge[] calldata liquidityGauges,
+        bool[] calldata justLiquidityGauges
+    ) internal {
+        if (
+            poolManagers.length != stablecoins.length ||
+            liquidityGauges.length != stablecoins.length ||
+            justLiquidityGauges.length != stablecoins.length
+        ) revert IncompatibleLengths();
+        for (uint256 i = 0; i < stablecoins.length; i++) {
+            IStableMasterFront stableMaster = mapStableMasters[stablecoins[i]];
+            _addPair(stableMaster, poolManagers[i], liquidityGauges[i], justLiquidityGauges[i]);
+        }
     }
 
     /// @notice Adds new collateral type to specific stablecoin
