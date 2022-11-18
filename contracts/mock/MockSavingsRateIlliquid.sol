@@ -21,7 +21,7 @@ contract MockSavingsRateIlliquid is ERC4626 {
 
     function claimRedeem(address receiver, address[] memory strategiesToClaim) external returns (uint256 totalOwed) {
         totalOwed = receiverRewards[receiver];
-        for (uint256 i = 0; i < strategiesToClaim.length; ++i) {
+        for (uint256 i; i < strategiesToClaim.length; ++i) {
             counter[strategiesToClaim[i]] += 1;
         }
         IERC20Metadata(asset()).transfer(receiver, totalOwed);

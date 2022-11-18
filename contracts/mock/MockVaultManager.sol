@@ -137,7 +137,7 @@ contract MockVaultManager {
         to;
         who;
         repayData;
-        for (uint256 i = 0; i < actions.length; i++) {
+        for (uint256 i; i < actions.length; ++i) {
             ActionBorrowType action = actions[i];
             action;
         }

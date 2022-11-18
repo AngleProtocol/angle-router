@@ -17,12 +17,12 @@ abstract contract BaseAngleRouterSidechain is BaseRouter {
     /// @param liquidityGauges Gauges to claim on
     /// @dev If the caller wants to send the rewards to another account it first needs to
     /// call `set_rewards_receiver(otherAccount)` on each `liquidityGauge`
-    function claimRewards(address gaugeUser, address[] memory liquidityGauges) external {
+    function claimRewards(address gaugeUser, address[] calldata liquidityGauges) external {
         _claimRewards(gaugeUser, liquidityGauges);
     }
 
     /// @inheritdoc BaseRouter
-    function _chainSpecificAction(ActionType action, bytes memory data) internal override {
+    function _chainSpecificAction(ActionType action, bytes calldata data) internal override {
         if (action == ActionType.swapIn) {
             (address canonicalToken, address bridgeToken, uint256 amount, uint256 minAmountOut, address to) = abi
                 .decode(data, (address, address, uint256, uint256, address));

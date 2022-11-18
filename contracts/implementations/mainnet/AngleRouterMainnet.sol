@@ -50,7 +50,7 @@ contract AngleRouterMainnet is BaseRouter {
         IPoolManager[] calldata poolManagers,
         ILiquidityGauge[] calldata liquidityGauges,
         bool[] calldata justLiquidityGauges
-    ) public {
+    ) external {
         initializeRouter(_core, _uniswapRouter, _oneInch);
         angleAddress.safeIncreaseAllowance(address(_getVeANGLE()), type(uint256).max);
         // agEUR and StableMaster for agEUR
@@ -63,7 +63,7 @@ contract AngleRouterMainnet is BaseRouter {
     // =========================== ROUTER FUNCTIONALITIES ==========================
 
     /// @inheritdoc BaseRouter
-    function _chainSpecificAction(ActionType action, bytes memory data) internal override {
+    function _chainSpecificAction(ActionType action, bytes calldata data) internal override {
         if (action == ActionType.claimRewardsWithPerps) {
             (
                 address user,
@@ -181,16 +181,18 @@ contract AngleRouterMainnet is BaseRouter {
         address[] memory stablecoins,
         address[] memory collateralsOrPerpetualManagers
     ) internal {
+        uint256 perpetualIDsLength = perpetualIDs.length;
         if (
-            perpetualIDs.length != 0 &&
-            (stablecoins.length != perpetualIDs.length || collateralsOrPerpetualManagers.length != perpetualIDs.length)
+            perpetualIDsLength != 0 &&
+            (stablecoins.length != perpetualIDsLength || collateralsOrPerpetualManagers.length != perpetualIDsLength)
         ) revert IncompatibleLengths();
 
-        for (uint256 i = 0; i < liquidityGauges.length; i++) {
+        uint256 liquidityGaugesLength = liquidityGauges.length;
+        for (uint256 i; i < liquidityGaugesLength; ++i) {
             ILiquidityGauge(liquidityGauges[i]).claim_rewards(gaugeUser);
         }
 
-        for (uint256 i = 0; i < perpetualIDs.length; i++) {
+        for (uint256 i; i < perpetualIDsLength; ++i) {
             IPerpetualManagerFrontWithClaim perpManager;
             if (addressProcessed) perpManager = IPerpetualManagerFrontWithClaim(collateralsOrPerpetualManagers[i]);
             else {
@@ -429,12 +431,13 @@ contract AngleRouterMainnet is BaseRouter {
         ILiquidityGauge[] calldata liquidityGauges,
         bool[] calldata justLiquidityGauges
     ) internal {
+        uint256 stablecoinsLength = stablecoins.length;
         if (
-            poolManagers.length != stablecoins.length ||
-            liquidityGauges.length != stablecoins.length ||
-            justLiquidityGauges.length != stablecoins.length
+            poolManagers.length != stablecoinsLength ||
+            liquidityGauges.length != stablecoinsLength ||
+            justLiquidityGauges.length != stablecoinsLength
         ) revert IncompatibleLengths();
-        for (uint256 i = 0; i < stablecoins.length; i++) {
+        for (uint256 i; i < stablecoinsLength; ++i) {
             IStableMasterFront stableMaster = mapStableMasters[stablecoins[i]];
             _addPair(stableMaster, poolManagers[i], liquidityGauges[i], justLiquidityGauges[i]);
         }
@@ -471,7 +474,7 @@ contract AngleRouterMainnet is BaseRouter {
             if (address(_pairs.poolManager) == address(0)) revert ZeroAddress();
             ILiquidityGauge gauge = _pairs.gauge;
             if (address(gauge) != address(0)) {
-                sanToken.approve(address(gauge), 0);
+                _changeAllowance(IERC20(address(sanToken)), address(gauge), 0);
             }
         } else {
             // Checking if the pair has not already been initialized: if yes we need to make the function revert
@@ -486,7 +489,7 @@ contract AngleRouterMainnet is BaseRouter {
         _pairs.gauge = liquidityGauge;
         if (address(liquidityGauge) != address(0)) {
             if (address(sanToken) != liquidityGauge.staking_token()) revert InvalidParams();
-            sanToken.approve(address(liquidityGauge), type(uint256).max);
+            _changeAllowance(IERC20(address(sanToken)), address(liquidityGauge), type(uint256).max);
         }
     }
 

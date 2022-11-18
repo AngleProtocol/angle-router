@@ -129,11 +129,12 @@ abstract contract BaseRouter is Initializable {
     /// do not perform a sweep action on these tokens
     function mixer(
         PermitType[] memory paramsPermit,
-        ActionType[] memory actions,
+        ActionType[] calldata actions,
         bytes[] calldata data
     ) public payable virtual {
-        // Do all the permits once for all: if all tokens have already been approved, there's no need for this step
-        for (uint256 i = 0; i < paramsPermit.length; i++) {
+        // If all tokens have already been approved, there's no need for this step
+        uint256 permitsLength = paramsPermit.length;
+        for (uint256 i; i < permitsLength; ++i) {
             IERC20Permit(paramsPermit[i].token).permit(
                 paramsPermit[i].owner,
                 address(this),
@@ -145,7 +146,8 @@ abstract contract BaseRouter is Initializable {
             );
         }
         // Performing actions one after the others
-        for (uint256 i = 0; i < actions.length; i++) {
+        uint256 actionsLength = actions.length;
+        for (uint256 i; i < actionsLength; ++i) {
             if (actions[i] == ActionType.transfer) {
                 (address inToken, address receiver, uint256 amount) = abi.decode(data[i], (address, address, uint256));
                 if (amount == type(uint256).max) amount = IERC20(inToken).balanceOf(msg.sender);
@@ -159,7 +161,8 @@ abstract contract BaseRouter is Initializable {
                 (address tokenOut, uint256 minAmountOut, address to) = abi.decode(data[i], (address, uint256, address));
                 _sweep(tokenOut, minAmountOut, to);
             } else if (actions[i] == ActionType.sweepNative) {
-                if (address(this).balance > 0) _safeTransferNative(msg.sender, address(this).balance);
+                uint256 routerBalance = address(this).balance;
+                if (routerBalance != 0) _safeTransferNative(msg.sender, routerBalance);
             } else if (actions[i] == ActionType.uniswapV3) {
                 (address inToken, uint256 amount, uint256 minAmountOut, bytes memory path) = abi.decode(
                     data[i],
@@ -251,10 +254,11 @@ abstract contract BaseRouter is Initializable {
     function mixerVaultManagerPermit(
         PermitVaultManagerType[] memory paramsPermitVaultManager,
         PermitType[] memory paramsPermit,
-        ActionType[] memory actions,
+        ActionType[] calldata actions,
         bytes[] calldata data
     ) external payable virtual {
-        for (uint256 i = 0; i < paramsPermitVaultManager.length; i++) {
+        uint256 permitVaultManagerLength = paramsPermitVaultManager.length;
+        for (uint256 i; i < permitVaultManagerLength; ++i) {
             if (paramsPermitVaultManager[i].approved) {
                 IVaultManagerFunctions(paramsPermitVaultManager[i].vaultManager).permit(
                     paramsPermitVaultManager[i].owner,
@@ -270,7 +274,7 @@ abstract contract BaseRouter is Initializable {
         mixer(paramsPermit, actions, data);
         // Storing the index at which starting the iteration for revoking approvals in a variable would make the stack
         // too deep
-        for (uint256 i = 0; i < paramsPermitVaultManager.length; i++) {
+        for (uint256 i; i < permitVaultManagerLength; ++i) {
             if (!paramsPermitVaultManager[i].approved) {
                 IVaultManagerFunctions(paramsPermitVaultManager[i].vaultManager).permit(
                     paramsPermitVaultManager[i].owner,
@@ -302,7 +306,7 @@ abstract contract BaseRouter is Initializable {
     function _unwrapNative(uint256 minAmountOut, address to) internal virtual returns (uint256 amount) {
         amount = _getNativeWrapper().balanceOf(address(this));
         _slippageCheck(amount, minAmountOut);
-        if (amount > 0) {
+        if (amount != 0) {
             _getNativeWrapper().withdraw(amount);
             _safeTransferNative(to, amount);
         }
@@ -313,7 +317,8 @@ abstract contract BaseRouter is Initializable {
     /// @dev If the caller wants to send the rewards to another account than `gaugeUser`, it first needs to
     /// call `set_rewards_receiver(otherAccount)` on each `liquidityGauge`
     function _claimRewards(address gaugeUser, address[] memory liquidityGauges) internal virtual {
-        for (uint256 i = 0; i < liquidityGauges.length; i++) {
+        uint256 gaugesLength = liquidityGauges.length;
+        for (uint256 i; i < gaugesLength; ++i) {
             ILiquidityGauge(liquidityGauges[i]).claim_rewards(gaugeUser);
         }
     }
@@ -363,7 +368,7 @@ abstract contract BaseRouter is Initializable {
     ) internal virtual {
         uint256 balanceToken = IERC20(tokenOut).balanceOf(address(this));
         _slippageCheck(balanceToken, minAmountOut);
-        if (balanceToken > 0) {
+        if (balanceToken != 0) {
             IERC20(tokenOut).safeTransfer(to, balanceToken);
         }
     }
@@ -505,7 +510,7 @@ abstract contract BaseRouter is Initializable {
     }
 
     /// @notice Allows to perform some specific actions for a chain
-    function _chainSpecificAction(ActionType action, bytes memory data) internal virtual {}
+    function _chainSpecificAction(ActionType action, bytes calldata data) internal virtual {}
 
     // ======================= VIRTUAL FUNCTIONS TO OVERRIDE =======================
 
@@ -535,8 +540,9 @@ abstract contract BaseRouter is Initializable {
         address[] calldata spenders,
         uint256[] calldata amounts
     ) external onlyGovernorOrGuardian {
-        if (tokens.length != spenders.length || tokens.length != amounts.length) revert IncompatibleLengths();
-        for (uint256 i = 0; i < tokens.length; i++) {
+        uint256 tokensLength = tokens.length;
+        if (tokensLength != spenders.length || tokensLength != amounts.length) revert IncompatibleLengths();
+        for (uint256 i; i < tokensLength; ++i) {
             _changeAllowance(tokens[i], spenders[i], amounts[i]);
         }
     }
@@ -590,14 +596,15 @@ abstract contract BaseRouter is Initializable {
         bytes[] memory dataBorrow,
         address vaultManager
     ) internal view {
-        if (actionsBorrow.length >= _MAX_BORROW_ACTIONS) revert IncompatibleLengths();
+        uint256 actionsBorrowLength = actionsBorrow.length;
+        if (actionsBorrowLength >= _MAX_BORROW_ACTIONS) revert IncompatibleLengths();
         // The amount of vaults to check cannot be bigger than the maximum amount of tokens
         // supported
         uint256[_MAX_BORROW_ACTIONS] memory vaultIDsToCheckOwnershipOf;
         bool createVaultAction;
         uint256 lastVaultID;
         uint256 vaultIDLength;
-        for (uint256 i = 0; i < actionsBorrow.length; i++) {
+        for (uint256 i; i < actionsBorrowLength; ++i) {
             uint256 vaultID;
             // If there is a `createVault` action, the router should not worry about looking at
             // next vaultIDs given equal to 0
@@ -629,7 +636,7 @@ abstract contract BaseRouter is Initializable {
             }
 
             // Check if this `vaultID` has already been verified
-            for (uint256 j = 0; j < vaultIDLength; j++) {
+            for (uint256 j; j < vaultIDLength; ++j) {
                 if (vaultIDsToCheckOwnershipOf[j] == vaultID) {
                     // If yes, we continue to the next iteration
                     continue;
@@ -651,7 +658,7 @@ abstract contract BaseRouter is Initializable {
 
     /// @notice Internal function used for error handling
     function _revertBytes(bytes memory errMsg) internal pure {
-        if (errMsg.length > 0) {
+        if (errMsg.length != 0) {
             //solhint-disable-next-line
             assembly {
                 revert(add(32, errMsg), mload(errMsg))
