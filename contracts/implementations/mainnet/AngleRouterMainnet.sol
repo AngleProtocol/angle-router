@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.17;
 
-import "../../interfaces/external/IWETH9.sol";
-
 import "../../interfaces/IFeeDistributorFront.sol";
 import "../../interfaces/ISanToken.sol";
 import "../../interfaces/IStableMasterFront.sol";

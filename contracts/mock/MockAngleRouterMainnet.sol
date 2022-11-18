@@ -15,3 +15,9 @@ contract MockAngleRouterMainnet is AngleRouterMainnet {
         return IVeANGLE(veAngle);
     }
 }
+
+contract MockAngleRouterMainnet2 is AngleRouterMainnet {
+    function getVeANGLE() external view returns (IVeANGLE) {
+        return _getVeANGLE();
+    }
+}

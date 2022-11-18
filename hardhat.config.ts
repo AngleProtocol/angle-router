@@ -186,6 +186,7 @@ const config: HardhatUserConfig = {
   paths: {
     sources: './contracts',
     tests: './test',
+    cache: 'cache-hh',
   },
   namedAccounts: {
     deployer: 0,
@@ -223,17 +224,6 @@ const config: HardhatUserConfig = {
     spacing: 2,
   },
   etherscan: {
-    /*
-    // eslint-disable-next-line
-    // @ts-ignore
-    apiKey: {
-      mainnet: process.env.ETHERSCAN_API_KEY,
-      optimisticEthereum: process.env.OPTIMISM_ETHERSCAN_API_KEY,
-      arbitrumOne: process.env.ARBITRUM_ETHERSCAN_API_KEY,
-      avalanche: process.env.AVALANCHE_ETHERSCAN_API_KEY,
-      polygon: process.env.POLYGON_ETHERSCAN_API_KEY,
-    },
-    */
     apiKey: process.env.ETHERSCAN_API_KEY,
   },
   tenderly: {

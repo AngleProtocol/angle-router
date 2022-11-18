@@ -1,10 +1,10 @@
-import yargs from 'yargs';
+import { ChainId, CONTRACTS_ADDRESSES, registry } from '@angleprotocol/sdk';
 import { DeployFunction } from 'hardhat-deploy/types';
-import { CONTRACTS_ADDRESSES, ChainId } from '@angleprotocol/sdk';
+import yargs from 'yargs';
 
-import params from './networks';
 // eslint-disable-next-line camelcase
-import { AngleRouter__factory } from '../typechain';
+import { AngleRouterMainnet__factory } from '../typechain';
+import params from './networks';
 
 const argv = yargs.env('').boolean('ci').parseSync();
 
@@ -14,7 +14,10 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
 
   console.log('Deploying router');
 
-  const chainIdNetwork = network.config.chainId as ChainId;
+  const chainId = network.config.chainId as ChainId;
+  const proxyAdmin = registry(chainId)?.ProxyAdminGuardian;
+  const coreBorrow = registry(chainId)?.CoreBorrow;
+  const stableMaster = registry(chainId)?.agEUR?.StableMaster;
 
   let governorAddress: string;
   let guardianAddress: string;
@@ -39,8 +42,6 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
   } else {
     throw new Error('Unsupported chainId!');
   }
-
-  const stableMaster = CONTRACTS_ADDRESSES[chainIdNetwork].agEUR?.StableMaster;
 
   for (const collateralName of Object.keys(constants.EUR)) {
     const poolManagerUnd = CONTRACTS_ADDRESSES[chainIdNetwork].agEUR?.collaterals?.[collateralName].PoolManager;

@@ -3,20 +3,18 @@
 pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/draft-IERC20PermitUpgradeable.sol";
-import "@openzeppelin/contracts/interfaces/IERC4626.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/draft-IERC20Permit.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
 import "./interfaces/external/uniswap/IUniswapRouter.sol";
 import "./interfaces/external/IWETH9.sol";
-import "./interfaces/IAgTokenMultiChain.sol";
 import "./interfaces/ICoreBorrow.sol";
 import "./interfaces/ILiquidityGauge.sol";
 import "./interfaces/ISavingsRateIlliquid.sol";
-import "./interfaces/ISwapper.sol";
 import "./interfaces/IVaultManager.sol";
 
-// =========================== Structs and Enums ===============================
+// ============================== STRUCTS AND ENUM =============================
 
 /// @notice Action types
 enum ActionType {
@@ -136,7 +134,7 @@ abstract contract BaseRouter is Initializable {
     ) public payable virtual {
         // Do all the permits once for all: if all tokens have already been approved, there's no need for this step
         for (uint256 i = 0; i < paramsPermit.length; i++) {
-            IERC20PermitUpgradeable(paramsPermit[i].token).permit(
+            IERC20Permit(paramsPermit[i].token).permit(
                 paramsPermit[i].owner,
                 address(this),
                 paramsPermit[i].value,

@@ -226,6 +226,21 @@ contract('BaseRouter', () => {
         expect(await USDC.balanceOf(alice.address)).to.be.equal(parseUnits('0.7', USDCdecimal));
         expect(await USDC.balanceOf(router.address)).to.be.equal(parseUnits('0.3', USDCdecimal));
       });
+      it('success - amount transferred to the vault and unsupported action', async () => {
+        await USDC.mint(alice.address, parseUnits('1', USDCdecimal));
+        await USDC.connect(alice).approve(router.address, parseUnits('1', USDCdecimal));
+
+        const transferData = ethers.utils.defaultAbiCoder.encode(
+          ['address', 'address', 'uint256'],
+          [USDC.address, router.address, parseUnits('0.3', USDCdecimal)],
+        );
+        const actions = [ActionType.transfer, ActionType.veANGLEDeposit];
+        const dataMixer = [transferData, transferData];
+
+        await router.connect(alice).mixer(permits, actions, dataMixer);
+        expect(await USDC.balanceOf(alice.address)).to.be.equal(parseUnits('0.7', USDCdecimal));
+        expect(await USDC.balanceOf(router.address)).to.be.equal(parseUnits('0.3', USDCdecimal));
+      });
       it('success - amount transferred to the vault with a permit before', async () => {
         await USDC.mint(alice.address, parseUnits('1', USDCdecimal));
         const permits2: TypePermit[] = [

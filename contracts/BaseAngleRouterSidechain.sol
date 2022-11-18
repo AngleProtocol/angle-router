@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.17;
 
-import "./interfaces/external/uniswap/IUniswapRouter.sol";
 import "./interfaces/IAgTokenMultiChain.sol";
 import "./BaseRouter.sol";
 

@@ -9,6 +9,8 @@ import {
   MockAgToken__factory,
   MockAngleRouterMainnet,
   MockAngleRouterMainnet__factory,
+  MockAngleRouterMainnet2,
+  MockAngleRouterMainnet2__factory,
   MockCoreBorrow,
   MockCoreBorrow__factory,
   MockFeeDistributor,
@@ -80,6 +82,12 @@ contract('AngleRouterMainnet - Actions', () => {
     feeDistrib = (await new MockFeeDistributor__factory(deployer).deploy()) as MockFeeDistributor;
     await feeDistrib.setToken(sanToken.address);
   });
+  describe('getVeANGLE', () => {
+    it('success - right address', async () => {
+      const router2 = (await new MockAngleRouterMainnet2__factory(deployer).deploy()) as MockAngleRouterMainnet2;
+      expect(await router2.getVeANGLE()).to.be.equal('0x0C462Dbb9EC8cD1630f1728B2CFD2769d09f0dd5');
+    });
+  });
   describe('claimRewardsWithPerps', () => {
     it('success - when just liquidity gauges', async () => {
       const claimData = ethers.utils.defaultAbiCoder.encode(
@@ -101,10 +109,19 @@ contract('AngleRouterMainnet - Actions', () => {
       await router.connect(alice).mixer(permits, actions, dataMixer);
       expect(await gauge.counter(bob.address)).to.be.equal(2);
     });
-    it('reverts - when incompatible lengths', async () => {
+    it('reverts - when incompatible lengths 1/2', async () => {
       const claimData = ethers.utils.defaultAbiCoder.encode(
         ['address', 'address[]', 'uint256[]', 'bool', 'address[]', 'address[]'],
         [bob.address, [gauge.address], [1, 2], true, [ZERO_ADDRESS], [perpetual.address]],
+      );
+      const actions = [ActionType.claimRewardsWithPerps];
+      const dataMixer = [claimData];
+      await expect(router.connect(alice).mixer(permits, actions, dataMixer)).to.be.revertedWith('IncompatibleLengths');
+    });
+    it('reverts - when incompatible lengths 2/2', async () => {
+      const claimData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address[]', 'uint256[]', 'bool', 'address[]', 'address[]'],
+        [bob.address, [gauge.address], [1, 2], true, [ZERO_ADDRESS, ZERO_ADDRESS], [perpetual.address]],
       );
       const actions = [ActionType.claimRewardsWithPerps];
       const dataMixer = [claimData];
