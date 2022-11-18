@@ -1,11 +1,8 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
-import { BigNumber, BytesLike } from 'ethers';
 import { parseEther, parseUnits } from 'ethers/lib/utils';
-import hre, { contract, ethers } from 'hardhat';
+import { contract, ethers } from 'hardhat';
 
 import {
-  ERC20,
-  ERC20__factory,
   Mock1Inch,
   Mock1Inch__factory,
   MockAgToken,
@@ -31,7 +28,7 @@ import {
 } from '../../../../../typechain';
 import { expect } from '../../../../../utils/chai-setup';
 import { ActionType, TypePermit } from '../../../../../utils/helpers';
-import { deployUpgradeable, expectApprox, MAX_UINT256, ZERO_ADDRESS } from '../../../utils/helpers';
+import { deployUpgradeable, MAX_UINT256, ZERO_ADDRESS } from '../../../utils/helpers';
 
 contract('AngleRouterMainnet - Actions', () => {
   let deployer: SignerWithAddress;
@@ -83,7 +80,6 @@ contract('AngleRouterMainnet - Actions', () => {
     feeDistrib = (await new MockFeeDistributor__factory(deployer).deploy()) as MockFeeDistributor;
     await feeDistrib.setToken(sanToken.address);
   });
-  /*
   describe('claimRewardsWithPerps', () => {
     it('success - when just liquidity gauges', async () => {
       const claimData = ethers.utils.defaultAbiCoder.encode(
@@ -318,30 +314,302 @@ contract('AngleRouterMainnet - Actions', () => {
       expect(await sanToken.balanceOf(bob.address)).to.be.equal(parseUnits('0.3', 6));
     });
   });
-  */
   describe('withdraw', () => {
     it('success - withdraw made when addresses processed', async () => {
+      await router.connect(alice).changeAllowance([sanToken.address], [stableMaster.address], [MAX_UINT256]);
+      await sanToken.mint(alice.address, parseUnits('1', 6));
+      await USDC.mint(stableMaster.address, parseUnits('1', 6));
+      await sanToken.connect(alice).approve(router.address, parseUnits('1', 6));
+      const transferData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256'],
+        [sanToken.address, router.address, parseUnits('0.3', 6)],
+      );
+      const withdrawData = ethers.utils.defaultAbiCoder.encode(
+        ['uint256', 'bool', 'address', 'address', 'address'],
+        [parseUnits('0.3', 6), true, stableMaster.address, alice.address, ZERO_ADDRESS],
+      );
+      const actions = [ActionType.transfer, ActionType.withdraw];
+      const dataMixer = [transferData, withdrawData];
+      await router.connect(alice).addStableMaster(agEUR.address, stableMaster.address);
+      await stableMaster.addCollateral(alice.address, USDC.address, sanToken.address, perpetual.address);
+      await router.connect(alice).addPairs([agEUR.address], [alice.address], [gauge.address], [false]);
+      await router.connect(alice).mixer(permits, actions, dataMixer);
+      expect(await USDC.balanceOf(stableMaster.address)).to.be.equal(parseUnits('0.7', 6));
+      expect(await USDC.balanceOf(router.address)).to.be.equal(parseUnits('0.3', 6));
+      expect(await sanToken.balanceOf(alice.address)).to.be.equal(parseUnits('0.7', 6));
+      expect(await sanToken.balanceOf(stableMaster.address)).to.be.equal(parseUnits('0.3', 6));
+    });
+    it('success - withdraw made when addresses processed and leftover', async () => {
+      await router.connect(alice).changeAllowance([sanToken.address], [stableMaster.address], [MAX_UINT256]);
+      await sanToken.mint(alice.address, parseUnits('1', 6));
+      await USDC.mint(stableMaster.address, parseUnits('1', 6));
+      await sanToken.connect(alice).approve(router.address, parseUnits('1', 6));
+      const transferData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256'],
+        [sanToken.address, router.address, parseUnits('0.3', 6)],
+      );
+      const withdrawData = ethers.utils.defaultAbiCoder.encode(
+        ['uint256', 'bool', 'address', 'address', 'address'],
+        [parseUnits('0.2', 6), true, stableMaster.address, alice.address, ZERO_ADDRESS],
+      );
+      const actions = [ActionType.transfer, ActionType.withdraw];
+      const dataMixer = [transferData, withdrawData];
+      await router.connect(alice).addStableMaster(agEUR.address, stableMaster.address);
+      await stableMaster.addCollateral(alice.address, USDC.address, sanToken.address, perpetual.address);
+      await router.connect(alice).addPairs([agEUR.address], [alice.address], [gauge.address], [false]);
+      await router.connect(alice).mixer(permits, actions, dataMixer);
+      expect(await USDC.balanceOf(stableMaster.address)).to.be.equal(parseUnits('0.8', 6));
+      expect(await USDC.balanceOf(router.address)).to.be.equal(parseUnits('0.2', 6));
+      expect(await sanToken.balanceOf(alice.address)).to.be.equal(parseUnits('0.7', 6));
+      expect(await sanToken.balanceOf(stableMaster.address)).to.be.equal(parseUnits('0.2', 6));
+      expect(await sanToken.balanceOf(router.address)).to.be.equal(parseUnits('0.1', 6));
+    });
+    it('reverts - withdraw made when addresses processed and no leftover because max uint but no sanToken address', async () => {
+      await router.connect(alice).changeAllowance([sanToken.address], [stableMaster.address], [MAX_UINT256]);
+      await sanToken.mint(alice.address, parseUnits('1', 6));
+      await USDC.mint(stableMaster.address, parseUnits('1', 6));
+      await sanToken.connect(alice).approve(router.address, parseUnits('1', 6));
+      const transferData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256'],
+        [sanToken.address, router.address, parseUnits('0.3', 6)],
+      );
+      const withdrawData = ethers.utils.defaultAbiCoder.encode(
+        ['uint256', 'bool', 'address', 'address', 'address'],
+        [MAX_UINT256, true, stableMaster.address, alice.address, ZERO_ADDRESS],
+      );
+      const actions = [ActionType.transfer, ActionType.withdraw];
+      const dataMixer = [transferData, withdrawData];
+      await router.connect(alice).addStableMaster(agEUR.address, stableMaster.address);
+      await stableMaster.addCollateral(alice.address, USDC.address, sanToken.address, perpetual.address);
+      await router.connect(alice).addPairs([agEUR.address], [alice.address], [gauge.address], [false]);
+      await expect(router.connect(alice).mixer(permits, actions, dataMixer)).to.be.reverted;
+    });
+    it('success - withdraw made when addresses not processed 1/2', async () => {
+      await router.connect(alice).changeAllowance([sanToken.address], [stableMaster.address], [MAX_UINT256]);
+      await sanToken.mint(alice.address, parseUnits('1', 6));
+      await USDC.mint(stableMaster.address, parseUnits('1', 6));
+      await sanToken.connect(alice).approve(router.address, parseUnits('1', 6));
+      const transferData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256'],
+        [sanToken.address, router.address, parseUnits('0.3', 6)],
+      );
+      const withdrawData = ethers.utils.defaultAbiCoder.encode(
+        ['uint256', 'bool', 'address', 'address', 'address'],
+        [MAX_UINT256, false, agEUR.address, USDC.address, sanToken.address],
+      );
+      const actions = [ActionType.transfer, ActionType.withdraw];
+      const dataMixer = [transferData, withdrawData];
+      await router.connect(alice).addStableMaster(agEUR.address, stableMaster.address);
+      await stableMaster.addCollateral(alice.address, USDC.address, sanToken.address, perpetual.address);
+      await router.connect(alice).addPairs([agEUR.address], [alice.address], [gauge.address], [false]);
+      await router.connect(alice).mixer(permits, actions, dataMixer);
+      expect(await USDC.balanceOf(stableMaster.address)).to.be.equal(parseUnits('0.7', 6));
+      expect(await USDC.balanceOf(router.address)).to.be.equal(parseUnits('0.3', 6));
+      expect(await sanToken.balanceOf(alice.address)).to.be.equal(parseUnits('0.7', 6));
+      expect(await sanToken.balanceOf(stableMaster.address)).to.be.equal(parseUnits('0.3', 6));
+    });
+    it('success - withdraw made when addresses not processed 2/2', async () => {
+      await router.connect(alice).changeAllowance([sanToken.address], [stableMaster.address], [MAX_UINT256]);
+      await sanToken.mint(alice.address, parseUnits('1', 6));
+      await USDC.mint(stableMaster.address, parseUnits('1', 6));
+      await sanToken.connect(alice).approve(router.address, parseUnits('1', 6));
+      const transferData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256'],
+        [sanToken.address, router.address, parseUnits('0.3', 6)],
+      );
+      const withdrawData = ethers.utils.defaultAbiCoder.encode(
+        ['uint256', 'bool', 'address', 'address', 'address'],
+        [parseUnits('0.2', 6), false, agEUR.address, USDC.address, sanToken.address],
+      );
+      const actions = [ActionType.transfer, ActionType.withdraw];
+      const dataMixer = [transferData, withdrawData];
+      await router.connect(alice).addStableMaster(agEUR.address, stableMaster.address);
+      await stableMaster.addCollateral(alice.address, USDC.address, sanToken.address, perpetual.address);
+      await router.connect(alice).addPairs([agEUR.address], [alice.address], [gauge.address], [false]);
+      await router.connect(alice).mixer(permits, actions, dataMixer);
+      expect(await USDC.balanceOf(stableMaster.address)).to.be.equal(parseUnits('0.8', 6));
+      expect(await USDC.balanceOf(router.address)).to.be.equal(parseUnits('0.2', 6));
+      expect(await sanToken.balanceOf(alice.address)).to.be.equal(parseUnits('0.7', 6));
+      expect(await sanToken.balanceOf(stableMaster.address)).to.be.equal(parseUnits('0.2', 6));
+      expect(await sanToken.balanceOf(router.address)).to.be.equal(parseUnits('0.1', 6));
+    });
+  });
+  describe('openPerpetual', () => {
+    it('success - perpetual opened - address processed 1/2', async () => {
+      await perpetual.setToken(USDC.address);
+      await USDC.mint(alice.address, parseUnits('1', 6));
+      await USDC.connect(alice).approve(router.address, parseUnits('1', 6));
+      const transferData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256'],
+        [USDC.address, router.address, parseUnits('0.5', 6)],
+      );
+      const openData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'uint256', 'uint256', 'uint256', 'uint256', 'bool', 'address', 'address'],
+        [
+          bob.address,
+          parseUnits('0.5', 6),
+          parseUnits('1', 6),
+          parseEther('1'),
+          0,
+          true,
+          perpetual.address,
+          ZERO_ADDRESS,
+        ],
+      );
+      const actions = [ActionType.transfer, ActionType.openPerpetual];
+      const dataMixer = [transferData, openData];
+      await router.connect(alice).addStableMaster(agEUR.address, stableMaster.address);
+      await stableMaster.addCollateral(alice.address, USDC.address, sanToken.address, perpetual.address);
+      await router.connect(alice).addPairs([agEUR.address], [alice.address], [gauge.address], [false]);
+      await router.connect(alice).mixer(permits, actions, dataMixer);
+      expect(await USDC.balanceOf(perpetual.address)).to.be.equal(parseUnits('0.5', 6));
+      expect(await USDC.balanceOf(router.address)).to.be.equal(parseUnits('0', 6));
+      expect(await perpetual.counter()).to.be.equal(1);
+      expect(await perpetual.perps(0)).to.be.equal(parseUnits('0.5', 6));
+    });
+    it('success - perpetual opened - address processed 2/2', async () => {
+      await perpetual.setToken(USDC.address);
+      await USDC.mint(alice.address, parseUnits('1', 6));
+      await USDC.connect(alice).approve(router.address, parseUnits('1', 6));
+      const transferData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256'],
+        [USDC.address, router.address, parseUnits('0.6', 6)],
+      );
+      const openData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'uint256', 'uint256', 'uint256', 'uint256', 'bool', 'address', 'address'],
+        [
+          bob.address,
+          parseUnits('0.5', 6),
+          parseUnits('1', 6),
+          parseEther('1'),
+          0,
+          true,
+          perpetual.address,
+          ZERO_ADDRESS,
+        ],
+      );
+      const actions = [ActionType.transfer, ActionType.openPerpetual];
+      const dataMixer = [transferData, openData];
+      await router.connect(alice).addStableMaster(agEUR.address, stableMaster.address);
+      await stableMaster.addCollateral(alice.address, USDC.address, sanToken.address, perpetual.address);
+      await router.connect(alice).addPairs([agEUR.address], [alice.address], [gauge.address], [false]);
+      await router.connect(alice).mixer(permits, actions, dataMixer);
+      expect(await USDC.balanceOf(perpetual.address)).to.be.equal(parseUnits('0.5', 6));
+      expect(await USDC.balanceOf(router.address)).to.be.equal(parseUnits('0.1', 6));
+      expect(await perpetual.counter()).to.be.equal(1);
+      expect(await perpetual.perps(0)).to.be.equal(parseUnits('0.5', 6));
+    });
+    it('success - perpetual opened - address not processed ', async () => {
+      await perpetual.setToken(USDC.address);
+      await USDC.mint(alice.address, parseUnits('1', 6));
+      await USDC.connect(alice).approve(router.address, parseUnits('1', 6));
+      const transferData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256'],
+        [USDC.address, router.address, parseUnits('0.6', 6)],
+      );
+      const openData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'uint256', 'uint256', 'uint256', 'uint256', 'bool', 'address', 'address'],
+        [bob.address, parseUnits('0.5', 6), parseUnits('1', 6), parseEther('1'), 0, false, agEUR.address, USDC.address],
+      );
+      const actions = [ActionType.transfer, ActionType.openPerpetual];
+      const dataMixer = [transferData, openData];
+      await router.connect(alice).addStableMaster(agEUR.address, stableMaster.address);
+      await stableMaster.addCollateral(alice.address, USDC.address, sanToken.address, perpetual.address);
+      await router.connect(alice).addPairs([agEUR.address], [alice.address], [gauge.address], [false]);
+      await router.connect(alice).mixer(permits, actions, dataMixer);
+      expect(await USDC.balanceOf(perpetual.address)).to.be.equal(parseUnits('0.5', 6));
+      expect(await USDC.balanceOf(router.address)).to.be.equal(parseUnits('0.1', 6));
+      expect(await perpetual.counter()).to.be.equal(1);
+      expect(await perpetual.perps(0)).to.be.equal(parseUnits('0.5', 6));
+    });
+  });
+  describe('addToPerpetual', () => {
+    it('success - amount added - address processed', async () => {
+      await perpetual.setToken(USDC.address);
+      await USDC.mint(alice.address, parseUnits('1', 6));
+      await USDC.connect(alice).approve(router.address, parseUnits('1', 6));
+      const transferData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256'],
+        [USDC.address, router.address, parseUnits('0.9', 6)],
+      );
+      const openData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'uint256', 'uint256', 'uint256', 'uint256', 'bool', 'address', 'address'],
+        [
+          bob.address,
+          parseUnits('0.5', 6),
+          parseUnits('1', 6),
+          parseEther('1'),
+          0,
+          true,
+          perpetual.address,
+          ZERO_ADDRESS,
+        ],
+      );
+      const addData = ethers.utils.defaultAbiCoder.encode(
+        ['uint256', 'uint256', 'bool', 'address', 'address'],
+        [parseUnits('0.3', 6), 0, true, perpetual.address, ZERO_ADDRESS],
+      );
+      const actions = [ActionType.transfer, ActionType.openPerpetual, ActionType.addToPerpetual];
+      const dataMixer = [transferData, openData, addData];
+      await router.connect(alice).addStableMaster(agEUR.address, stableMaster.address);
+      await stableMaster.addCollateral(alice.address, USDC.address, sanToken.address, perpetual.address);
+      await router.connect(alice).addPairs([agEUR.address], [alice.address], [gauge.address], [false]);
+      await router.connect(alice).mixer(permits, actions, dataMixer);
+      expect(await USDC.balanceOf(perpetual.address)).to.be.equal(parseUnits('0.8', 6));
+      expect(await USDC.balanceOf(router.address)).to.be.equal(parseUnits('0.1', 6));
+      expect(await perpetual.counter()).to.be.equal(1);
+      expect(await perpetual.perps(0)).to.be.equal(parseUnits('0.8', 6));
+    });
+    it('success - amount added - address not processed', async () => {
+      await perpetual.setToken(USDC.address);
+      await USDC.mint(alice.address, parseUnits('1', 6));
+      await USDC.connect(alice).approve(router.address, parseUnits('1', 6));
+      const transferData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256'],
+        [USDC.address, router.address, parseUnits('0.9', 6)],
+      );
+      const openData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'uint256', 'uint256', 'uint256', 'uint256', 'bool', 'address', 'address'],
+        [
+          bob.address,
+          parseUnits('0.5', 6),
+          parseUnits('1', 6),
+          parseEther('1'),
+          0,
+          true,
+          perpetual.address,
+          ZERO_ADDRESS,
+        ],
+      );
+      const addData = ethers.utils.defaultAbiCoder.encode(
+        ['uint256', 'uint256', 'bool', 'address', 'address'],
+        [parseUnits('0.3', 6), 0, false, agEUR.address, USDC.address],
+      );
+      const actions = [ActionType.transfer, ActionType.openPerpetual, ActionType.addToPerpetual];
+      const dataMixer = [transferData, openData, addData];
+      await router.connect(alice).addStableMaster(agEUR.address, stableMaster.address);
+      await stableMaster.addCollateral(alice.address, USDC.address, sanToken.address, perpetual.address);
+      await router.connect(alice).addPairs([agEUR.address], [alice.address], [gauge.address], [false]);
+      await router.connect(alice).mixer(permits, actions, dataMixer);
+      expect(await USDC.balanceOf(perpetual.address)).to.be.equal(parseUnits('0.8', 6));
+      expect(await USDC.balanceOf(router.address)).to.be.equal(parseUnits('0.1', 6));
+      expect(await perpetual.counter()).to.be.equal(1);
+      expect(await perpetual.perps(0)).to.be.equal(parseUnits('0.8', 6));
+    });
+  });
+  describe('unsupported action', () => {
+    it('success - nothing happens', async () => {
       await USDC.mint(alice.address, parseUnits('1', 6));
       await USDC.connect(alice).approve(router.address, parseUnits('1', 6));
       const transferData = ethers.utils.defaultAbiCoder.encode(
         ['address', 'address', 'uint256'],
         [USDC.address, router.address, parseUnits('0.3', 6)],
       );
-      const mintData = ethers.utils.defaultAbiCoder.encode(
-        ['address', 'uint256', 'bool', 'address', 'address', 'address'],
-        [bob.address, parseUnits('0.3', 6), true, stableMaster.address, ZERO_ADDRESS, alice.address],
-      );
-      const actions = [ActionType.transfer, ActionType.deposit];
-      const dataMixer = [transferData, mintData];
-      await router.connect(alice).addStableMaster(agEUR.address, stableMaster.address);
-      await stableMaster.addCollateral(alice.address, USDC.address, sanToken.address, perpetual.address);
-      await router.connect(alice).addPairs([agEUR.address], [alice.address], [gauge.address], [false]);
-      await USDC.connect(alice).approve(router.address, MAX_UINT256);
-      await sanToken.mint(stableMaster.address, parseUnits('0.3', 6));
+      const actions = [ActionType.transfer, ActionType.swapIn];
+      const dataMixer = [transferData, transferData];
       await router.connect(alice).mixer(permits, actions, dataMixer);
-      expect(await USDC.balanceOf(stableMaster.address)).to.be.equal(parseUnits('0.3', 6));
+      expect(await USDC.balanceOf(router.address)).to.be.equal(parseUnits('0.3', 6));
       expect(await USDC.balanceOf(alice.address)).to.be.equal(parseUnits('0.7', 6));
-      expect(await sanToken.balanceOf(bob.address)).to.be.equal(parseUnits('0.3', 6));
     });
   });
 });

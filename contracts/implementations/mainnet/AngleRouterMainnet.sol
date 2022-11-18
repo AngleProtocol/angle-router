@@ -108,7 +108,6 @@ contract AngleRouterMainnet is BaseRouter {
                 address sanToken
             ) = abi.decode(data, (uint256, bool, address, address, address));
             if (amount == type(uint256).max) amount = IERC20(sanToken).balanceOf(address(this));
-            // Reusing the `collateralOrPoolManager` variable to save some variable declarations
             _withdraw(amount, addressProcessed, stablecoinOrStableMaster, collateralOrPoolManager);
         } else if (action == ActionType.mint) {
             (

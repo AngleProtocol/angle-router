@@ -8,6 +8,8 @@ import {
   Mock1Inch__factory,
   MockAgToken,
   MockAgToken__factory,
+  MockBorrowStaker,
+  MockBorrowStaker__factory,
   MockCoreBorrow,
   MockCoreBorrow__factory,
   MockLiquidityGauge,
@@ -21,6 +23,7 @@ import {
 } from '../../../typechain';
 import { expect } from '../../../utils/chai-setup';
 import { ActionType, TypePermit } from '../../../utils/helpers';
+import { signPermit } from '../../../utils/sign';
 import { deployUpgradeable, MAX_UINT256, ZERO_ADDRESS } from '../utils/helpers';
 
 contract('BaseRouter', () => {
@@ -223,6 +226,97 @@ contract('BaseRouter', () => {
         expect(await USDC.balanceOf(alice.address)).to.be.equal(parseUnits('0.7', USDCdecimal));
         expect(await USDC.balanceOf(router.address)).to.be.equal(parseUnits('0.3', USDCdecimal));
       });
+      it('success - amount transferred to the vault with a permit before', async () => {
+        await USDC.mint(alice.address, parseUnits('1', USDCdecimal));
+        const permits2: TypePermit[] = [
+          await signPermit(
+            alice,
+            (await USDC.nonces(alice.address)).toNumber(),
+            USDC.address,
+            Number(await (await web3.eth.getBlock('latest')).timestamp) + 1000,
+            router.address,
+            MAX_UINT256,
+            'USDC',
+          ),
+        ];
+
+        const transferData = ethers.utils.defaultAbiCoder.encode(
+          ['address', 'address', 'uint256'],
+          [USDC.address, router.address, parseUnits('0.3', USDCdecimal)],
+        );
+        const actions = [ActionType.transfer];
+        const dataMixer = [transferData];
+
+        await router.connect(alice).mixer(permits2, actions, dataMixer);
+        expect(await USDC.balanceOf(alice.address)).to.be.equal(parseUnits('0.7', USDCdecimal));
+        expect(await USDC.balanceOf(router.address)).to.be.equal(parseUnits('0.3', USDCdecimal));
+      });
+      it('reverts - permit with invalid deadline', async () => {
+        await USDC.mint(alice.address, parseUnits('1', USDCdecimal));
+        const permits2: TypePermit[] = [
+          await signPermit(
+            alice,
+            (await USDC.nonces(alice.address)).toNumber(),
+            USDC.address,
+            Number(await (await web3.eth.getBlock('latest')).timestamp) - 1000,
+            router.address,
+            MAX_UINT256,
+            'USDC',
+          ),
+        ];
+
+        const transferData = ethers.utils.defaultAbiCoder.encode(
+          ['address', 'address', 'uint256'],
+          [USDC.address, router.address, parseUnits('0.3', USDCdecimal)],
+        );
+        const actions = [ActionType.transfer];
+        const dataMixer = [transferData];
+
+        await expect(router.connect(alice).mixer(permits2, actions, dataMixer)).to.be.reverted;
+      });
+      it('success - several permits and several transfers', async () => {
+        await USDC.mint(alice.address, parseUnits('1', USDCdecimal));
+        await agEUR.mint(alice.address, parseEther('3'));
+        const permits2: TypePermit[] = [
+          await signPermit(
+            alice,
+            (await USDC.nonces(alice.address)).toNumber(),
+            USDC.address,
+            Number(await (await web3.eth.getBlock('latest')).timestamp) + 1000,
+            router.address,
+            MAX_UINT256,
+            'USDC',
+          ),
+          await signPermit(
+            alice,
+            (await agEUR.nonces(alice.address)).toNumber(),
+            agEUR.address,
+            Number(await (await web3.eth.getBlock('latest')).timestamp) + 1000,
+            router.address,
+            parseEther('1.3'),
+            'agEUR',
+          ),
+        ];
+
+        const transferData0 = ethers.utils.defaultAbiCoder.encode(
+          ['address', 'address', 'uint256'],
+          [USDC.address, router.address, parseUnits('0.3', USDCdecimal)],
+        );
+        const transferData1 = ethers.utils.defaultAbiCoder.encode(
+          ['address', 'address', 'uint256'],
+          [agEUR.address, bob.address, parseEther('1.2')],
+        );
+        const actions = [ActionType.transfer, ActionType.transfer];
+        const dataMixer = [transferData0, transferData1];
+
+        await router.connect(alice).mixer(permits2, actions, dataMixer);
+
+        expect(await USDC.balanceOf(alice.address)).to.be.equal(parseUnits('0.7', USDCdecimal));
+        expect(await USDC.balanceOf(router.address)).to.be.equal(parseUnits('0.3', USDCdecimal));
+        expect(await agEUR.balanceOf(alice.address)).to.be.equal(parseEther('1.8'));
+        expect(await agEUR.balanceOf(bob.address)).to.be.equal(parseEther('1.2'));
+        expect(await agEUR.allowance(alice.address, router.address)).to.be.equal(parseEther('0.1'));
+      });
       it('success - amount transferred to the vault and then swept', async () => {
         await USDC.mint(alice.address, parseUnits('1', USDCdecimal));
         await USDC.connect(alice).approve(router.address, parseUnits('1', USDCdecimal));
@@ -351,6 +445,20 @@ contract('BaseRouter', () => {
         const actions = [ActionType.claimRewards];
         const dataMixer = [claimData];
         await router.connect(alice).mixer(permits, actions, dataMixer);
+        expect(await gauge.counter(bob.address)).to.be.equal(1);
+      });
+      it('success - claiming rewards from two gauges with different interfaces and return values', async () => {
+        const gauge = (await new MockLiquidityGauge__factory(deployer).deploy(USDC.address)) as MockLiquidityGauge;
+        const staker = (await new MockBorrowStaker__factory(deployer).deploy()) as MockBorrowStaker;
+        const claimData = ethers.utils.defaultAbiCoder.encode(
+          ['address', 'address[]'],
+          [bob.address, [gauge.address, staker.address, staker.address]],
+        );
+        const actions = [ActionType.claimRewards];
+        const dataMixer = [claimData];
+        await router.connect(alice).mixer(permits, actions, dataMixer);
+        expect(await gauge.counter(bob.address)).to.be.equal(1);
+        expect(await staker.counter(bob.address)).to.be.equal(2);
       });
       it('reverts - when gauge address is invalid', async () => {
         const claimData = ethers.utils.defaultAbiCoder.encode(['address', 'address[]'], [bob.address, [bob.address]]);
