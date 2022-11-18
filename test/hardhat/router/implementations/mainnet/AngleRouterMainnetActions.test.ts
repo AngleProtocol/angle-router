@@ -629,4 +629,37 @@ contract('AngleRouterMainnet - Actions', () => {
       expect(await USDC.balanceOf(alice.address)).to.be.equal(parseUnits('0.7', 6));
     });
   });
+  describe('Composed actions', () => {
+    describe('deposit & stake', () => {
+      it('success - flow works correctly', async () => {
+        await USDC.mint(alice.address, parseUnits('1', 6));
+        await USDC.connect(alice).approve(router.address, parseUnits('1', 6));
+        const transferData = ethers.utils.defaultAbiCoder.encode(
+          ['address', 'address', 'uint256'],
+          [USDC.address, router.address, parseUnits('0.3', 6)],
+        );
+        const mintData = ethers.utils.defaultAbiCoder.encode(
+          ['address', 'uint256', 'bool', 'address', 'address', 'address'],
+          [router.address, parseUnits('0.3', 6), true, stableMaster.address, ZERO_ADDRESS, alice.address],
+        );
+        const gaugeData = ethers.utils.defaultAbiCoder.encode(
+          ['address', 'uint256', 'address', 'bool'],
+          [bob.address, parseUnits('0.3', 6), gauge.address, false],
+        );
+        const actions = [ActionType.transfer, ActionType.deposit, ActionType.gaugeDeposit];
+        const dataMixer = [transferData, mintData, gaugeData];
+        await router.connect(alice).addStableMaster(agEUR.address, stableMaster.address);
+        await stableMaster.addCollateral(alice.address, USDC.address, sanToken.address, perpetual.address);
+        await router.connect(alice).addPairs([agEUR.address], [alice.address], [gauge.address], [false]);
+        await USDC.connect(alice).approve(router.address, MAX_UINT256);
+        await sanToken.mint(stableMaster.address, parseUnits('0.3', 6));
+        await router.connect(alice).mixer(permits, actions, dataMixer);
+        expect(await USDC.balanceOf(stableMaster.address)).to.be.equal(parseUnits('0.3', 6));
+        expect(await USDC.balanceOf(alice.address)).to.be.equal(parseUnits('0.7', 6));
+        expect(await sanToken.balanceOf(bob.address)).to.be.equal(parseUnits('0', 6));
+        expect(await sanToken.balanceOf(router.address)).to.be.equal(parseUnits('0.3', 6));
+        expect(await gauge.counter2(bob.address)).to.be.equal(1);
+      });
+    });
+  });
 });

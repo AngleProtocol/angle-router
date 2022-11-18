@@ -34,11 +34,10 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
   for (const collateralName of collateralAssets) {
     const collateral = registry(chainId)?.agEUR?.collaterals?.[collateralName as 'USDC' | 'DAI' | 'WETH' | 'FRAX'];
     const poolManager = collateral?.PoolManager;
-    let gauge: string;
-    gauge = collateral?.LiquidityGauge!;
     poolManagers.push(poolManager as string);
-    if (gauge === undefined) gauge = ZERO_ADDRESS;
-    gauges.push(gauge as string);
+    const gauge = collateral?.LiquidityGauge;
+    if (gauge === undefined) gauges.push(ZERO_ADDRESS);
+    else gauges.push(gauge as string);
     stablecoins.push(registry(chainId)?.agEUR?.AgToken as string);
     justLiquidityGauges.push(false);
   }

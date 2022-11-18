@@ -14,6 +14,7 @@ contract MockLiquidityGauge is ILiquidityGauge {
 
     IERC20 public token;
     mapping(address => uint256) public counter;
+    mapping(address => uint256) public counter2;
 
     constructor(address _token) {
         token = IERC20(_token);
@@ -38,10 +39,11 @@ contract MockLiquidityGauge is ILiquidityGauge {
         address _addr,
         // solhint-disable-next-line
         bool _claim_rewards
-    ) external pure override {
+    ) external override {
         _value;
         _addr;
         _claim_rewards;
+        counter2[_addr] += 1;
         return;
     }
 
