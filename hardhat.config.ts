@@ -46,7 +46,7 @@ const config: HardhatUserConfig = {
   solidity: {
     compilers: [
       {
-        version: '0.8.12',
+        version: '0.8.17',
         settings: {
           optimizer: {
             enabled: true,
@@ -57,7 +57,7 @@ const config: HardhatUserConfig = {
     ],
     overrides: {
       'contracts/implementations/mainnet/AngleRouterMainnet.sol': {
-        version: '0.8.12',
+        version: '0.8.17',
         settings: {
           optimizer: {
             enabled: true,
@@ -66,25 +66,7 @@ const config: HardhatUserConfig = {
         },
       },
       'contracts/mock/MockAngleRouterMainnet.sol': {
-        version: '0.8.12',
-        settings: {
-          optimizer: {
-            enabled: true,
-            runs: 1,
-          },
-        },
-      },
-      'contracts/mock/OldRouter.sol': {
-        version: '0.8.12',
-        settings: {
-          optimizer: {
-            enabled: true,
-            runs: 825,
-          },
-        },
-      },
-      'contracts/deprecated/OldRouterMainnet.sol': {
-        version: '0.8.12',
+        version: '0.8.17',
         settings: {
           optimizer: {
             enabled: true,
