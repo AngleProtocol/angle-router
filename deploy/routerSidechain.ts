@@ -19,14 +19,13 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
     chainId = ChainId.POLYGON;
     chainName = 'Polygon';
   } else {
-    chainId = network.config.chainId as ChainId;
+    chainId = ChainId.POLYGON;
     chainName = network.name.charAt(0).toUpperCase() + network.name.substring(1);
   }
   const proxyAdmin = registry(chainId)?.ProxyAdminGuardian;
   const coreBorrow = registry(chainId)?.CoreBorrow;
 
   const contractName = `AngleRouter${chainName}`;
-
   console.log('Now deploying the implementation');
   await deploy(`${contractName}_Implementation`, {
     contract: contractName,

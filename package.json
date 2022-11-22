@@ -9,7 +9,7 @@
     "coverage": "hardhat coverage",
     "coverage:foundry": "forge coverage --report",
     "foundry:setup": "curl -L https://foundry.paradigm.xyz | bash && foundryup && git submodule update --init --recursive",
-    "deploy:arbitrum": "hardhat deploy --network",
+    "deploy": "hardhat deploy",
     "etherscan": "hardhat etherscan-verify --network",
     "license": "hardhat prepend-spdx-license",
     "lint": "yarn lint:sol && yarn lint:js:fix",
