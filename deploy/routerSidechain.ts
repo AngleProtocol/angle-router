@@ -26,6 +26,7 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
   const coreBorrow = registry(chainId)?.CoreBorrow;
 
   const contractName = `AngleRouter${chainName}`;
+
   console.log('Now deploying the implementation');
   await deploy(`${contractName}_Implementation`, {
     contract: contractName,
@@ -40,6 +41,7 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
     routerImplementation,
     AngleRouterPolygon__factory.createInterface(),
   ).interface.encodeFunctionData('initializeRouter', [coreBorrow, json.uniswapV3Router, json.oneInchRouter]);
+
   await deploy(`${contractName}`, {
     contract: 'TransparentUpgradeableProxy',
     from: deployer.address,
