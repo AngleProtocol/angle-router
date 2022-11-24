@@ -11,6 +11,7 @@
     "foundry:setup": "curl -L https://foundry.paradigm.xyz | bash && foundryup && git submodule update --init --recursive",
     "deploy": "hardhat deploy --network",
     "etherscan": "hardhat etherscan-verify --network",
+    "hardhat:compile": "hardhat compile",
     "license": "hardhat prepend-spdx-license",
     "lint": "yarn lint:sol && yarn lint:js:fix",
     "lint:js:fix": "eslint --ignore-path .gitignore --fix --max-warnings 30 'test/**/*.{js,ts}' '*.{js,ts}'",
