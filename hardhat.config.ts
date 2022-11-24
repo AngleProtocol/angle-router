@@ -46,7 +46,7 @@ const config: HardhatUserConfig = {
   solidity: {
     compilers: [
       {
-        version: '0.8.12',
+        version: '0.8.17',
         settings: {
           optimizer: {
             enabled: true,
@@ -56,8 +56,8 @@ const config: HardhatUserConfig = {
       },
     ],
     overrides: {
-      'contracts/AngleRouter01.sol': {
-        version: '0.8.12',
+      'contracts/implementations/mainnet/AngleRouterMainnet.sol': {
+        version: '0.8.17',
         settings: {
           optimizer: {
             enabled: true,
@@ -65,48 +65,12 @@ const config: HardhatUserConfig = {
           },
         },
       },
-      'contracts/AngleRouterArbitrum.sol': {
-        version: '0.8.12',
+      'contracts/mock/MockAngleRouterMainnet.sol': {
+        version: '0.8.17',
         settings: {
           optimizer: {
             enabled: true,
-            runs: 1000000,
-          },
-        },
-      },
-      'contracts/AngleRouterAvalanche.sol': {
-        version: '0.8.12',
-        settings: {
-          optimizer: {
-            enabled: true,
-            runs: 1000000,
-          },
-        },
-      },
-      'contracts/AngleRouterOptimism.sol': {
-        version: '0.8.12',
-        settings: {
-          optimizer: {
-            enabled: true,
-            runs: 1000000,
-          },
-        },
-      },
-      'contracts/AngleRouterPolygon.sol': {
-        version: '0.8.12',
-        settings: {
-          optimizer: {
-            enabled: true,
-            runs: 1000000,
-          },
-        },
-      },
-      'contracts/mock/OldRouter.sol': {
-        version: '0.8.12',
-        settings: {
-          optimizer: {
-            enabled: true,
-            runs: 825,
+            runs: 1,
           },
         },
       },
@@ -123,11 +87,13 @@ const config: HardhatUserConfig = {
       forking: {
         enabled: argv.fork || false,
         // For mainnet
-        // url: nodeUrl('fork'),
-        // blockNumber: 14665543,
+        url: nodeUrl('fork'),
+        blockNumber: 15975107,
         // For Polygon
+        /*
         url: nodeUrl('forkpolygon'),
         blockNumber: 29947186,
+        */
       },
       mining: argv.disableAutoMining
         ? {
@@ -222,6 +188,7 @@ const config: HardhatUserConfig = {
   paths: {
     sources: './contracts',
     tests: './test',
+    cache: 'cache-hh',
   },
   namedAccounts: {
     deployer: 0,
@@ -259,17 +226,6 @@ const config: HardhatUserConfig = {
     spacing: 2,
   },
   etherscan: {
-    /*
-    // eslint-disable-next-line
-    // @ts-ignore
-    apiKey: {
-      mainnet: process.env.ETHERSCAN_API_KEY,
-      optimisticEthereum: process.env.OPTIMISM_ETHERSCAN_API_KEY,
-      arbitrumOne: process.env.ARBITRUM_ETHERSCAN_API_KEY,
-      avalanche: process.env.AVALANCHE_ETHERSCAN_API_KEY,
-      polygon: process.env.POLYGON_ETHERSCAN_API_KEY,
-    },
-    */
     apiKey: process.env.ETHERSCAN_API_KEY,
   },
   tenderly: {

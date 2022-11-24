@@ -1,24 +1,30 @@
-import yargs from 'yargs';
+import { ChainId, registry } from '@angleprotocol/sdk';
 import { DeployFunction } from 'hardhat-deploy/types';
-import { CONTRACTS_ADDRESSES, ChainId } from '@angleprotocol/sdk';
+import yargs from 'yargs';
 
-import params from './networks';
-// eslint-disable-next-line camelcase
 import { AngleRouterPolygon__factory } from '../typechain';
 
 const argv = yargs.env('').boolean('ci').parseSync();
 
 const func: DeployFunction = async ({ ethers, deployments, network }) => {
   const { deploy } = deployments;
-  const [deployer] = await ethers.getSigners();
+  const { deployer } = await ethers.getNamedSigners();
   console.log(`Deploying the router on ${network.name}`);
   const json = await import('./networks/' + network.name + '.json');
 
-  const chainIdNetwork = network.config.chainId as ChainId;
-  const proxyAdmin = CONTRACTS_ADDRESSES[chainIdNetwork].ProxyAdmin!;
-  const coreBorrow = CONTRACTS_ADDRESSES[chainIdNetwork].CoreBorrow!;
+  let chainId: ChainId;
+  let chainName: string;
 
-  const chainName = network.name.charAt(0).toUpperCase() + network.name.substring(1);
+  if (!network.live) {
+    chainId = ChainId.POLYGON;
+    chainName = 'Polygon';
+  } else {
+    chainId = ChainId.POLYGON;
+    chainName = network.name.charAt(0).toUpperCase() + network.name.substring(1);
+  }
+  const proxyAdmin = registry(chainId)?.ProxyAdminGuardian;
+  const coreBorrow = registry(chainId)?.CoreBorrow;
+
   const contractName = `AngleRouter${chainName}`;
 
   console.log('Now deploying the implementation');
@@ -33,9 +39,9 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
   console.log('Now deploying the proxy contract');
   const dataRouter = new ethers.Contract(
     routerImplementation,
-    // eslint-disable-next-line camelcase
     AngleRouterPolygon__factory.createInterface(),
   ).interface.encodeFunctionData('initializeRouter', [coreBorrow, json.uniswapV3Router, json.oneInchRouter]);
+
   await deploy(`${contractName}`, {
     contract: 'TransparentUpgradeableProxy',
     from: deployer.address,
@@ -50,5 +56,5 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
   console.log('Success');
 };
 
-func.tags = ['angleRouterSidechain'];
+func.tags = ['routerSidechain'];
 export default func;

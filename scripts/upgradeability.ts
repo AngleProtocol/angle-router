@@ -25,12 +25,18 @@ const testStorage = async (name: string, file: string, nameUpgrade: string, file
 };
 
 async function main() {
-  // testUpgradeability('AngleRouter', 'contracts/AngleRouter01.sol');
-  // testUpgradeability('OldRouter2', 'contracts/mock/OldRouter2.sol');
+  testUpgradeability('AngleRouterMainnet', 'contracts/AngleRouterMainnet.sol');
 
   testStorage(
-    'OldAngleRouterPolygon',
-    'contracts/deprecated/OldAngleRouterPolygon.sol',
+    'OldRouterMainnet',
+    'contracts/deprecated/OldRouterMainnet.sol',
+    'AngleRouterMainnet',
+    'contracts/AngleRouterMainnet.sol',
+  );
+
+  testStorage(
+    'OldRouterPolygon',
+    'contracts/deprecated/OldRouterPolygon.sol',
     'AngleRouterPolygon',
     'contracts/sidechains/polygon/AngleRouterPolygon.sol',
   );

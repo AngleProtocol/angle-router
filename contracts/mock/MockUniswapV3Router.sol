@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0
 
-pragma solidity 0.8.12;
+pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import "../interfaces/external/uniswap/IUniswapRouter.sol";
-import "../interfaces/mock/IERC20MINT.sol";
+import "./MockTokenPermit.sol";
 
 // @notice mock contract to swap token
 contract MockUniswapV3Router is IUniswapV3Router {
@@ -20,7 +20,7 @@ contract MockUniswapV3Router is IUniswapV3Router {
         tokenB = _tokenB;
         decimalsA = _tokenA.decimals();
         decimalsB = _tokenB.decimals();
-        IERC20MINT(address(tokenB)).mint(address(this), type(uint256).max / 1000);
+        MockTokenPermit(address(tokenB)).mint(address(this), type(uint256).max / 1000);
     }
 
     function exactInput(ExactInputParams calldata params) external payable override returns (uint256 amountOut) {

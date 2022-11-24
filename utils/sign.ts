@@ -1,9 +1,9 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
-import { BigNumber, ethers } from 'ethers';
-import { TypePermit } from './helpers';
 import { TypedDataUtils } from 'eth-sig-util';
 import { fromRpcSig } from 'ethereumjs-util';
-import { ChainId } from '@angleprotocol/sdk';
+import { BigNumber } from 'ethers';
+
+import { TypePermit } from './helpers';
 
 const EIP712Domain = [
   { name: 'name', type: 'string' },
@@ -69,43 +69,6 @@ export async function signPermit(
   return {
     token: verifyingContract,
     owner: owner.address,
-    value: value,
-    deadline: deadline,
-    v: v,
-    r: r,
-    s: s,
-  };
-}
-
-export async function signPermitRPC(
-  _owner: ethers.providers.JsonRpcSigner,
-  nonce: number,
-  verifyingContract: string,
-  deadline: number,
-  spender: string,
-  value: BigNumber,
-  name: string,
-  chainId = ChainId.RINKEBY,
-  version = '1',
-): Promise<TypePermit> {
-  const owner = _owner;
-  const data = buildData(
-    await owner.getAddress(),
-    chainId,
-    verifyingContract,
-    deadline,
-    spender,
-    nonce,
-    value,
-    name,
-    version,
-  );
-  const signature = await owner._signTypedData(data.domain, data.types, data.message);
-  const { v, r, s } = fromRpcSig(signature);
-
-  return {
-    token: verifyingContract,
-    owner: await owner.getAddress(),
     value: value,
     deadline: deadline,
     v: v,

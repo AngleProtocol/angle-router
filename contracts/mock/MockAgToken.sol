@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
 
-pragma solidity 0.8.12;
+pragma solidity 0.8.17;
 
 import "../interfaces/IAgToken.sol";
-import "../interfaces/IStableMaster.sol";
+import "../interfaces/IStableMasterFront.sol";
 import "../interfaces/ITreasury.sol";
 // OpenZeppelin may update its version of the ERC20PermitUpgradeable token
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/draft-ERC20PermitUpgradeable.sol";
@@ -87,7 +87,7 @@ contract MockAgToken is IAgToken, ERC20PermitUpgradeable {
     /// the `stocksUsers`: this a way for the protocol to maintain healthy accounting variables
     function burnNoRedeem(uint256 amount, address poolManager) external {
         _burn(msg.sender, amount);
-        IStableMaster(stableMaster).updateStocksUsers(amount, poolManager);
+        IStableMasterFront(stableMaster).updateStocksUsers(amount, poolManager);
     }
 
     /// @notice Burns `amount` of agToken on behalf of another account without redeeming collateral back
@@ -100,7 +100,7 @@ contract MockAgToken is IAgToken, ERC20PermitUpgradeable {
         address poolManager
     ) external {
         _burnFromNoRedeem(amount, account, msg.sender);
-        IStableMaster(stableMaster).updateStocksUsers(amount, poolManager);
+        IStableMasterFront(stableMaster).updateStocksUsers(amount, poolManager);
     }
 
     /// @notice Allows anyone to burn agToken without redeeming collateral back
@@ -113,7 +113,7 @@ contract MockAgToken is IAgToken, ERC20PermitUpgradeable {
     // ======================= Minter Role Only Functions ==========================
 
     /// @inheritdoc IAgToken
-    function burnSelf(uint256 amount, address burner) external override onlyMinter {
+    function burnSelf(uint256 amount, address burner) external override {
         _burn(burner, amount);
     }
 
