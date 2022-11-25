@@ -12,6 +12,7 @@ import "./interfaces/external/IWETH9.sol";
 import "./interfaces/ICoreBorrow.sol";
 import "./interfaces/ILiquidityGauge.sol";
 import "./interfaces/ISavingsRateIlliquid.sol";
+import "./interfaces/ISwapper.sol";
 import "./interfaces/IVaultManager.sol";
 
 // ============================== STRUCTS AND ENUM =============================
@@ -28,6 +29,7 @@ enum ActionType {
     claimRewards,
     gaugeDeposit,
     borrower,
+    swapper,
     mintSavingsRate,
     depositSavingsRate,
     redeemSavingsRate,
@@ -198,6 +200,17 @@ abstract contract BaseRouter is Initializable {
                 _changeAllowance(IERC20(collateral), address(vaultManager), type(uint256).max);
                 _angleBorrower(vaultManager, actionsBorrow, dataBorrow, to, who, repayData);
                 _changeAllowance(IERC20(collateral), address(vaultManager), 0);
+            } else if (actions[i] == ActionType.swapper) {
+                (
+                    ISwapper swapperContract,
+                    IERC20 inToken,
+                    IERC20 outToken,
+                    address outTokenRecipient,
+                    uint256 outTokenOwed,
+                    uint256 inTokenObtained,
+                    bytes memory payload
+                ) = abi.decode(data[i], (ISwapper, IERC20, IERC20, address, uint256, uint256, bytes));
+                _swapper(swapperContract, inToken, outToken, outTokenRecipient, outTokenOwed, inTokenObtained, payload);
             } else if (actions[i] == ActionType.mintSavingsRate) {
                 (IERC20 token, IERC4626 savingsRate, uint256 shares, address to, uint256 maxAmountIn) = abi.decode(
                     data[i],
@@ -371,6 +384,26 @@ abstract contract BaseRouter is Initializable {
         if (balanceToken != 0) {
             IERC20(tokenOut).safeTransfer(to, balanceToken);
         }
+    }
+
+    /// @notice Uses an external swapper
+    /// @param swapper Contracts implementing the logic of the swap
+    /// @param inToken Token used to do the swap
+    /// @param outToken Token wanted
+    /// @param outTokenRecipient Address who should have at the end of the swap at least `outTokenOwed`
+    /// @param outTokenOwed Minimal amount for the `outTokenRecipient`
+    /// @param inTokenObtained Amount of `inToken` used for the swap
+    /// @param data Additional info for the specific swapper
+    function _swapper(
+        ISwapper swapper,
+        IERC20 inToken,
+        IERC20 outToken,
+        address outTokenRecipient,
+        uint256 outTokenOwed,
+        uint256 inTokenObtained,
+        bytes memory data
+    ) internal {
+        swapper.swap(inToken, outToken, outTokenRecipient, outTokenOwed, inTokenObtained, data);
     }
 
     /// @notice Allows to swap between tokens via UniswapV3 (if there is a path)

@@ -80,6 +80,7 @@ export enum ActionType {
   claimRewards,
   gaugeDeposit,
   borrower,
+  swapper,
   mintSavingsRate,
   depositSavingsRate,
   redeemSavingsRate,

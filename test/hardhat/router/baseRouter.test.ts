@@ -16,6 +16,8 @@ import {
   MockLiquidityGauge__factory,
   MockRouterSidechain,
   MockRouterSidechain__factory,
+  MockSwapper,
+  MockSwapper__factory,
   MockTokenPermit,
   MockTokenPermit__factory,
   MockUniswapV3Router,
@@ -37,6 +39,7 @@ contract('BaseRouter', () => {
   let uniswap: MockUniswapV3Router;
   let oneInch: Mock1Inch;
   let router: MockRouterSidechain;
+  let swapper: MockSwapper;
   let UNIT_USDC: BigNumber;
   let USDCdecimal: BigNumber;
   let governor: string;
@@ -81,6 +84,7 @@ contract('BaseRouter', () => {
     await core.toggleGovernor(governor);
     await core.toggleGuardian(governor);
     await core.toggleGuardian(guardian);
+    swapper = (await new MockSwapper__factory(deployer).deploy()) as MockSwapper;
     await router.initializeRouter(core.address, uniswap.address, oneInch.address);
   });
   describe('initializeRouter', () => {
@@ -451,6 +455,43 @@ contract('BaseRouter', () => {
         );
         const dataMixer = [wrapData];
         await router.connect(alice).mixer(permits, actions, dataMixer);
+      });
+    });
+    describe('swapper', () => {
+      it('reverts - when not enough balance', async () => {
+        const actions = [ActionType.swapper];
+        const swapperData = ethers.utils.defaultAbiCoder.encode(
+          ['address', 'address', 'address', 'address', 'uint256', 'uint256', 'bytes'],
+          [swapper.address, USDC.address, agEUR.address, bob.address, parseEther('1'), parseUnits('1', 6), '0x'],
+        );
+        const dataMixer = [swapperData];
+        await expect(router.connect(alice).mixer(permits, actions, dataMixer)).to.be.reverted;
+        await router
+          .connect(impersonatedSigners[governor])
+          .changeAllowance([USDC.address], [swapper.address], [MAX_UINT256]);
+        await expect(router.connect(alice).mixer(permits, actions, dataMixer)).to.be.reverted;
+      });
+      it('success - when enough balance', async () => {
+        await USDC.mint(alice.address, parseUnits('1', USDCdecimal));
+        await USDC.connect(alice).approve(router.address, parseUnits('1', USDCdecimal));
+        await agEUR.mint(swapper.address, parseEther('1'));
+        await router
+          .connect(impersonatedSigners[governor])
+          .changeAllowance([USDC.address], [swapper.address], [MAX_UINT256]);
+        const transferData = ethers.utils.defaultAbiCoder.encode(
+          ['address', 'address', 'uint256'],
+          [USDC.address, router.address, parseUnits('1', USDCdecimal)],
+        );
+
+        const swapperData = ethers.utils.defaultAbiCoder.encode(
+          ['address', 'address', 'address', 'address', 'uint256', 'uint256', 'bytes'],
+          [swapper.address, USDC.address, agEUR.address, bob.address, parseEther('1'), parseUnits('1', 6), '0x'],
+        );
+        const actions = [ActionType.transfer, ActionType.swapper];
+        const dataMixer = [transferData, swapperData];
+        await router.connect(alice).mixer(permits, actions, dataMixer);
+        expect(await USDC.balanceOf(swapper.address)).to.be.equal(parseUnits('1', 6));
+        expect(await agEUR.balanceOf(bob.address)).to.be.equal(parseEther('1'));
       });
     });
     describe('claimRewards', () => {
