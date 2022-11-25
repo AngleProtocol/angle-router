@@ -19,7 +19,7 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
     chainId = ChainId.POLYGON;
     chainName = 'Polygon';
   } else {
-    chainId = ChainId.POLYGON;
+    chainId = ChainId.ARBITRUM;
     chainName = network.name.charAt(0).toUpperCase() + network.name.substring(1);
   }
   const proxyAdmin = registry(chainId)?.ProxyAdminGuardian;
@@ -28,13 +28,13 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
   const contractName = `AngleRouter${chainName}`;
 
   console.log('Now deploying the implementation');
-  await deploy(`${contractName}_Implementation`, {
+  await deploy(`${contractName}V2_Implementation`, {
     contract: contractName,
     from: deployer.address,
     log: !argv.ci,
   });
 
-  const routerImplementation = (await ethers.getContract(`${contractName}_Implementation`)).address;
+  const routerImplementation = (await ethers.getContract(`${contractName}V2_Implementation`)).address;
   console.log(`Successfully deployed the implementation for the router at ${routerImplementation}`);
   console.log('Now deploying the proxy contract');
   const dataRouter = new ethers.Contract(
@@ -42,14 +42,14 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
     AngleRouterPolygon__factory.createInterface(),
   ).interface.encodeFunctionData('initializeRouter', [coreBorrow, json.uniswapV3Router, json.oneInchRouter]);
 
-  await deploy(`${contractName}`, {
+  await deploy(`${contractName}V2`, {
     contract: 'TransparentUpgradeableProxy',
     from: deployer.address,
     args: [routerImplementation, proxyAdmin, dataRouter],
     log: !argv.ci,
   });
-  const router = (await deployments.get(`${contractName}`)).address;
-  console.log(`Successfully deployed ${contractName} at the address ${router}`);
+  const router = (await deployments.get(`${contractName}V2`)).address;
+  console.log(`Successfully deployed ${contractName}V2 at the address ${router}`);
 
   console.log(`${router} ${routerImplementation} ${proxyAdmin} ${dataRouter}`);
   console.log('');
