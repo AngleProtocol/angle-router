@@ -54,7 +54,7 @@ contract AngleRouterMainnetTest is BaseTest {
         deal(address(token), address(savingsRate), gainOrLoss);
     }
 
-    function testMintSavingsRateGoodPractice(
+    function testMint4626GoodPractice(
         uint256 initShares,
         uint256 shares,
         uint256 maxAmount,
@@ -84,7 +84,7 @@ contract AngleRouterMainnetTest is BaseTest {
         token.approve(address(router), type(uint256).max);
         // as this is a mock vault, previewMint is exactly what is needed to mint
         if (maxAmount < previewMint) {
-            vm.expectRevert(bytes("ERC20: insufficient allowance"));
+            vm.expectRevert(BaseRouter.TooSmallAmountOut.selector);
             router.mixer(paramsPermit, actionType, data);
             return;
         } else {
@@ -101,7 +101,7 @@ contract AngleRouterMainnetTest is BaseTest {
         assertEq(token.balanceOf(address(to)), 0);
     }
 
-    function testMintSavingsRateForgotFunds(
+    function testMint4626ForgotFunds(
         uint256 initShares,
         uint256 shares,
         uint256 maxAmount,
@@ -132,7 +132,7 @@ contract AngleRouterMainnetTest is BaseTest {
         token.approve(address(router), type(uint256).max);
         // as this is a mock vault, previewMint is exactly what is needed to mint
         if (maxAmount < previewMint) {
-            vm.expectRevert(bytes("ERC20: insufficient allowance"));
+            vm.expectRevert(BaseRouter.TooSmallAmountOut.selector);
             router.mixer(paramsPermit, actionType, data);
             return;
         } else {
@@ -147,7 +147,7 @@ contract AngleRouterMainnetTest is BaseTest {
         assertEq(token.balanceOf(address(to)), 0);
     }
 
-    function testDepositSavingsRateGoodPractice(
+    function testDeposit4626GoodPractice(
         uint256 initShares,
         uint256 amount,
         uint256 minSharesOut,
@@ -194,7 +194,7 @@ contract AngleRouterMainnetTest is BaseTest {
         assertEq(token.balanceOf(address(to)), 0);
     }
 
-    function testDepositSavingsRateForgotFunds(
+    function testDeposit4626ForgotFunds(
         uint256 initShares,
         uint256 amount,
         uint256 minSharesOut,
@@ -237,7 +237,7 @@ contract AngleRouterMainnetTest is BaseTest {
         assertEq(token.balanceOf(address(_alice)), balanceUsers - amount);
     }
 
-    function testRedeemSavingsRateGoodPractice(
+    function testRedeem4626GoodPractice(
         uint256 initShares,
         uint256 aliceAmount,
         uint256 propSharesBurn,
@@ -318,7 +318,7 @@ contract AngleRouterMainnetTest is BaseTest {
         assertEq(token.balanceOf(address(_alice)), balanceUsers - aliceAmount);
     }
 
-    function testRedeemSavingsRateForgotFunds(
+    function testRedeem4626ForgotFunds(
         uint256 initShares,
         uint256 aliceAmount,
         uint256 propSharesBurn,
@@ -392,7 +392,7 @@ contract AngleRouterMainnetTest is BaseTest {
         assertEq(token.balanceOf(address(_alice)), balanceUsers - aliceAmount);
     }
 
-    function testWithdrawSavingsRateGoodPractice(
+    function testWithdraw4626GoodPractice(
         uint256 initShares,
         uint256 aliceAmount,
         uint256 withdraw,
@@ -479,7 +479,7 @@ contract AngleRouterMainnetTest is BaseTest {
         assertEq(token.balanceOf(address(_alice)), balanceUsers - aliceAmount);
     }
 
-    function testWithdrawSavingsRateForgotFunds(
+    function testWithdraw4626ForgotFunds(
         uint256 initShares,
         uint256 aliceAmount,
         uint256 withdraw,

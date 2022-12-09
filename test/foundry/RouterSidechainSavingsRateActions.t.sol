@@ -60,7 +60,7 @@ contract RouterSidechainSavingsRateActionsTest is BaseTest {
         deal(address(token), address(savingsRate), gainOrLoss);
     }
 
-    function testMintSavingsRate(
+    function testMint4626(
         uint256 initShares,
         uint256 shares,
         uint256 maxAmount,
@@ -95,7 +95,7 @@ contract RouterSidechainSavingsRateActionsTest is BaseTest {
         token.approve(address(router), type(uint256).max);
         // as this is a mock vault, previewMint is exactly what is needed to mint
         if (maxAmount < previewMint) {
-            vm.expectRevert(bytes("ERC20: insufficient allowance"));
+            vm.expectRevert(BaseRouter.TooSmallAmountOut.selector);
             router.mixer(paramsPermit, actionType, data);
             return;
         } else {
@@ -112,7 +112,7 @@ contract RouterSidechainSavingsRateActionsTest is BaseTest {
         assertEq(token.balanceOf(address(to)), 0);
     }
 
-    function testDepositSavingsRate(
+    function testDeposit4626(
         uint256 initShares,
         uint256 amount,
         uint256 minSharesOut,
@@ -161,7 +161,7 @@ contract RouterSidechainSavingsRateActionsTest is BaseTest {
         assertEq(token.balanceOf(address(to)), 0);
     }
 
-    function testRedeemSavingsRate(
+    function testRedeem4626(
         uint256 initShares,
         uint256 aliceAmount,
         uint256 propSharesBurn,
@@ -239,7 +239,7 @@ contract RouterSidechainSavingsRateActionsTest is BaseTest {
         assertEq(token.balanceOf(address(to)), previewRedeem);
     }
 
-    function testWithdrawSavingsRate(
+    function testWithdraw4626(
         uint256 initShares,
         uint256 aliceAmount,
         uint256 propWithdraw,

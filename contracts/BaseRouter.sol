@@ -33,7 +33,7 @@
           ▓▓▓        ▓▓      ▓▓▓    ▓▓▓       ▓▓▓▓▓▓▓▓▓▓        ▓▓▓▓▓▓▓▓▓▓       ▓▓▓▓▓▓▓▓▓▓          
 */
 
-pragma solidity 0.8.17;
+pragma solidity ^0.8.17;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-IERC20Permit.sol";
@@ -519,9 +519,6 @@ abstract contract BaseRouter is Initializable {
         address to,
         uint256 maxAmountIn
     ) internal returns (uint256 amountIn) {
-        // This check is useless as the contract needs to approve an amount and it will revert
-        // anyway if more than `maxAmountIn` is used
-        // We let it just in case we call this function outside of the mixer
         _slippageCheck(maxAmountIn, (amountIn = savingsRate.mint(shares, to)));
     }
 
