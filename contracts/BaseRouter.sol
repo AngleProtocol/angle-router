@@ -110,9 +110,6 @@ struct PermitVaultManagerType {
 abstract contract BaseRouter is Initializable {
     using SafeERC20 for IERC20;
 
-    /// @notice How many actions can be performed on a given `VaultManager` contract
-    uint256 private constant _MAX_BORROW_ACTIONS = 10;
-
     // ================================= REFERENCES ================================
 
     /// @notice Core address handling access control
@@ -659,10 +656,7 @@ abstract contract BaseRouter is Initializable {
         address collateral
     ) internal view returns (bytes[] memory) {
         uint256 actionsBorrowLength = actionsBorrow.length;
-        if (actionsBorrowLength >= _MAX_BORROW_ACTIONS) revert IncompatibleLengths();
-        // The amount of vaults to check cannot be bigger than the maximum amount of tokens
-        // supported
-        uint256[_MAX_BORROW_ACTIONS] memory vaultIDsToCheckOwnershipOf;
+        uint256[] memory vaultIDsToCheckOwnershipOf = new uint256[](actionsBorrowLength);
         bool createVaultAction;
         uint256 lastVaultID;
         uint256 vaultIDLength;
@@ -681,7 +675,7 @@ abstract contract BaseRouter is Initializable {
                 if (amount == type(uint256).max)
                     dataBorrow[i] = abi.encode(vaultID, IERC20(collateral).balanceOf(address(this)));
                 continue;
-                // There are then different ways depending on the action to find the `vaultID`
+                // There are different ways depending on the action to find the `vaultID` to parse
             } else if (
                 actionsBorrow[i] == ActionBorrowType.removeCollateral || actionsBorrow[i] == ActionBorrowType.borrow
             ) {
@@ -712,7 +706,7 @@ abstract contract BaseRouter is Initializable {
                     continue;
                 }
             }
-            // Verify this new vaultID and add it to the list
+            // Verify this new `vaultID` and add it to the list
             if (!IVaultManagerFunctions(vaultManager).isApprovedOrOwner(msg.sender, vaultID)) {
                 revert NotApprovedOrOwner();
             }

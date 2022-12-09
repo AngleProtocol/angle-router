@@ -389,42 +389,6 @@ contract('BaseRouter - VaultManager functionalities', () => {
       await router.connect(alice).mixer(permits, actions, dataMixer);
       expect(await USDC.allowance(router.address, vaultManager.address)).to.be.equal(MAX_UINT256);
     });
-    it('reverts - closeVault - too many actions', async () => {
-      await vaultManager.connect(alice).setPaymentData(0, 0, 0, 0);
-      await vaultManager.updateVaultIDCount(10);
-      await vaultManager.approveSpenderVault(alice.address, 10, true);
-      await vaultManager.approveSpenderVault(alice.address, 2, true);
-      await vaultManager.approveSpenderVault(alice.address, 3, true);
-      await vaultManager.approveSpenderVault(alice.address, 4, true);
-      await vaultManager.approveSpenderVault(alice.address, 5, true);
-      const permits: TypePermit[] = [];
-      const callsBorrow = [
-        closeVault(0),
-        closeVault(0),
-        createVault(alice.address),
-        closeVault(0),
-        createVault(alice.address),
-        closeVault(0),
-        closeVault(2),
-        closeVault(3),
-        closeVault(0),
-        closeVault(0),
-        closeVault(0),
-        closeVault(0),
-      ];
-      const dataBorrow = await encodeAngleBorrowSidechain(
-        USDC.address,
-        vaultManager.address,
-        bob.address,
-        ZERO_ADDRESS,
-        '0x',
-        callsBorrow,
-      );
-
-      const actions = [ActionType.borrower];
-      const dataMixer = [dataBorrow];
-      await expect(router.connect(alice).mixer(permits, actions, dataMixer)).to.be.revertedWith('IncompatibleLengths');
-    });
     it('success - borrow', async () => {
       await vaultManager.connect(alice).setPaymentData(0, 0, 0, 0);
       await vaultManager.updateVaultIDCount(10);
