@@ -18,7 +18,7 @@ import {
 import { expect } from '../../../utils/chai-setup';
 import { ActionType, initToken, TypePermit } from '../../../utils/helpers';
 import { signPermit } from '../../../utils/sign';
-import { deployUpgradeable } from '../utils/helpers';
+import { deployUpgradeable, MAX_UINT256 } from '../utils/helpers';
 
 contract('BaseRouter - ERC4626 functionalities', () => {
   // As a proxy for the AngleRouter sidechain we're using the Polygon implementation of it
@@ -106,7 +106,7 @@ contract('BaseRouter - ERC4626 functionalities', () => {
       expect(await USDC.balanceOf(alice.address)).to.be.equal(parseUnits('999', 6));
       expect(await strat.balanceOf(bob.address)).to.be.equal(parseEther('1'));
       expect(await strat.totalSupply()).to.be.equal(parseEther('1'));
-      expect(await USDC.allowance(router.address, strat.address)).to.be.equal(0);
+      expect(await USDC.allowance(router.address, strat.address)).to.be.equal(MAX_UINT256);
     });
     it('success - shares minted to the to address - when there are shares existing', async () => {
       const permits: TypePermit[] = [
@@ -154,7 +154,7 @@ contract('BaseRouter - ERC4626 functionalities', () => {
       expect(await strat.balanceOf(bob.address)).to.be.equal(parseEther('1'));
       expect(await strat.balanceOf(deployer.address)).to.be.equal(parseEther('300'));
       expect(await strat.totalSupply()).to.be.equal(parseEther('301'));
-      expect(await USDC.allowance(router.address, strat.address)).to.be.equal(0);
+      expect(await USDC.allowance(router.address, strat.address)).to.be.equal(MAX_UINT256);
     });
     it('reverts - too big amount in', async () => {
       const permits: TypePermit[] = [
@@ -213,7 +213,7 @@ contract('BaseRouter - ERC4626 functionalities', () => {
       expect(await USDC.balanceOf(alice.address)).to.be.equal(parseUnits('999', 6));
       expect(await strat.balanceOf(bob.address)).to.be.equal(parseEther('1'));
       expect(await strat.totalSupply()).to.be.equal(parseEther('1'));
-      expect(await USDC.allowance(router.address, strat.address)).to.be.equal(0);
+      expect(await USDC.allowance(router.address, strat.address)).to.be.equal(MAX_UINT256);
     });
     it('success - shares minted to the to address - when there are already shares', async () => {
       const permits: TypePermit[] = [
@@ -264,7 +264,7 @@ contract('BaseRouter - ERC4626 functionalities', () => {
       expect(await strat.balanceOf(bob.address)).to.be.equal(parseEther('1'));
       expect(await strat.balanceOf(deployer.address)).to.be.equal(parseEther('300'));
       expect(await strat.totalSupply()).to.be.equal(parseEther('301'));
-      expect(await USDC.allowance(router.address, strat.address)).to.be.equal(0);
+      expect(await USDC.allowance(router.address, strat.address)).to.be.equal(MAX_UINT256);
     });
     it('reverts - too small amount out', async () => {
       const permits: TypePermit[] = [
@@ -333,7 +333,7 @@ contract('BaseRouter - ERC4626 functionalities', () => {
       expect(await USDC.balanceOf(bob.address)).to.be.equal(0);
       expect(await strat.balanceOf(bob.address)).to.be.equal(parseEther('1'));
       expect(await strat.totalSupply()).to.be.equal(parseEther('1'));
-      expect(await USDC.allowance(router.address, strat.address)).to.be.equal(0);
+      expect(await USDC.allowance(router.address, strat.address)).to.be.equal(MAX_UINT256);
     });
   });
 
@@ -376,7 +376,7 @@ contract('BaseRouter - ERC4626 functionalities', () => {
       expect(await USDC.balanceOf(alice.address)).to.be.equal(parseUnits('999', 6));
       expect(await strat.balanceOf(bob.address)).to.be.equal(parseEther('0'));
       expect(await strat.totalSupply()).to.be.equal(parseEther('0'));
-      expect(await USDC.allowance(router.address, strat.address)).to.be.equal(0);
+      expect(await USDC.allowance(router.address, strat.address)).to.be.equal(MAX_UINT256);
       expect(await strat.allowance(alice.address, router.address)).to.be.equal(parseEther('12'));
     });
     it('success - in two steps', async () => {
@@ -458,7 +458,7 @@ contract('BaseRouter - ERC4626 functionalities', () => {
       expect(await USDC.balanceOf(alice.address)).to.be.equal(parseUnits('999', 6));
       expect(await strat.balanceOf(bob.address)).to.be.equal(parseEther('0'));
       expect(await strat.totalSupply()).to.be.equal(parseEther('0'));
-      expect(await USDC.allowance(router.address, strat.address)).to.be.equal(0);
+      expect(await USDC.allowance(router.address, strat.address)).to.be.equal(MAX_UINT256);
       expect(await strat.allowance(alice.address, router.address)).to.be.equal(parseEther('12'));
     });
     it('success - in two steps', async () => {
@@ -585,7 +585,7 @@ contract('BaseRouter - ERC4626 functionalities', () => {
       expect(await USDC.balanceOf(alice.address)).to.be.equal(parseUnits('999', 6));
       expect(await stratIlliquid.balanceOf(bob.address)).to.be.equal(parseEther('0'));
       expect(await stratIlliquid.totalSupply()).to.be.equal(parseEther('0'));
-      expect(await USDC.allowance(router.address, stratIlliquid.address)).to.be.equal(0);
+      expect(await USDC.allowance(router.address, stratIlliquid.address)).to.be.equal(MAX_UINT256);
       expect(await stratIlliquid.allowance(alice.address, router.address)).to.be.equal(parseEther('12'));
     });
     it('success - in two steps', async () => {
