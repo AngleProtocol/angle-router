@@ -395,12 +395,12 @@ abstract contract BaseRouter is Initializable {
     }
 
     /// @notice Adds collateral in an existing vault
-    /// @param vaultManager Address of the vault to perform actions on
+    /// @param vaultManager Address of the corresponding `VaultManager` contract
     /// @param vaultID ID of the vault to add collateral to
     /// @param amount Amount to add
     /// @dev No check is made that the `msg.sender` is the owner of the vault
-    /// @dev This action is typically to be called after a leverage action (through `borrower`) that leads to more collateral
-    /// than expected
+    /// @dev This action is typically to be called after a leverage action (through `borrower`) that gives more collateral
+    /// than expected: it allows to avoid dust kept under the form of `collateral`
     function _addCollateralBorrower(
         address vaultManager,
         uint256 vaultID,
