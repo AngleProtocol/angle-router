@@ -79,7 +79,7 @@ enum ActionType {
     addToPerpetual,
     veANGLEDeposit,
     claimRewardsWithPerps,
-    addCollateral
+    addCollateralBorrower
 }
 
 /// @notice Data needed to get permits
@@ -233,14 +233,14 @@ abstract contract BaseRouter is Initializable {
                 _parseVaultIDs(actionsBorrow, dataBorrow, vaultManager);
                 _changeAllowance(IERC20(collateral), address(vaultManager), type(uint256).max);
                 _angleBorrower(vaultManager, actionsBorrow, dataBorrow, to, who, repayData);
-            } else if (actions[i] == ActionType.addCollateral) {
+            } else if (actions[i] == ActionType.addCollateralBorrower) {
                 (address collateral, address vaultManager, uint256 vaultID, uint256 amount) = abi.decode(
                     data[i],
                     (address, address, uint256, uint256)
                 );
                 if (amount == type(uint256).max) amount = IERC20(collateral).balanceOf(address(this));
                 _changeAllowance(IERC20(collateral), address(vaultManager), type(uint256).max);
-                _addCollateral(vaultManager, vaultID, amount);
+                _addCollateralBorrower(vaultManager, vaultID, amount);
             } else if (actions[i] == ActionType.swapper) {
                 (
                     ISwapper swapperContract,
@@ -401,7 +401,7 @@ abstract contract BaseRouter is Initializable {
     /// @dev No check is made that the `msg.sender` is the owner of the vault
     /// @dev This action is typically to be called after a leverage action (through `borrower`) that leads to more collateral
     /// than expected
-    function _addCollateral(
+    function _addCollateralBorrower(
         address vaultManager,
         uint256 vaultID,
         uint256 amount
@@ -410,7 +410,8 @@ abstract contract BaseRouter is Initializable {
         action[0] = ActionBorrowType.addCollateral;
         bytes[] memory dataBorrow = new bytes[](1);
         dataBorrow[0] = abi.encode(vaultID, amount);
-        IVaultManagerFunctions(vaultManager).angle(action, dataBorrow, address(0), address(0), address(0), "0x");
+        bytes memory emptyBytes;
+        IVaultManagerFunctions(vaultManager).angle(action, dataBorrow, address(0), address(0), address(0), emptyBytes);
     }
 
     /// @notice Allows to deposit tokens into a gauge
@@ -507,9 +508,9 @@ abstract contract BaseRouter is Initializable {
         _slippageCheck(amountOut, minAmountOut);
     }
 
-    /// @notice Mints `shares` from an ERC4626 `SavingsRate` contract
-    /// @param savingsRate ERC4626 `SavingsRate` to mint shares from
-    /// @param shares Amount of shares to mint from `savingsRate`
+    /// @notice Mints `shares` from an ERC4626 contract
+    /// @param savingsRate ERC4626 to mint shares from
+    /// @param shares Amount of shares to mint from the contract
     /// @param to Address to which shares should be sent
     /// @param maxAmountIn Max amount of assets used to mint
     /// @return amountIn Amount of assets used to mint by `to`
@@ -522,11 +523,11 @@ abstract contract BaseRouter is Initializable {
         _slippageCheck(maxAmountIn, (amountIn = savingsRate.mint(shares, to)));
     }
 
-    /// @notice Deposits `amount` to an ERC4626 `SavingsRate` contract
-    /// @param savingsRate The ERC4626 `SavingsRate` to deposit assets to
+    /// @notice Deposits `amount` to an ERC4626 contract
+    /// @param savingsRate The ERC4626 to deposit assets to
     /// @param amount Amount of assets to deposit
     /// @param to Address to which shares should be sent
-    /// @param minSharesOut Minimum amount of `SavingsRate` shares that `to` should received
+    /// @param minSharesOut Minimum amount of shares that `to` should received
     /// @return sharesOut Amount of shares received by `to`
     function _deposit4626(
         IERC4626 savingsRate,
@@ -537,8 +538,8 @@ abstract contract BaseRouter is Initializable {
         _slippageCheck(sharesOut = savingsRate.deposit(amount, to), minSharesOut);
     }
 
-    /// @notice Withdraws `amount` from an ERC4626 `SavingsRate` contract
-    /// @param savingsRate ERC4626 `SavingsRate` to withdraw assets from
+    /// @notice Withdraws `amount` from an ERC4626 contract
+    /// @param savingsRate ERC4626 to withdraw assets from
     /// @param amount Amount of assets to withdraw
     /// @param to Destination of assets
     /// @param maxSharesOut Maximum amount of shares that should be burnt in the operation
@@ -552,8 +553,8 @@ abstract contract BaseRouter is Initializable {
         _slippageCheck(maxSharesOut, sharesOut = savingsRate.withdraw(amount, to, msg.sender));
     }
 
-    /// @notice Redeems `shares` from an ERC4626 `SavingsRate` contract
-    /// @param savingsRate ERC4626 `SavingsRate` to redeem shares from
+    /// @notice Redeems `shares` from an ERC4626 contract
+    /// @param savingsRate ERC4626 to redeem shares from
     /// @param shares Amount of shares to redeem
     /// @param to Destination of assets
     /// @param minAmountOut Minimum amount of assets that `to` should receive in the redemption process

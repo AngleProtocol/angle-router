@@ -156,7 +156,7 @@ contract MockVaultManagerPermit {
         address to,
         address who,
         bytes memory repayData
-    ) public payable returns (PaymentData memory) {
+    ) public payable virtual returns (PaymentData memory) {
         datas;
         from;
         to;

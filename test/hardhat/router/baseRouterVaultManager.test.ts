@@ -12,6 +12,8 @@ import {
   MockVaultManager__factory,
   MockVaultManagerPermit,
   MockVaultManagerPermit__factory,
+  MockVaultManagerPermitCollateral,
+  MockVaultManagerPermitCollateral__factory,
 } from '../../../typechain';
 import { expect } from '../../../utils/chai-setup';
 import { ActionType, initToken, TypePermit } from '../../../utils/helpers';
@@ -91,6 +93,7 @@ contract('BaseRouter - VaultManager functionalities', () => {
       );
     await agEUR.addMinter(vaultManager.address);
   });
+  /*
   describe('mixer - parseVaultIDs', () => {
     it('success - addCollateral - to 1 vault', async () => {
       await vaultManager.connect(alice).setPaymentData(ethers.constants.Zero, 0, 0, UNIT_USDC);
@@ -1363,6 +1366,122 @@ contract('BaseRouter - VaultManager functionalities', () => {
       expect(await USDC.balanceOf(alice.address)).to.be.equal(UNIT_USDC.mul(0));
       expect(await vaultManager.operatorApprovals(bob.address, router.address)).to.be.equal(1);
       expect(await USDC.allowance(router.address, vaultManager.address)).to.be.equal(MAX_UINT256);
+    });
+  });
+  */
+  describe('mixer - addCollateralBorrower', () => {
+    it('success - collateral added to 1 vault with max amount', async () => {
+      const vaultManager2 = (await new MockVaultManagerPermitCollateral__factory(deployer).deploy(
+        'testVM',
+      )) as MockVaultManagerPermitCollateral;
+      vaultManager2
+        .connect(alice)
+        .setParams(
+          alice.address,
+          USDC.address,
+          agEUR.address,
+          BigNumber.from(1),
+          BigNumber.from(1),
+          BigNumber.from(1),
+          BigNumber.from(1),
+        );
+      await (await USDC.connect(governor).mint(alice.address, UNIT_USDC)).wait();
+      const permits: TypePermit[] = [
+        await signPermit(
+          alice,
+          (await USDC.nonces(alice.address)).toNumber(),
+          USDC.address,
+          Number(await (await web3.eth.getBlock('latest')).timestamp) + 1000,
+          router.address,
+          UNIT_DAI,
+          'USDC',
+        ),
+      ];
+
+      const transferData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256'],
+        [USDC.address, router.address, UNIT_USDC],
+      );
+      const callsBorrow = [createVault(alice.address)];
+      const dataBorrow = await encodeAngleBorrowSidechain(
+        USDC.address,
+        vaultManager2.address,
+        bob.address,
+        ZERO_ADDRESS,
+        '0x',
+        callsBorrow,
+      );
+
+      const addData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256', 'uint256'],
+        [USDC.address, vaultManager2.address, 1, MAX_UINT256],
+      );
+
+      const actions = [ActionType.transfer, ActionType.borrower, ActionType.addCollateralBorrower];
+      const dataMixer = [transferData, dataBorrow, addData];
+
+      await router.connect(alice).mixer(permits, actions, dataMixer);
+      expect(await USDC.balanceOf(bob.address)).to.be.equal(0);
+      expect(await USDC.balanceOf(vaultManager2.address)).to.be.equal(UNIT_USDC);
+      expect(await USDC.allowance(router.address, vaultManager2.address)).to.be.equal(MAX_UINT256);
+      expect(await vaultManager2.collatData(1)).to.be.equal(UNIT_USDC);
+    });
+    it('success - collateral added to 1 vault with partial amount', async () => {
+      const vaultManager2 = (await new MockVaultManagerPermitCollateral__factory(deployer).deploy(
+        'testVM',
+      )) as MockVaultManagerPermitCollateral;
+      vaultManager2
+        .connect(alice)
+        .setParams(
+          alice.address,
+          USDC.address,
+          agEUR.address,
+          BigNumber.from(1),
+          BigNumber.from(1),
+          BigNumber.from(1),
+          BigNumber.from(1),
+        );
+      await (await USDC.connect(governor).mint(alice.address, UNIT_USDC)).wait();
+      const permits: TypePermit[] = [
+        await signPermit(
+          alice,
+          (await USDC.nonces(alice.address)).toNumber(),
+          USDC.address,
+          Number(await (await web3.eth.getBlock('latest')).timestamp) + 1000,
+          router.address,
+          UNIT_DAI,
+          'USDC',
+        ),
+      ];
+
+      const transferData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256'],
+        [USDC.address, router.address, UNIT_USDC],
+      );
+      const callsBorrow = [createVault(alice.address)];
+      const dataBorrow = await encodeAngleBorrowSidechain(
+        USDC.address,
+        vaultManager2.address,
+        bob.address,
+        ZERO_ADDRESS,
+        '0x',
+        callsBorrow,
+      );
+
+      const addData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256', 'uint256'],
+        [USDC.address, vaultManager2.address, 0, UNIT_USDC.div(3)],
+      );
+
+      const actions = [ActionType.transfer, ActionType.borrower, ActionType.addCollateralBorrower];
+      const dataMixer = [transferData, dataBorrow, addData];
+
+      await router.connect(alice).mixer(permits, actions, dataMixer);
+      expect(await USDC.balanceOf(bob.address)).to.be.equal(0);
+      expect(await USDC.balanceOf(vaultManager2.address)).to.be.equal(UNIT_USDC.div(3));
+      expect(await USDC.balanceOf(router.address)).to.be.equal(UNIT_USDC.mul(2).div(3).add(1));
+      expect(await USDC.allowance(router.address, vaultManager2.address)).to.be.equal(MAX_UINT256);
+      expect(await vaultManager2.collatData(0)).to.be.equal(UNIT_USDC.div(3));
     });
   });
 });
