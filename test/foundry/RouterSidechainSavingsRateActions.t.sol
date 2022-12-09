@@ -84,7 +84,7 @@ contract RouterSidechainSavingsRateActionsTest is BaseTest {
         bytes[] memory data = new bytes[](3);
 
         actionType[0] = ActionType.transfer;
-        actionType[1] = ActionType.mintSavingsRate;
+        actionType[1] = ActionType.mint4626;
         actionType[2] = ActionType.sweep;
 
         data[0] = abi.encode(address(token), address(router), previewMint);
@@ -135,7 +135,7 @@ contract RouterSidechainSavingsRateActionsTest is BaseTest {
         bytes[] memory data = new bytes[](2);
 
         actionType[0] = ActionType.transfer;
-        actionType[1] = ActionType.depositSavingsRate;
+        actionType[1] = ActionType.deposit4626;
 
         data[0] = abi.encode(address(token), address(router), amount);
         data[1] = abi.encode(token, savingsRate, amount, to, minSharesOut);
@@ -187,7 +187,7 @@ contract RouterSidechainSavingsRateActionsTest is BaseTest {
         bytes[] memory data = new bytes[](2);
 
         actionType[0] = ActionType.transfer;
-        actionType[1] = ActionType.depositSavingsRate;
+        actionType[1] = ActionType.deposit4626;
 
         data[0] = abi.encode(address(token), address(router), aliceAmount);
         data[1] = abi.encode(token, savingsRate, aliceAmount, _alice, previewDeposit);
@@ -215,7 +215,7 @@ contract RouterSidechainSavingsRateActionsTest is BaseTest {
 
         actionType = new ActionType[](1);
         data = new bytes[](1);
-        actionType[0] = ActionType.redeemSavingsRate;
+        actionType[0] = ActionType.redeem4626;
         data[0] = abi.encode(savingsRate, sharesToBurn, to, minAmount);
 
         vm.startPrank(_alice);
@@ -263,7 +263,7 @@ contract RouterSidechainSavingsRateActionsTest is BaseTest {
         bytes[] memory data = new bytes[](2);
 
         actionType[0] = ActionType.transfer;
-        actionType[1] = ActionType.depositSavingsRate;
+        actionType[1] = ActionType.deposit4626;
 
         data[0] = abi.encode(address(token), address(router), aliceAmount);
         data[1] = abi.encode(token, savingsRate, aliceAmount, _alice, previewDeposit);
@@ -288,7 +288,7 @@ contract RouterSidechainSavingsRateActionsTest is BaseTest {
 
         actionType = new ActionType[](1);
         data = new bytes[](1);
-        actionType[0] = ActionType.withdrawSavingsRate;
+        actionType[0] = ActionType.withdraw4626;
         data[0] = abi.encode(savingsRate, withdraw, to, maxAmountBurn);
 
         vm.startPrank(_alice);

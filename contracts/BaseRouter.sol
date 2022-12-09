@@ -63,10 +63,10 @@ enum ActionType {
     gaugeDeposit,
     borrower,
     swapper,
-    mintSavingsRate,
-    depositSavingsRate,
-    redeemSavingsRate,
-    withdrawSavingsRate,
+    mint4626,
+    deposit4626,
+    redeem4626,
+    withdraw4626,
     prepareRedeemSavingsRate,
     claimRedeemSavingsRate,
     swapIn,
@@ -78,7 +78,8 @@ enum ActionType {
     openPerpetual,
     addToPerpetual,
     veANGLEDeposit,
-    claimRewardsWithPerps
+    claimRewardsWithPerps,
+    addCollateral
 }
 
 /// @notice Data needed to get permits
@@ -232,7 +233,14 @@ abstract contract BaseRouter is Initializable {
                 _parseVaultIDs(actionsBorrow, dataBorrow, vaultManager);
                 _changeAllowance(IERC20(collateral), address(vaultManager), type(uint256).max);
                 _angleBorrower(vaultManager, actionsBorrow, dataBorrow, to, who, repayData);
-                _changeAllowance(IERC20(collateral), address(vaultManager), 0);
+            } else if (actions[i] == ActionType.addCollateral) {
+                (address collateral, address vaultManager, uint256 vaultID, uint256 amount) = abi.decode(
+                    data[i],
+                    (address, address, uint256, uint256)
+                );
+                if (amount == type(uint256).max) amount = IERC20(collateral).balanceOf(address(this));
+                _changeAllowance(IERC20(collateral), address(vaultManager), type(uint256).max);
+                _addCollateral(vaultManager, vaultID, amount);
             } else if (actions[i] == ActionType.swapper) {
                 (
                     ISwapper swapperContract,
@@ -244,33 +252,32 @@ abstract contract BaseRouter is Initializable {
                     bytes memory payload
                 ) = abi.decode(data[i], (ISwapper, IERC20, IERC20, address, uint256, uint256, bytes));
                 _swapper(swapperContract, inToken, outToken, outTokenRecipient, outTokenOwed, inTokenObtained, payload);
-            } else if (actions[i] == ActionType.mintSavingsRate) {
+            } else if (actions[i] == ActionType.mint4626) {
                 (IERC20 token, IERC4626 savingsRate, uint256 shares, address to, uint256 maxAmountIn) = abi.decode(
                     data[i],
                     (IERC20, IERC4626, uint256, address, uint256)
                 );
-                _changeAllowance(token, address(savingsRate), maxAmountIn);
-                _mintSavingsRate(savingsRate, shares, to, maxAmountIn);
-                _changeAllowance(token, address(savingsRate), 0);
-            } else if (actions[i] == ActionType.depositSavingsRate) {
+                _changeAllowance(token, address(savingsRate), type(uint256).max);
+                _mint4626(savingsRate, shares, to, maxAmountIn);
+            } else if (actions[i] == ActionType.deposit4626) {
                 (IERC20 token, IERC4626 savingsRate, uint256 amount, address to, uint256 minSharesOut) = abi.decode(
                     data[i],
                     (IERC20, IERC4626, uint256, address, uint256)
                 );
-                _changeAllowance(token, address(savingsRate), amount);
-                _depositSavingsRate(savingsRate, amount, to, minSharesOut);
-            } else if (actions[i] == ActionType.redeemSavingsRate) {
+                _changeAllowance(token, address(savingsRate), type(uint256).max);
+                _deposit4626(savingsRate, amount, to, minSharesOut);
+            } else if (actions[i] == ActionType.redeem4626) {
                 (IERC4626 savingsRate, uint256 shares, address to, uint256 minAmountOut) = abi.decode(
                     data[i],
                     (IERC4626, uint256, address, uint256)
                 );
-                _redeemSavingsRate(savingsRate, shares, to, minAmountOut);
-            } else if (actions[i] == ActionType.withdrawSavingsRate) {
+                _redeem4626(savingsRate, shares, to, minAmountOut);
+            } else if (actions[i] == ActionType.withdraw4626) {
                 (IERC4626 savingsRate, uint256 amount, address to, uint256 maxSharesOut) = abi.decode(
                     data[i],
                     (IERC4626, uint256, address, uint256)
                 );
-                _withdrawSavingsRate(savingsRate, amount, to, maxSharesOut);
+                _withdraw4626(savingsRate, amount, to, maxSharesOut);
             } else if (actions[i] == ActionType.prepareRedeemSavingsRate) {
                 (ISavingsRateIlliquid savingsRate, uint256 amount, address to, uint256 minAmountOut) = abi.decode(
                     data[i],
@@ -387,6 +394,25 @@ abstract contract BaseRouter is Initializable {
         return IVaultManagerFunctions(vaultManager).angle(actionsBorrow, dataBorrow, msg.sender, to, who, repayData);
     }
 
+    /// @notice Adds collateral in an existing vault
+    /// @param vaultManager Address of the vault to perform actions on
+    /// @param vaultID ID of the vault to add collateral to
+    /// @param amount Amount to add
+    /// @dev No check is made that the `msg.sender` is the owner of the vault
+    /// @dev This action is typically to be called after a leverage action (through `borrower`) that leads to more collateral
+    /// than expected
+    function _addCollateral(
+        address vaultManager,
+        uint256 vaultID,
+        uint256 amount
+    ) internal virtual {
+        ActionBorrowType[] memory action = new ActionBorrowType[](1);
+        action[0] = ActionBorrowType.addCollateral;
+        bytes[] memory dataBorrow = new bytes[](1);
+        dataBorrow[0] = abi.encode(vaultID, amount);
+        IVaultManagerFunctions(vaultManager).angle(action, dataBorrow, address(0), address(0), address(0), "0x");
+    }
+
     /// @notice Allows to deposit tokens into a gauge
     /// @param user Address on behalf of which deposits should be made in the gauge
     /// @param amount Amount to stake
@@ -487,7 +513,7 @@ abstract contract BaseRouter is Initializable {
     /// @param to Address to which shares should be sent
     /// @param maxAmountIn Max amount of assets used to mint
     /// @return amountIn Amount of assets used to mint by `to`
-    function _mintSavingsRate(
+    function _mint4626(
         IERC4626 savingsRate,
         uint256 shares,
         address to,
@@ -505,7 +531,7 @@ abstract contract BaseRouter is Initializable {
     /// @param to Address to which shares should be sent
     /// @param minSharesOut Minimum amount of `SavingsRate` shares that `to` should received
     /// @return sharesOut Amount of shares received by `to`
-    function _depositSavingsRate(
+    function _deposit4626(
         IERC4626 savingsRate,
         uint256 amount,
         address to,
@@ -520,7 +546,7 @@ abstract contract BaseRouter is Initializable {
     /// @param to Destination of assets
     /// @param maxSharesOut Maximum amount of shares that should be burnt in the operation
     /// @return sharesOut Amount of shares burnt
-    function _withdrawSavingsRate(
+    function _withdraw4626(
         IERC4626 savingsRate,
         uint256 amount,
         address to,
@@ -535,7 +561,7 @@ abstract contract BaseRouter is Initializable {
     /// @param to Destination of assets
     /// @param minAmountOut Minimum amount of assets that `to` should receive in the redemption process
     /// @return amountOut Amount of assets received by `to`
-    function _redeemSavingsRate(
+    function _redeem4626(
         IERC4626 savingsRate,
         uint256 shares,
         address to,

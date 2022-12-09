@@ -77,7 +77,7 @@ contract AngleRouterMainnetTest is BaseTest {
 
         actionType[0] = ActionType.transfer;
         data[0] = abi.encode(token, router, previewMint);
-        actionType[1] = ActionType.mintSavingsRate;
+        actionType[1] = ActionType.mint4626;
         data[1] = abi.encode(token, savingsRate, shares, to, maxAmount);
 
         vm.startPrank(_alice);
@@ -125,7 +125,7 @@ contract AngleRouterMainnetTest is BaseTest {
 
         actionType[0] = ActionType.transfer;
         data[0] = abi.encode(token, router, previewMint);
-        actionType[1] = ActionType.mintSavingsRate;
+        actionType[1] = ActionType.mint4626;
         data[1] = abi.encode(token, savingsRate, shares, to, maxAmount);
 
         vm.startPrank(_alice);
@@ -170,7 +170,7 @@ contract AngleRouterMainnetTest is BaseTest {
 
         actionType[0] = ActionType.transfer;
         data[0] = abi.encode(token, router, amount);
-        actionType[1] = ActionType.depositSavingsRate;
+        actionType[1] = ActionType.deposit4626;
         data[1] = abi.encode(token, savingsRate, amount, to, minSharesOut);
 
         vm.startPrank(_alice);
@@ -216,7 +216,7 @@ contract AngleRouterMainnetTest is BaseTest {
 
         actionType[0] = ActionType.transfer;
         data[0] = abi.encode(token, router, amount);
-        actionType[1] = ActionType.depositSavingsRate;
+        actionType[1] = ActionType.deposit4626;
         data[1] = abi.encode(token, savingsRate, amount, to, minSharesOut);
 
         vm.startPrank(_alice);
@@ -266,7 +266,7 @@ contract AngleRouterMainnetTest is BaseTest {
 
             actionType[0] = ActionType.transfer;
             data[0] = abi.encode(token, router, aliceAmount);
-            actionType[1] = ActionType.depositSavingsRate;
+            actionType[1] = ActionType.deposit4626;
             data[1] = abi.encode(token, savingsRate, aliceAmount, _alice, previewDeposit);
 
             vm.startPrank(_alice);
@@ -292,7 +292,7 @@ contract AngleRouterMainnetTest is BaseTest {
             actionType = new ActionType[](1);
             data = new bytes[](1);
 
-            actionType[0] = ActionType.redeemSavingsRate;
+            actionType[0] = ActionType.redeem4626;
             data[0] = abi.encode(savingsRate, sharesToBurn, to, minAmount);
 
             uint256 previewRedeem = savingsRate.previewRedeem(sharesToBurn);
@@ -345,7 +345,7 @@ contract AngleRouterMainnetTest is BaseTest {
 
             actionType[0] = ActionType.transfer;
             data[0] = abi.encode(token, router, aliceAmount);
-            actionType[1] = ActionType.depositSavingsRate;
+            actionType[1] = ActionType.deposit4626;
             data[1] = abi.encode(token, savingsRate, aliceAmount, _alice, previewDeposit);
 
             vm.startPrank(_alice);
@@ -369,7 +369,7 @@ contract AngleRouterMainnetTest is BaseTest {
             actionType = new ActionType[](1);
             data = new bytes[](1);
 
-            actionType[0] = ActionType.redeemSavingsRate;
+            actionType[0] = ActionType.redeem4626;
             data[0] = abi.encode(savingsRate, sharesToBurn, address(router), minAmount);
 
             previewRedeem = savingsRate.previewRedeem(sharesToBurn);
@@ -420,7 +420,7 @@ contract AngleRouterMainnetTest is BaseTest {
 
             actionType[0] = ActionType.transfer;
             data[0] = abi.encode(token, router, aliceAmount);
-            actionType[1] = ActionType.depositSavingsRate;
+            actionType[1] = ActionType.deposit4626;
             data[1] = abi.encode(token, savingsRate, aliceAmount, _alice, previewDeposit);
 
             vm.startPrank(_alice);
@@ -450,7 +450,7 @@ contract AngleRouterMainnetTest is BaseTest {
             actionType = new ActionType[](1);
             data = new bytes[](1);
 
-            actionType[0] = ActionType.withdrawSavingsRate;
+            actionType[0] = ActionType.withdraw4626;
             data[0] = abi.encode(savingsRate, withdraw, to, maxAmountBurn);
 
             uint256 previewWithdraw = savingsRate.previewWithdraw(withdraw);
@@ -505,7 +505,7 @@ contract AngleRouterMainnetTest is BaseTest {
 
             actionType[0] = ActionType.transfer;
             data[0] = abi.encode(token, router, aliceAmount);
-            actionType[1] = ActionType.depositSavingsRate;
+            actionType[1] = ActionType.deposit4626;
             data[1] = abi.encode(token, savingsRate, aliceAmount, _alice, previewDeposit);
 
             vm.startPrank(_alice);
@@ -527,7 +527,7 @@ contract AngleRouterMainnetTest is BaseTest {
             actionType = new ActionType[](1);
             data = new bytes[](1);
 
-            actionType[0] = ActionType.withdrawSavingsRate;
+            actionType[0] = ActionType.withdraw4626;
             data[0] = abi.encode(savingsRate, withdraw, address(router), maxAmountBurn);
 
             {

@@ -98,7 +98,7 @@ contract('BaseRouter - ERC4626 functionalities', () => {
         [USDC.address, strat.address, parseEther('1'), bob.address, parseEther('100')],
       );
 
-      const actions = [ActionType.transfer, ActionType.mintSavingsRate];
+      const actions = [ActionType.transfer, ActionType.mint4626];
       const dataMixer = [transferData, mintData];
 
       await router.connect(alice).mixer(permits, actions, dataMixer);
@@ -131,7 +131,7 @@ contract('BaseRouter - ERC4626 functionalities', () => {
         [USDC.address, strat.address, parseEther('1'), bob.address, parseEther('100')],
       );
 
-      const actions = [ActionType.transfer, ActionType.mintSavingsRate];
+      const actions = [ActionType.transfer, ActionType.mint4626];
       const dataMixer = [transferData, mintData];
       await router.connect(alice).mixer(permits, actions, dataMixer);
 
@@ -145,9 +145,7 @@ contract('BaseRouter - ERC4626 functionalities', () => {
         [USDC.address, strat.address, parseEther('300'), deployer.address, parseEther('100')],
       );
       await USDC.connect(deployer).approve(router.address, parseUnits('1000', 6));
-      await router
-        .connect(deployer)
-        .mixer([], [ActionType.transfer, ActionType.mintSavingsRate], [transferData2, mintData2]);
+      await router.connect(deployer).mixer([], [ActionType.transfer, ActionType.mint4626], [transferData2, mintData2]);
 
       expect(await USDC.balanceOf(bob.address)).to.be.equal(0);
       expect(await USDC.balanceOf(alice.address)).to.be.equal(parseUnits('999', 6));
@@ -178,7 +176,7 @@ contract('BaseRouter - ERC4626 functionalities', () => {
         ['address', 'address', 'uint256', 'address', 'uint256'],
         [USDC.address, strat.address, parseEther('1'), bob.address, parseEther('0')],
       );
-      const actions = [ActionType.transfer, ActionType.mintSavingsRate];
+      const actions = [ActionType.transfer, ActionType.mint4626];
       const dataMixer = [transferData, mintData];
       await expect(router.connect(alice).mixer(permits, actions, dataMixer)).to.be.reverted;
     });
@@ -207,7 +205,7 @@ contract('BaseRouter - ERC4626 functionalities', () => {
         [USDC.address, strat.address, parseUnits('1', 6), bob.address, parseEther('0')],
       );
 
-      const actions = [ActionType.transfer, ActionType.depositSavingsRate];
+      const actions = [ActionType.transfer, ActionType.deposit4626];
       const dataMixer = [transferData, mintData];
 
       await router.connect(alice).mixer(permits, actions, dataMixer);
@@ -240,7 +238,7 @@ contract('BaseRouter - ERC4626 functionalities', () => {
         [USDC.address, strat.address, parseUnits('1', 6), bob.address, parseEther('0')],
       );
 
-      const actions = [ActionType.transfer, ActionType.depositSavingsRate];
+      const actions = [ActionType.transfer, ActionType.deposit4626];
       const dataMixer = [transferData, mintData];
 
       await router.connect(alice).mixer(permits, actions, dataMixer);
@@ -257,7 +255,7 @@ contract('BaseRouter - ERC4626 functionalities', () => {
       await USDC.connect(deployer).approve(router.address, parseUnits('1000', 6));
       await router
         .connect(deployer)
-        .mixer([], [ActionType.transfer, ActionType.depositSavingsRate], [transferData2, mintData2]);
+        .mixer([], [ActionType.transfer, ActionType.deposit4626], [transferData2, mintData2]);
 
       expect(await USDC.balanceOf(bob.address)).to.be.equal(0);
       expect(await USDC.balanceOf(alice.address)).to.be.equal(parseUnits('999', 6));
@@ -290,7 +288,7 @@ contract('BaseRouter - ERC4626 functionalities', () => {
         [USDC.address, strat.address, parseUnits('1', 6), bob.address, parseEther('1000')],
       );
 
-      const actions = [ActionType.transfer, ActionType.depositSavingsRate];
+      const actions = [ActionType.transfer, ActionType.deposit4626];
       const dataMixer = [transferData, mintData];
 
       await expect(router.connect(alice).mixer(permits, actions, dataMixer)).to.be.revertedWith('TooSmallAmountOut');
@@ -327,7 +325,7 @@ contract('BaseRouter - ERC4626 functionalities', () => {
         [USDC.address, strat.address, parseUnits('1', 6), bob.address, parseEther('0')],
       );
       const dataMixer = [transferData, swapData, mintData];
-      const actions = [ActionType.transfer, ActionType.oneInch, ActionType.depositSavingsRate];
+      const actions = [ActionType.transfer, ActionType.oneInch, ActionType.deposit4626];
       await router.connect(alice).mixer([], actions, dataMixer);
       expect(await DAI.balanceOf(oneInch.address)).to.be.equal(parseEther('1'));
       expect(await USDC.balanceOf(strat.address)).to.be.equal(parseUnits('1', 6));
@@ -368,7 +366,7 @@ contract('BaseRouter - ERC4626 functionalities', () => {
         [strat.address, parseEther('1'), bob.address, parseUnits('0', 6)],
       );
 
-      const actions = [ActionType.transfer, ActionType.mintSavingsRate, ActionType.redeemSavingsRate];
+      const actions = [ActionType.transfer, ActionType.mint4626, ActionType.redeem4626];
       const dataMixer = [transferData, mintData, redeemData];
 
       await strat.connect(alice).approve(router.address, parseEther('13'));
@@ -390,7 +388,7 @@ contract('BaseRouter - ERC4626 functionalities', () => {
         [strat.address, parseEther('1'), bob.address, parseUnits('0', 6)],
       );
 
-      const actions = [ActionType.redeemSavingsRate];
+      const actions = [ActionType.redeem4626];
       const dataMixer = [redeemData];
 
       await strat.connect(alice).approve(router.address, parseEther('1300'));
@@ -412,7 +410,7 @@ contract('BaseRouter - ERC4626 functionalities', () => {
         [strat.address, parseEther('1'), bob.address, parseUnits('10', 6)],
       );
 
-      const actions = [ActionType.redeemSavingsRate];
+      const actions = [ActionType.redeem4626];
       const dataMixer = [redeemData];
 
       await strat.connect(alice).approve(router.address, parseEther('1300'));
@@ -450,7 +448,7 @@ contract('BaseRouter - ERC4626 functionalities', () => {
         [strat.address, parseUnits('1', 6), bob.address, parseEther('2')],
       );
 
-      const actions = [ActionType.transfer, ActionType.mintSavingsRate, ActionType.withdrawSavingsRate];
+      const actions = [ActionType.transfer, ActionType.mint4626, ActionType.withdraw4626];
       const dataMixer = [transferData, mintData, redeemData];
 
       await strat.connect(alice).approve(router.address, parseEther('13'));
@@ -472,7 +470,7 @@ contract('BaseRouter - ERC4626 functionalities', () => {
         [strat.address, parseUnits('1', 6), bob.address, parseEther('100')],
       );
 
-      const actions = [ActionType.withdrawSavingsRate];
+      const actions = [ActionType.withdraw4626];
       const dataMixer = [redeemData];
 
       await strat.connect(alice).approve(router.address, parseEther('1300'));
@@ -494,7 +492,7 @@ contract('BaseRouter - ERC4626 functionalities', () => {
         [strat.address, parseUnits('1', 6), bob.address, parseEther('100')],
       );
 
-      const actions = [ActionType.redeemSavingsRate];
+      const actions = [ActionType.redeem4626];
       const dataMixer = [redeemData];
 
       await strat.connect(alice).approve(router.address, parseEther('1300'));
@@ -535,7 +533,7 @@ contract('BaseRouter - ERC4626 functionalities', () => {
         [USDC.address, parseUnits('0', USDCdecimal), bob.address],
       );
 
-      const actions = [ActionType.withdrawSavingsRate, ActionType.oneInch, ActionType.sweep];
+      const actions = [ActionType.withdraw4626, ActionType.oneInch, ActionType.sweep];
       const dataMixer = [redeemData, swapData, sweepData];
 
       await router.connect(alice).mixer([], actions, dataMixer);
@@ -577,7 +575,7 @@ contract('BaseRouter - ERC4626 functionalities', () => {
         [stratIlliquid.address, parseEther('1'), bob.address, parseUnits('0', 6)],
       );
 
-      const actions = [ActionType.transfer, ActionType.mintSavingsRate, ActionType.prepareRedeemSavingsRate];
+      const actions = [ActionType.transfer, ActionType.mint4626, ActionType.prepareRedeemSavingsRate];
       const dataMixer = [transferData, mintData, redeemData];
 
       await stratIlliquid.connect(alice).approve(router.address, parseEther('13'));
