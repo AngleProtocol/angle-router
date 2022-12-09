@@ -93,7 +93,6 @@ contract('BaseRouter - VaultManager functionalities', () => {
       );
     await agEUR.addMinter(vaultManager.address);
   });
-  /*
   describe('mixer - parseVaultIDs', () => {
     it('success - addCollateral - to 1 vault', async () => {
       await vaultManager.connect(alice).setPaymentData(ethers.constants.Zero, 0, 0, UNIT_USDC);
@@ -1368,8 +1367,7 @@ contract('BaseRouter - VaultManager functionalities', () => {
       expect(await USDC.allowance(router.address, vaultManager.address)).to.be.equal(MAX_UINT256);
     });
   });
-  */
-  describe('mixer - addCollateralBorrower', () => {
+  describe('mixer - borrower with collateral amount max', () => {
     it('success - collateral added to 1 vault with max amount', async () => {
       const vaultManager2 = (await new MockVaultManagerPermitCollateral__factory(deployer).deploy(
         'testVM',
@@ -1402,7 +1400,7 @@ contract('BaseRouter - VaultManager functionalities', () => {
         ['address', 'address', 'uint256'],
         [USDC.address, router.address, UNIT_USDC],
       );
-      const callsBorrow = [createVault(alice.address)];
+      const callsBorrow = [createVault(alice.address), addCollateral(1, MAX_UINT256)];
       const dataBorrow = await encodeAngleBorrowSidechain(
         USDC.address,
         vaultManager2.address,
@@ -1411,14 +1409,8 @@ contract('BaseRouter - VaultManager functionalities', () => {
         '0x',
         callsBorrow,
       );
-
-      const addData = ethers.utils.defaultAbiCoder.encode(
-        ['address', 'address', 'uint256', 'uint256'],
-        [USDC.address, vaultManager2.address, 1, MAX_UINT256],
-      );
-
-      const actions = [ActionType.transfer, ActionType.borrower, ActionType.addCollateralBorrower];
-      const dataMixer = [transferData, dataBorrow, addData];
+      const actions = [ActionType.transfer, ActionType.borrower];
+      const dataMixer = [transferData, dataBorrow];
 
       await router.connect(alice).mixer(permits, actions, dataMixer);
       expect(await USDC.balanceOf(bob.address)).to.be.equal(0);
@@ -1458,7 +1450,7 @@ contract('BaseRouter - VaultManager functionalities', () => {
         ['address', 'address', 'uint256'],
         [USDC.address, router.address, UNIT_USDC],
       );
-      const callsBorrow = [createVault(alice.address)];
+      const callsBorrow = [createVault(alice.address), addCollateral(0, UNIT_USDC.div(3))];
       const dataBorrow = await encodeAngleBorrowSidechain(
         USDC.address,
         vaultManager2.address,
@@ -1468,13 +1460,8 @@ contract('BaseRouter - VaultManager functionalities', () => {
         callsBorrow,
       );
 
-      const addData = ethers.utils.defaultAbiCoder.encode(
-        ['address', 'address', 'uint256', 'uint256'],
-        [USDC.address, vaultManager2.address, 0, UNIT_USDC.div(3)],
-      );
-
-      const actions = [ActionType.transfer, ActionType.borrower, ActionType.addCollateralBorrower];
-      const dataMixer = [transferData, dataBorrow, addData];
+      const actions = [ActionType.transfer, ActionType.borrower];
+      const dataMixer = [transferData, dataBorrow];
 
       await router.connect(alice).mixer(permits, actions, dataMixer);
       expect(await USDC.balanceOf(bob.address)).to.be.equal(0);

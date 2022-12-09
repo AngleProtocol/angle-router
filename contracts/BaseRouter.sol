@@ -78,8 +78,7 @@ enum ActionType {
     openPerpetual,
     addToPerpetual,
     veANGLEDeposit,
-    claimRewardsWithPerps,
-    addCollateralBorrower
+    claimRewardsWithPerps
 }
 
 /// @notice Data needed to get permits
@@ -230,17 +229,9 @@ abstract contract BaseRouter is Initializable {
                     bytes[] memory dataBorrow,
                     bytes memory repayData
                 ) = abi.decode(data[i], (address, address, address, address, ActionBorrowType[], bytes[], bytes));
-                _parseVaultIDs(actionsBorrow, dataBorrow, vaultManager);
+                dataBorrow = _parseVaultIDs(actionsBorrow, dataBorrow, vaultManager, collateral);
                 _changeAllowance(IERC20(collateral), address(vaultManager), type(uint256).max);
                 _angleBorrower(vaultManager, actionsBorrow, dataBorrow, to, who, repayData);
-            } else if (actions[i] == ActionType.addCollateralBorrower) {
-                (address collateral, address vaultManager, uint256 vaultID, uint256 amount) = abi.decode(
-                    data[i],
-                    (address, address, uint256, uint256)
-                );
-                if (amount == type(uint256).max) amount = IERC20(collateral).balanceOf(address(this));
-                _changeAllowance(IERC20(collateral), address(vaultManager), type(uint256).max);
-                _addCollateralBorrower(vaultManager, vaultID, amount);
             } else if (actions[i] == ActionType.swapper) {
                 (
                     ISwapper swapperContract,
@@ -392,26 +383,6 @@ abstract contract BaseRouter is Initializable {
         bytes memory repayData
     ) internal virtual returns (PaymentData memory paymentData) {
         return IVaultManagerFunctions(vaultManager).angle(actionsBorrow, dataBorrow, msg.sender, to, who, repayData);
-    }
-
-    /// @notice Adds collateral in an existing vault
-    /// @param vaultManager Address of the corresponding `VaultManager` contract
-    /// @param vaultID ID of the vault to add collateral to
-    /// @param amount Amount to add
-    /// @dev No check is made that the `msg.sender` is the owner of the vault
-    /// @dev This action is typically to be called after a leverage action (through `borrower`) that gives more collateral
-    /// than expected: it allows to avoid dust kept under the form of `collateral`
-    function _addCollateralBorrower(
-        address vaultManager,
-        uint256 vaultID,
-        uint256 amount
-    ) internal virtual {
-        ActionBorrowType[] memory action = new ActionBorrowType[](1);
-        action[0] = ActionBorrowType.addCollateral;
-        bytes[] memory dataBorrow = new bytes[](1);
-        dataBorrow[0] = abi.encode(vaultID, amount);
-        bytes memory emptyBytes;
-        IVaultManagerFunctions(vaultManager).angle(action, dataBorrow, address(0), address(0), address(0), emptyBytes);
     }
 
     /// @notice Allows to deposit tokens into a gauge
@@ -684,8 +655,9 @@ abstract contract BaseRouter is Initializable {
     function _parseVaultIDs(
         ActionBorrowType[] memory actionsBorrow,
         bytes[] memory dataBorrow,
-        address vaultManager
-    ) internal view {
+        address vaultManager,
+        address collateral
+    ) internal view returns (bytes[] memory) {
         uint256 actionsBorrowLength = actionsBorrow.length;
         if (actionsBorrowLength >= _MAX_BORROW_ACTIONS) revert IncompatibleLengths();
         // The amount of vaults to check cannot be bigger than the maximum amount of tokens
@@ -700,6 +672,14 @@ abstract contract BaseRouter is Initializable {
             // next vaultIDs given equal to 0
             if (actionsBorrow[i] == ActionBorrowType.createVault) {
                 createVaultAction = true;
+                continue;
+                // If the action is a `addCollateral` action, we should check whether a max amount was given to end up adding
+                // as collateral the full contract balance
+            } else if (actionsBorrow[i] == ActionBorrowType.addCollateral) {
+                uint256 amount;
+                (vaultID, amount) = abi.decode(dataBorrow[i], (uint256, uint256));
+                if (amount == type(uint256).max)
+                    dataBorrow[i] = abi.encode(vaultID, IERC20(collateral).balanceOf(address(this)));
                 continue;
                 // There are then different ways depending on the action to find the `vaultID`
             } else if (
@@ -739,6 +719,7 @@ abstract contract BaseRouter is Initializable {
             vaultIDsToCheckOwnershipOf[vaultIDLength] = vaultID;
             vaultIDLength += 1;
         }
+        return dataBorrow;
     }
 
     /// @notice Checks whether the amount obtained during a swap is not too small
