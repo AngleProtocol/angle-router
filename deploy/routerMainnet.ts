@@ -13,8 +13,20 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
 
   console.log('Deploying router');
 
-  const chainId = ChainId.MAINNET;
+  console.log('Now deploying implementation');
 
+  await deploy('AngleRouterMainnetV2_1_Implementation', {
+    contract: 'AngleRouterMainnet',
+    from: deployer.address,
+    log: !argv.ci,
+  });
+
+  const angleRouterImplementation = (await deployments.get('AngleRouterMainnetV2_1_Implementation')).address;
+  console.log(`Successfully deployed Angle router implementation at the address ${angleRouterImplementation}`);
+  console.log('');
+  /*
+  const chainId = ChainId.MAINNET;
+  const json = await import('./networks/' + network.name + '.json');
   const proxyAdmin = registry(chainId)?.ProxyAdminGuardian;
   const coreBorrow = registry(chainId)?.CoreBorrow;
   const angle = registry(chainId)?.ANGLE;
@@ -23,8 +35,6 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
   const gauges: string[] = [];
   const stablecoins: string[] = [];
   const justLiquidityGauges: boolean[] = [];
-
-  const json = await import('./networks/' + network.name + '.json');
 
   const uniswapRouter = json.uniswapV3Router;
   const oneInchAggregator = json.oneInchRouter;
@@ -44,19 +54,6 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
   console.log(poolManagers);
   console.log(gauges);
   console.log(stablecoins);
-
-  console.log('Now deploying implementation');
-
-  await deploy('AngleRouterMainnetV2_1_Implementation', {
-    contract: 'AngleRouterMainnet',
-    from: deployer.address,
-    log: !argv.ci,
-  });
-
-  const angleRouterImplementation = (await deployments.get('AngleRouterMainnetV2_1_Implementation')).address;
-  console.log(`Successfully deployed Angle router implementation at the address ${angleRouterImplementation}`);
-  console.log('');
-  /*
   console.log('Now deploying the proxy');
 
   const dataRouter = new ethers.Contract(

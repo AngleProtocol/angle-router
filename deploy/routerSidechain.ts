@@ -19,7 +19,7 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
     chainId = ChainId.POLYGON;
     chainName = 'Polygon';
   } else {
-    chainId = ChainId.ARBITRUM;
+    chainId = ChainId.AVALANCHE;
     chainName = network.name.charAt(0).toUpperCase() + network.name.substring(1);
   }
 
@@ -34,8 +34,9 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
 
   const routerImplementation = (await ethers.getContract(`${contractName}V2_1_Implementation`)).address;
   console.log(`Successfully deployed the implementation for the router at ${routerImplementation}`);
-  /*
-  const proxyAdmin = registry(chainId)?.ProxyAdminGuardian;
+
+  // const proxyAdmin = registry(chainId)?.ProxyAdminGuardian;
+  const proxyAdmin = '0xb1F2A25fFB2b095E99f430cAF507cC31F9A3EaAB';
   const coreBorrow = registry(chainId)?.CoreBorrow;
   console.log('Now deploying the proxy contract');
   const dataRouter = new ethers.Contract(
@@ -55,7 +56,6 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
   console.log(`${router} ${routerImplementation} ${proxyAdmin} ${dataRouter}`);
   console.log('');
   console.log('Success');
-  */
 };
 
 func.tags = ['routerSidechain'];
