@@ -47,16 +47,16 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
 
   console.log('Now deploying implementation');
 
-  await deploy('AngleRouterMainnet_Implementation', {
+  await deploy('AngleRouterMainnetV2_1_Implementation', {
     contract: 'AngleRouterMainnet',
     from: deployer.address,
     log: !argv.ci,
   });
 
-  const angleRouterImplementation = (await deployments.get('AngleRouterMainnet_Implementation')).address;
-
+  const angleRouterImplementation = (await deployments.get('AngleRouterMainnetV2_1_Implementation')).address;
   console.log(`Successfully deployed Angle router implementation at the address ${angleRouterImplementation}`);
   console.log('');
+  /*
   console.log('Now deploying the proxy');
 
   const dataRouter = new ethers.Contract(
@@ -79,6 +79,7 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
     args: [angleRouterImplementation, proxyAdmin, dataRouter],
     log: !argv.ci,
   });
+  */
 };
 
 func.tags = ['routerMainnet'];

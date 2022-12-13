@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
-pragma solidity 0.8.17;
+pragma solidity ^0.8.17;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -156,7 +156,7 @@ contract MockVaultManagerPermit {
         address to,
         address who,
         bytes memory repayData
-    ) public payable returns (PaymentData memory) {
+    ) public payable virtual returns (PaymentData memory) {
         datas;
         from;
         to;

@@ -54,7 +54,7 @@ contract AngleRouterMainnetTest is BaseTest {
         deal(address(token), address(savingsRate), gainOrLoss);
     }
 
-    function testMintSavingsRateGoodPractice(
+    function testMint4626GoodPractice(
         uint256 initShares,
         uint256 shares,
         uint256 maxAmount,
@@ -77,14 +77,14 @@ contract AngleRouterMainnetTest is BaseTest {
 
         actionType[0] = ActionType.transfer;
         data[0] = abi.encode(token, router, previewMint);
-        actionType[1] = ActionType.mintSavingsRate;
+        actionType[1] = ActionType.mint4626;
         data[1] = abi.encode(token, savingsRate, shares, to, maxAmount);
 
         vm.startPrank(_alice);
         token.approve(address(router), type(uint256).max);
         // as this is a mock vault, previewMint is exactly what is needed to mint
         if (maxAmount < previewMint) {
-            vm.expectRevert(bytes("ERC20: insufficient allowance"));
+            vm.expectRevert(BaseRouter.TooSmallAmountOut.selector);
             router.mixer(paramsPermit, actionType, data);
             return;
         } else {
@@ -101,7 +101,7 @@ contract AngleRouterMainnetTest is BaseTest {
         assertEq(token.balanceOf(address(to)), 0);
     }
 
-    function testMintSavingsRateForgotFunds(
+    function testMint4626ForgotFunds(
         uint256 initShares,
         uint256 shares,
         uint256 maxAmount,
@@ -125,14 +125,14 @@ contract AngleRouterMainnetTest is BaseTest {
 
         actionType[0] = ActionType.transfer;
         data[0] = abi.encode(token, router, previewMint);
-        actionType[1] = ActionType.mintSavingsRate;
+        actionType[1] = ActionType.mint4626;
         data[1] = abi.encode(token, savingsRate, shares, to, maxAmount);
 
         vm.startPrank(_alice);
         token.approve(address(router), type(uint256).max);
         // as this is a mock vault, previewMint is exactly what is needed to mint
         if (maxAmount < previewMint) {
-            vm.expectRevert(bytes("ERC20: insufficient allowance"));
+            vm.expectRevert(BaseRouter.TooSmallAmountOut.selector);
             router.mixer(paramsPermit, actionType, data);
             return;
         } else {
@@ -147,7 +147,7 @@ contract AngleRouterMainnetTest is BaseTest {
         assertEq(token.balanceOf(address(to)), 0);
     }
 
-    function testDepositSavingsRateGoodPractice(
+    function testDeposit4626GoodPractice(
         uint256 initShares,
         uint256 amount,
         uint256 minSharesOut,
@@ -170,7 +170,7 @@ contract AngleRouterMainnetTest is BaseTest {
 
         actionType[0] = ActionType.transfer;
         data[0] = abi.encode(token, router, amount);
-        actionType[1] = ActionType.depositSavingsRate;
+        actionType[1] = ActionType.deposit4626;
         data[1] = abi.encode(token, savingsRate, amount, to, minSharesOut);
 
         vm.startPrank(_alice);
@@ -194,7 +194,7 @@ contract AngleRouterMainnetTest is BaseTest {
         assertEq(token.balanceOf(address(to)), 0);
     }
 
-    function testDepositSavingsRateForgotFunds(
+    function testDeposit4626ForgotFunds(
         uint256 initShares,
         uint256 amount,
         uint256 minSharesOut,
@@ -216,7 +216,7 @@ contract AngleRouterMainnetTest is BaseTest {
 
         actionType[0] = ActionType.transfer;
         data[0] = abi.encode(token, router, amount);
-        actionType[1] = ActionType.depositSavingsRate;
+        actionType[1] = ActionType.deposit4626;
         data[1] = abi.encode(token, savingsRate, amount, to, minSharesOut);
 
         vm.startPrank(_alice);
@@ -237,7 +237,7 @@ contract AngleRouterMainnetTest is BaseTest {
         assertEq(token.balanceOf(address(_alice)), balanceUsers - amount);
     }
 
-    function testRedeemSavingsRateGoodPractice(
+    function testRedeem4626GoodPractice(
         uint256 initShares,
         uint256 aliceAmount,
         uint256 propSharesBurn,
@@ -266,7 +266,7 @@ contract AngleRouterMainnetTest is BaseTest {
 
             actionType[0] = ActionType.transfer;
             data[0] = abi.encode(token, router, aliceAmount);
-            actionType[1] = ActionType.depositSavingsRate;
+            actionType[1] = ActionType.deposit4626;
             data[1] = abi.encode(token, savingsRate, aliceAmount, _alice, previewDeposit);
 
             vm.startPrank(_alice);
@@ -292,7 +292,7 @@ contract AngleRouterMainnetTest is BaseTest {
             actionType = new ActionType[](1);
             data = new bytes[](1);
 
-            actionType[0] = ActionType.redeemSavingsRate;
+            actionType[0] = ActionType.redeem4626;
             data[0] = abi.encode(savingsRate, sharesToBurn, to, minAmount);
 
             uint256 previewRedeem = savingsRate.previewRedeem(sharesToBurn);
@@ -318,7 +318,7 @@ contract AngleRouterMainnetTest is BaseTest {
         assertEq(token.balanceOf(address(_alice)), balanceUsers - aliceAmount);
     }
 
-    function testRedeemSavingsRateForgotFunds(
+    function testRedeem4626ForgotFunds(
         uint256 initShares,
         uint256 aliceAmount,
         uint256 propSharesBurn,
@@ -345,7 +345,7 @@ contract AngleRouterMainnetTest is BaseTest {
 
             actionType[0] = ActionType.transfer;
             data[0] = abi.encode(token, router, aliceAmount);
-            actionType[1] = ActionType.depositSavingsRate;
+            actionType[1] = ActionType.deposit4626;
             data[1] = abi.encode(token, savingsRate, aliceAmount, _alice, previewDeposit);
 
             vm.startPrank(_alice);
@@ -369,7 +369,7 @@ contract AngleRouterMainnetTest is BaseTest {
             actionType = new ActionType[](1);
             data = new bytes[](1);
 
-            actionType[0] = ActionType.redeemSavingsRate;
+            actionType[0] = ActionType.redeem4626;
             data[0] = abi.encode(savingsRate, sharesToBurn, address(router), minAmount);
 
             previewRedeem = savingsRate.previewRedeem(sharesToBurn);
@@ -392,7 +392,7 @@ contract AngleRouterMainnetTest is BaseTest {
         assertEq(token.balanceOf(address(_alice)), balanceUsers - aliceAmount);
     }
 
-    function testWithdrawSavingsRateGoodPractice(
+    function testWithdraw4626GoodPractice(
         uint256 initShares,
         uint256 aliceAmount,
         uint256 withdraw,
@@ -420,7 +420,7 @@ contract AngleRouterMainnetTest is BaseTest {
 
             actionType[0] = ActionType.transfer;
             data[0] = abi.encode(token, router, aliceAmount);
-            actionType[1] = ActionType.depositSavingsRate;
+            actionType[1] = ActionType.deposit4626;
             data[1] = abi.encode(token, savingsRate, aliceAmount, _alice, previewDeposit);
 
             vm.startPrank(_alice);
@@ -450,7 +450,7 @@ contract AngleRouterMainnetTest is BaseTest {
             actionType = new ActionType[](1);
             data = new bytes[](1);
 
-            actionType[0] = ActionType.withdrawSavingsRate;
+            actionType[0] = ActionType.withdraw4626;
             data[0] = abi.encode(savingsRate, withdraw, to, maxAmountBurn);
 
             uint256 previewWithdraw = savingsRate.previewWithdraw(withdraw);
@@ -479,7 +479,7 @@ contract AngleRouterMainnetTest is BaseTest {
         assertEq(token.balanceOf(address(_alice)), balanceUsers - aliceAmount);
     }
 
-    function testWithdrawSavingsRateForgotFunds(
+    function testWithdraw4626ForgotFunds(
         uint256 initShares,
         uint256 aliceAmount,
         uint256 withdraw,
@@ -505,7 +505,7 @@ contract AngleRouterMainnetTest is BaseTest {
 
             actionType[0] = ActionType.transfer;
             data[0] = abi.encode(token, router, aliceAmount);
-            actionType[1] = ActionType.depositSavingsRate;
+            actionType[1] = ActionType.deposit4626;
             data[1] = abi.encode(token, savingsRate, aliceAmount, _alice, previewDeposit);
 
             vm.startPrank(_alice);
@@ -527,7 +527,7 @@ contract AngleRouterMainnetTest is BaseTest {
             actionType = new ActionType[](1);
             data = new bytes[](1);
 
-            actionType[0] = ActionType.withdrawSavingsRate;
+            actionType[0] = ActionType.withdraw4626;
             data[0] = abi.encode(savingsRate, withdraw, address(router), maxAmountBurn);
 
             {

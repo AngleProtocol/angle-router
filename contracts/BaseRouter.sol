@@ -33,7 +33,7 @@
           ▓▓▓        ▓▓      ▓▓▓    ▓▓▓       ▓▓▓▓▓▓▓▓▓▓        ▓▓▓▓▓▓▓▓▓▓       ▓▓▓▓▓▓▓▓▓▓          
 */
 
-pragma solidity 0.8.17;
+pragma solidity ^0.8.17;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-IERC20Permit.sol";
@@ -63,10 +63,10 @@ enum ActionType {
     gaugeDeposit,
     borrower,
     swapper,
-    mintSavingsRate,
-    depositSavingsRate,
-    redeemSavingsRate,
-    withdrawSavingsRate,
+    mint4626,
+    deposit4626,
+    redeem4626,
+    withdraw4626,
     prepareRedeemSavingsRate,
     claimRedeemSavingsRate,
     swapIn,
@@ -109,9 +109,6 @@ struct PermitVaultManagerType {
 /// @dev Router contracts are designed to facilitate the composition of actions on the different modules of the protocol
 abstract contract BaseRouter is Initializable {
     using SafeERC20 for IERC20;
-
-    /// @notice How many actions can be performed on a given `VaultManager` contract
-    uint256 private constant _MAX_BORROW_ACTIONS = 10;
 
     // ================================= REFERENCES ================================
 
@@ -229,10 +226,9 @@ abstract contract BaseRouter is Initializable {
                     bytes[] memory dataBorrow,
                     bytes memory repayData
                 ) = abi.decode(data[i], (address, address, address, address, ActionBorrowType[], bytes[], bytes));
-                _parseVaultIDs(actionsBorrow, dataBorrow, vaultManager);
+                dataBorrow = _parseVaultIDs(actionsBorrow, dataBorrow, vaultManager, collateral);
                 _changeAllowance(IERC20(collateral), address(vaultManager), type(uint256).max);
                 _angleBorrower(vaultManager, actionsBorrow, dataBorrow, to, who, repayData);
-                _changeAllowance(IERC20(collateral), address(vaultManager), 0);
             } else if (actions[i] == ActionType.swapper) {
                 (
                     ISwapper swapperContract,
@@ -244,33 +240,32 @@ abstract contract BaseRouter is Initializable {
                     bytes memory payload
                 ) = abi.decode(data[i], (ISwapper, IERC20, IERC20, address, uint256, uint256, bytes));
                 _swapper(swapperContract, inToken, outToken, outTokenRecipient, outTokenOwed, inTokenObtained, payload);
-            } else if (actions[i] == ActionType.mintSavingsRate) {
+            } else if (actions[i] == ActionType.mint4626) {
                 (IERC20 token, IERC4626 savingsRate, uint256 shares, address to, uint256 maxAmountIn) = abi.decode(
                     data[i],
                     (IERC20, IERC4626, uint256, address, uint256)
                 );
-                _changeAllowance(token, address(savingsRate), maxAmountIn);
-                _mintSavingsRate(savingsRate, shares, to, maxAmountIn);
-                _changeAllowance(token, address(savingsRate), 0);
-            } else if (actions[i] == ActionType.depositSavingsRate) {
+                _changeAllowance(token, address(savingsRate), type(uint256).max);
+                _mint4626(savingsRate, shares, to, maxAmountIn);
+            } else if (actions[i] == ActionType.deposit4626) {
                 (IERC20 token, IERC4626 savingsRate, uint256 amount, address to, uint256 minSharesOut) = abi.decode(
                     data[i],
                     (IERC20, IERC4626, uint256, address, uint256)
                 );
-                _changeAllowance(token, address(savingsRate), amount);
-                _depositSavingsRate(savingsRate, amount, to, minSharesOut);
-            } else if (actions[i] == ActionType.redeemSavingsRate) {
+                _changeAllowance(token, address(savingsRate), type(uint256).max);
+                _deposit4626(savingsRate, amount, to, minSharesOut);
+            } else if (actions[i] == ActionType.redeem4626) {
                 (IERC4626 savingsRate, uint256 shares, address to, uint256 minAmountOut) = abi.decode(
                     data[i],
                     (IERC4626, uint256, address, uint256)
                 );
-                _redeemSavingsRate(savingsRate, shares, to, minAmountOut);
-            } else if (actions[i] == ActionType.withdrawSavingsRate) {
+                _redeem4626(savingsRate, shares, to, minAmountOut);
+            } else if (actions[i] == ActionType.withdraw4626) {
                 (IERC4626 savingsRate, uint256 amount, address to, uint256 maxSharesOut) = abi.decode(
                     data[i],
                     (IERC4626, uint256, address, uint256)
                 );
-                _withdrawSavingsRate(savingsRate, amount, to, maxSharesOut);
+                _withdraw4626(savingsRate, amount, to, maxSharesOut);
             } else if (actions[i] == ActionType.prepareRedeemSavingsRate) {
                 (ISavingsRateIlliquid savingsRate, uint256 amount, address to, uint256 minAmountOut) = abi.decode(
                     data[i],
@@ -481,31 +476,28 @@ abstract contract BaseRouter is Initializable {
         _slippageCheck(amountOut, minAmountOut);
     }
 
-    /// @notice Mints `shares` from an ERC4626 `SavingsRate` contract
-    /// @param savingsRate ERC4626 `SavingsRate` to mint shares from
-    /// @param shares Amount of shares to mint from `savingsRate`
+    /// @notice Mints `shares` from an ERC4626 contract
+    /// @param savingsRate ERC4626 to mint shares from
+    /// @param shares Amount of shares to mint from the contract
     /// @param to Address to which shares should be sent
     /// @param maxAmountIn Max amount of assets used to mint
     /// @return amountIn Amount of assets used to mint by `to`
-    function _mintSavingsRate(
+    function _mint4626(
         IERC4626 savingsRate,
         uint256 shares,
         address to,
         uint256 maxAmountIn
     ) internal returns (uint256 amountIn) {
-        // This check is useless as the contract needs to approve an amount and it will revert
-        // anyway if more than `maxAmountIn` is used
-        // We let it just in case we call this function outside of the mixer
         _slippageCheck(maxAmountIn, (amountIn = savingsRate.mint(shares, to)));
     }
 
-    /// @notice Deposits `amount` to an ERC4626 `SavingsRate` contract
-    /// @param savingsRate The ERC4626 `SavingsRate` to deposit assets to
+    /// @notice Deposits `amount` to an ERC4626 contract
+    /// @param savingsRate The ERC4626 to deposit assets to
     /// @param amount Amount of assets to deposit
     /// @param to Address to which shares should be sent
-    /// @param minSharesOut Minimum amount of `SavingsRate` shares that `to` should received
+    /// @param minSharesOut Minimum amount of shares that `to` should received
     /// @return sharesOut Amount of shares received by `to`
-    function _depositSavingsRate(
+    function _deposit4626(
         IERC4626 savingsRate,
         uint256 amount,
         address to,
@@ -514,13 +506,13 @@ abstract contract BaseRouter is Initializable {
         _slippageCheck(sharesOut = savingsRate.deposit(amount, to), minSharesOut);
     }
 
-    /// @notice Withdraws `amount` from an ERC4626 `SavingsRate` contract
-    /// @param savingsRate ERC4626 `SavingsRate` to withdraw assets from
+    /// @notice Withdraws `amount` from an ERC4626 contract
+    /// @param savingsRate ERC4626 to withdraw assets from
     /// @param amount Amount of assets to withdraw
     /// @param to Destination of assets
     /// @param maxSharesOut Maximum amount of shares that should be burnt in the operation
     /// @return sharesOut Amount of shares burnt
-    function _withdrawSavingsRate(
+    function _withdraw4626(
         IERC4626 savingsRate,
         uint256 amount,
         address to,
@@ -529,13 +521,13 @@ abstract contract BaseRouter is Initializable {
         _slippageCheck(maxSharesOut, sharesOut = savingsRate.withdraw(amount, to, msg.sender));
     }
 
-    /// @notice Redeems `shares` from an ERC4626 `SavingsRate` contract
-    /// @param savingsRate ERC4626 `SavingsRate` to redeem shares from
+    /// @notice Redeems `shares` from an ERC4626 contract
+    /// @param savingsRate ERC4626 to redeem shares from
     /// @param shares Amount of shares to redeem
     /// @param to Destination of assets
     /// @param minAmountOut Minimum amount of assets that `to` should receive in the redemption process
     /// @return amountOut Amount of assets received by `to`
-    function _redeemSavingsRate(
+    function _redeem4626(
         IERC4626 savingsRate,
         uint256 shares,
         address to,
@@ -660,13 +652,11 @@ abstract contract BaseRouter is Initializable {
     function _parseVaultIDs(
         ActionBorrowType[] memory actionsBorrow,
         bytes[] memory dataBorrow,
-        address vaultManager
-    ) internal view {
+        address vaultManager,
+        address collateral
+    ) internal view returns (bytes[] memory) {
         uint256 actionsBorrowLength = actionsBorrow.length;
-        if (actionsBorrowLength >= _MAX_BORROW_ACTIONS) revert IncompatibleLengths();
-        // The amount of vaults to check cannot be bigger than the maximum amount of tokens
-        // supported
-        uint256[_MAX_BORROW_ACTIONS] memory vaultIDsToCheckOwnershipOf;
+        uint256[] memory vaultIDsToCheckOwnershipOf = new uint256[](actionsBorrowLength);
         bool createVaultAction;
         uint256 lastVaultID;
         uint256 vaultIDLength;
@@ -677,7 +667,15 @@ abstract contract BaseRouter is Initializable {
             if (actionsBorrow[i] == ActionBorrowType.createVault) {
                 createVaultAction = true;
                 continue;
-                // There are then different ways depending on the action to find the `vaultID`
+                // If the action is a `addCollateral` action, we should check whether a max amount was given to end up adding
+                // as collateral the full contract balance
+            } else if (actionsBorrow[i] == ActionBorrowType.addCollateral) {
+                uint256 amount;
+                (vaultID, amount) = abi.decode(dataBorrow[i], (uint256, uint256));
+                if (amount == type(uint256).max)
+                    dataBorrow[i] = abi.encode(vaultID, IERC20(collateral).balanceOf(address(this)));
+                continue;
+                // There are different ways depending on the action to find the `vaultID` to parse
             } else if (
                 actionsBorrow[i] == ActionBorrowType.removeCollateral || actionsBorrow[i] == ActionBorrowType.borrow
             ) {
@@ -708,13 +706,14 @@ abstract contract BaseRouter is Initializable {
                     continue;
                 }
             }
-            // Verify this new vaultID and add it to the list
+            // Verify this new `vaultID` and add it to the list
             if (!IVaultManagerFunctions(vaultManager).isApprovedOrOwner(msg.sender, vaultID)) {
                 revert NotApprovedOrOwner();
             }
             vaultIDsToCheckOwnershipOf[vaultIDLength] = vaultID;
             vaultIDLength += 1;
         }
+        return dataBorrow;
     }
 
     /// @notice Checks whether the amount obtained during a swap is not too small

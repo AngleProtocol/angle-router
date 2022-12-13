@@ -12,6 +12,8 @@ import {
   MockVaultManager__factory,
   MockVaultManagerPermit,
   MockVaultManagerPermit__factory,
+  MockVaultManagerPermitCollateral,
+  MockVaultManagerPermitCollateral__factory,
 } from '../../../typechain';
 import { expect } from '../../../utils/chai-setup';
 import { ActionType, initToken, TypePermit } from '../../../utils/helpers';
@@ -28,7 +30,7 @@ import {
 } from '../../../utils/helpersEncoding';
 import { signPermit } from '../../../utils/sign';
 import { signPermitNFT } from '../../../utils/sigUtilsNFT';
-import { deployUpgradeable, latestTime, ZERO_ADDRESS } from '../utils/helpers';
+import { deployUpgradeable, latestTime, MAX_UINT256, ZERO_ADDRESS } from '../utils/helpers';
 
 contract('BaseRouter - VaultManager functionalities', () => {
   // As a proxy for the AngleRouter sidechain we're using the Polygon implementation of it
@@ -127,6 +129,7 @@ contract('BaseRouter - VaultManager functionalities', () => {
       await router.connect(alice).mixer(permits, actions, dataMixer);
       expect(await USDC.balanceOf(bob.address)).to.be.equal(0);
       expect(await USDC.balanceOf(vaultManager.address)).to.be.equal(UNIT_USDC);
+      expect(await USDC.allowance(router.address, vaultManager.address)).to.be.equal(MAX_UINT256);
     });
 
     it('success - addCollateral - to multiple vaults 1/2 - vaultID = 0 and createVault action', async () => {
@@ -168,6 +171,7 @@ contract('BaseRouter - VaultManager functionalities', () => {
       await router.connect(alice).mixer(permits, actions, dataMixer);
       expect(await USDC.balanceOf(bob.address)).to.be.equal(0);
       expect(await USDC.balanceOf(vaultManager.address)).to.be.equal(UNIT_USDC.mul(2));
+      expect(await USDC.allowance(router.address, vaultManager.address)).to.be.equal(MAX_UINT256);
     });
     it('success - addCollateral - to multiple vaults 2/2 - vaultID = 0 and no createVault action', async () => {
       await vaultManager.connect(alice).setPaymentData(ethers.constants.Zero, 0, 0, UNIT_USDC.mul(2));
@@ -205,6 +209,7 @@ contract('BaseRouter - VaultManager functionalities', () => {
       await router.connect(alice).mixer(permits, actions, dataMixer);
       expect(await USDC.balanceOf(bob.address)).to.be.equal(0);
       expect(await USDC.balanceOf(vaultManager.address)).to.be.equal(UNIT_USDC.mul(2));
+      expect(await USDC.allowance(router.address, vaultManager.address)).to.be.equal(MAX_UINT256);
     });
     it('reverts - closeVault - not approved', async () => {
       await vaultManager.connect(alice).setPaymentData(0, 0, 0, 0);
@@ -240,6 +245,8 @@ contract('BaseRouter - VaultManager functionalities', () => {
       const dataMixer = [dataBorrow];
       await vaultManager.approveSpenderVault(alice.address, 1, true);
       await router.connect(alice).mixer(permits, actions, dataMixer);
+      // Allowance is still given in this case
+      expect(await USDC.allowance(router.address, vaultManager.address)).to.be.equal(MAX_UINT256);
     });
     it('success - closeVault - ID is zero and no createVault action', async () => {
       await vaultManager.connect(alice).setPaymentData(0, 0, 0, 0);
@@ -259,6 +266,7 @@ contract('BaseRouter - VaultManager functionalities', () => {
       const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixer(permits, actions, dataMixer);
+      expect(await USDC.allowance(router.address, vaultManager.address)).to.be.equal(MAX_UINT256);
     });
     it('success - closeVault - ID is zero and createVault action before', async () => {
       await vaultManager.connect(alice).setPaymentData(0, 0, 0, 0);
@@ -276,6 +284,7 @@ contract('BaseRouter - VaultManager functionalities', () => {
       const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixer(permits, actions, dataMixer);
+      expect(await USDC.allowance(router.address, vaultManager.address)).to.be.equal(MAX_UINT256);
     });
     it('success - closeVault - ID is zero and createVault action after', async () => {
       await vaultManager.connect(alice).setPaymentData(0, 0, 0, 0);
@@ -295,6 +304,7 @@ contract('BaseRouter - VaultManager functionalities', () => {
       const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixer(permits, actions, dataMixer);
+      expect(await USDC.allowance(router.address, vaultManager.address)).to.be.equal(MAX_UINT256);
     });
     it('reverts - closeVault - with just one missing vault', async () => {
       await vaultManager.connect(alice).setPaymentData(0, 0, 0, 0);
@@ -344,6 +354,7 @@ contract('BaseRouter - VaultManager functionalities', () => {
       const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixer(permits, actions, dataMixer);
+      expect(await USDC.allowance(router.address, vaultManager.address)).to.be.equal(MAX_UINT256);
     });
     it('success - closeVault - multiple zero and different vaults', async () => {
       await vaultManager.connect(alice).setPaymentData(0, 0, 0, 0);
@@ -376,42 +387,7 @@ contract('BaseRouter - VaultManager functionalities', () => {
       const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixer(permits, actions, dataMixer);
-    });
-    it('reverts - closeVault - too many actions', async () => {
-      await vaultManager.connect(alice).setPaymentData(0, 0, 0, 0);
-      await vaultManager.updateVaultIDCount(10);
-      await vaultManager.approveSpenderVault(alice.address, 10, true);
-      await vaultManager.approveSpenderVault(alice.address, 2, true);
-      await vaultManager.approveSpenderVault(alice.address, 3, true);
-      await vaultManager.approveSpenderVault(alice.address, 4, true);
-      await vaultManager.approveSpenderVault(alice.address, 5, true);
-      const permits: TypePermit[] = [];
-      const callsBorrow = [
-        closeVault(0),
-        closeVault(0),
-        createVault(alice.address),
-        closeVault(0),
-        createVault(alice.address),
-        closeVault(0),
-        closeVault(2),
-        closeVault(3),
-        closeVault(0),
-        closeVault(0),
-        closeVault(0),
-        closeVault(0),
-      ];
-      const dataBorrow = await encodeAngleBorrowSidechain(
-        USDC.address,
-        vaultManager.address,
-        bob.address,
-        ZERO_ADDRESS,
-        '0x',
-        callsBorrow,
-      );
-
-      const actions = [ActionType.borrower];
-      const dataMixer = [dataBorrow];
-      await expect(router.connect(alice).mixer(permits, actions, dataMixer)).to.be.revertedWith('IncompatibleLengths');
+      expect(await USDC.allowance(router.address, vaultManager.address)).to.be.equal(MAX_UINT256);
     });
     it('success - borrow', async () => {
       await vaultManager.connect(alice).setPaymentData(0, 0, 0, 0);
@@ -431,6 +407,7 @@ contract('BaseRouter - VaultManager functionalities', () => {
       const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixer(permits, actions, dataMixer);
+      expect(await USDC.allowance(router.address, vaultManager.address)).to.be.equal(MAX_UINT256);
     });
     it('success - borrow - custom vaultID', async () => {
       await vaultManager.connect(alice).setPaymentData(0, 0, 0, 0);
@@ -449,6 +426,7 @@ contract('BaseRouter - VaultManager functionalities', () => {
       const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixer(permits, actions, dataMixer);
+      expect(await USDC.allowance(router.address, vaultManager.address)).to.be.equal(MAX_UINT256);
     });
     it('reverts - borrow - not owner', async () => {
       await vaultManager.connect(alice).setPaymentData(0, 0, 0, 0);
@@ -486,6 +464,7 @@ contract('BaseRouter - VaultManager functionalities', () => {
       const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixer(permits, actions, dataMixer);
+      expect(await USDC.allowance(router.address, vaultManager.address)).to.be.equal(MAX_UINT256);
     });
     it('success - removeCollateral - custom vaultID', async () => {
       await vaultManager.connect(alice).setPaymentData(0, 0, 0, 0);
@@ -504,6 +483,7 @@ contract('BaseRouter - VaultManager functionalities', () => {
       const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixer(permits, actions, dataMixer);
+      expect(await USDC.allowance(router.address, vaultManager.address)).to.be.equal(MAX_UINT256);
     });
     it('reverts - removeCollateral - not owner', async () => {
       await vaultManager.connect(alice).setPaymentData(0, 0, 0, 0);
@@ -541,6 +521,7 @@ contract('BaseRouter - VaultManager functionalities', () => {
       const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixer(permits, actions, dataMixer);
+      expect(await USDC.allowance(router.address, vaultManager.address)).to.be.equal(MAX_UINT256);
     });
     it('success - getDebtIn - custom vaultID', async () => {
       await vaultManager.connect(alice).setPaymentData(0, 0, 0, 0);
@@ -559,6 +540,7 @@ contract('BaseRouter - VaultManager functionalities', () => {
       const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixer(permits, actions, dataMixer);
+      expect(await USDC.allowance(router.address, vaultManager.address)).to.be.equal(MAX_UINT256);
     });
     it('reverts - getDebtIn - not owner', async () => {
       await vaultManager.connect(alice).setPaymentData(0, 0, 0, 0);
@@ -595,6 +577,7 @@ contract('BaseRouter - VaultManager functionalities', () => {
       const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixer(permits, actions, dataMixer);
+      expect(await USDC.allowance(router.address, vaultManager.address)).to.be.equal(MAX_UINT256);
     });
     it('success - repayDebt - on a custom vault with a createVault before', async () => {
       await vaultManager.connect(alice).setPaymentData(0, 0, 0, 0);
@@ -613,6 +596,7 @@ contract('BaseRouter - VaultManager functionalities', () => {
       const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixer(permits, actions, dataMixer);
+      expect(await USDC.allowance(router.address, vaultManager.address)).to.be.equal(MAX_UINT256);
     });
     it('success - repayDebt - on a custom vault with a createVault after', async () => {
       await vaultManager.connect(alice).setPaymentData(0, 0, 0, 0);
@@ -631,6 +615,7 @@ contract('BaseRouter - VaultManager functionalities', () => {
       const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixer(permits, actions, dataMixer);
+      expect(await USDC.allowance(router.address, vaultManager.address)).to.be.equal(MAX_UINT256);
     });
     it('success - permit - on a custom vault with no approval', async () => {
       await vaultManager.connect(alice).setPaymentData(0, 0, 0, 0);
@@ -658,6 +643,7 @@ contract('BaseRouter - VaultManager functionalities', () => {
       const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixer(permits, actions, dataMixer);
+      expect(await USDC.allowance(router.address, vaultManager.address)).to.be.equal(MAX_UINT256);
     });
     it('success - permit - on a custom vault with a createVault before', async () => {
       await vaultManager.connect(alice).setPaymentData(0, 0, 0, 0);
@@ -685,6 +671,7 @@ contract('BaseRouter - VaultManager functionalities', () => {
       const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixer(permits, actions, dataMixer);
+      expect(await USDC.allowance(router.address, vaultManager.address)).to.be.equal(MAX_UINT256);
     });
     it('success - permit - on a custom vault with a createVault after', async () => {
       await vaultManager.connect(alice).setPaymentData(0, 0, 0, 0);
@@ -712,6 +699,7 @@ contract('BaseRouter - VaultManager functionalities', () => {
       const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixer(permits, actions, dataMixer);
+      expect(await USDC.allowance(router.address, vaultManager.address)).to.be.equal(MAX_UINT256);
     });
     it('success - composition of different actions in the vault with all approved vaults', async () => {
       await vaultManager.connect(alice).setPaymentData(0, 0, 0, 0);
@@ -744,6 +732,7 @@ contract('BaseRouter - VaultManager functionalities', () => {
       const actions = [ActionType.borrower];
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixer(permits, actions, dataMixer);
+      expect(await USDC.allowance(router.address, vaultManager.address)).to.be.equal(MAX_UINT256);
     });
     it('reverts - when one approval for one vault lacks', async () => {
       await vaultManager.connect(alice).setPaymentData(0, 0, 0, 0);
@@ -805,6 +794,7 @@ contract('BaseRouter - VaultManager functionalities', () => {
       const dataMixer: BytesLike[] = [];
       await router.mixerVaultManagerPermit([permitParam], permits, actions, dataMixer);
       expect(await vaultManager.operatorApprovals(bob.address, router.address)).to.be.equal(1);
+      expect(await USDC.allowance(router.address, vaultManager.address)).to.be.equal(0);
     });
     it('success - permit signed on vaultManager - just revoke', async () => {
       const name = 'testVM';
@@ -831,6 +821,7 @@ contract('BaseRouter - VaultManager functionalities', () => {
       const dataMixer: BytesLike[] = [];
       await router.mixerVaultManagerPermit([permitParam], permits, actions, dataMixer);
       expect(await vaultManager.operatorApprovals(bob.address, router.address)).to.be.equal(0);
+      expect(await USDC.allowance(router.address, vaultManager.address)).to.be.equal(0);
     });
     it('reverts - invalid signature', async () => {
       const name = 'testVM';
@@ -902,6 +893,7 @@ contract('BaseRouter - VaultManager functionalities', () => {
       const dataMixer: BytesLike[] = [];
       await router.mixerVaultManagerPermit([permitParam, permitParam2], permits, actions, dataMixer);
       expect(await vaultManager.operatorApprovals(bob.address, router.address)).to.be.equal(0);
+      expect(await USDC.allowance(router.address, vaultManager.address)).to.be.equal(0);
     });
     it('success - permit signed on vaultManager - first granted then two revoked', async () => {
       const name = 'testVM';
@@ -948,6 +940,7 @@ contract('BaseRouter - VaultManager functionalities', () => {
       expect(await vaultManager.operatorApprovals(bob.address, router.address)).to.be.equal(1);
       await router.mixerVaultManagerPermit([permitParam2], permits, actions, dataMixer);
       expect(await vaultManager.operatorApprovals(bob.address, router.address)).to.be.equal(0);
+      expect(await USDC.allowance(router.address, vaultManager.address)).to.be.equal(0);
     });
     it('reverts - invalid signature on revoke', async () => {
       const name = 'testVM';
@@ -1047,6 +1040,7 @@ contract('BaseRouter - VaultManager functionalities', () => {
       const dataMixer = [dataBorrow];
       await router.connect(alice).mixerVaultManagerPermit([permitParam], permits, actions, dataMixer);
       expect(await vaultManager.operatorApprovals(bob.address, router.address)).to.be.equal(1);
+      expect(await USDC.allowance(router.address, vaultManager.address)).to.be.equal(MAX_UINT256);
     });
     it('success - with repayData.length > 0 and no transfers', async () => {
       const name = 'testVM';
@@ -1088,6 +1082,7 @@ contract('BaseRouter - VaultManager functionalities', () => {
       await router.connect(alice).mixerVaultManagerPermit([permitParam], permits, actions, dataMixer);
       expect(await vaultManager.operatorApprovals(bob.address, router.address)).to.be.equal(1);
       expect(await USDC.balanceOf(router.address)).to.be.equal(UNIT_USDC);
+      expect(await USDC.allowance(router.address, vaultManager.address)).to.be.equal(MAX_UINT256);
     });
 
     it('success - with repayData.length > 0 and collateral transfers to another address', async () => {
@@ -1130,6 +1125,7 @@ contract('BaseRouter - VaultManager functionalities', () => {
       await router.connect(alice).mixerVaultManagerPermit([permitParam], permits, actions, dataMixer);
       // Nothing is transferred to the msg.sender
       expect(await USDC.balanceOf(bob.address)).to.be.equal(UNIT_USDC);
+      expect(await USDC.allowance(router.address, vaultManager.address)).to.be.equal(MAX_UINT256);
     });
     it('success - with collateral payment and stablecoin payment + repayData', async () => {
       const name = 'testVM';
@@ -1178,6 +1174,7 @@ contract('BaseRouter - VaultManager functionalities', () => {
       // Leftover transferred to the msg.sender
       expect(await USDC.balanceOf(vaultManager.address)).to.be.equal(UNIT_USDC);
       expect(await agEUR.balanceOf(alice.address)).to.be.equal(0);
+      expect(await USDC.allowance(router.address, vaultManager.address)).to.be.equal(MAX_UINT256);
     });
     it('success - with collateral payment and stablecoin payment + no repayData -> effect should be the same', async () => {
       const name = 'testVM';
@@ -1227,6 +1224,7 @@ contract('BaseRouter - VaultManager functionalities', () => {
       expect(await USDC.balanceOf(vaultManager.address)).to.be.equal(UNIT_USDC);
       expect(await agEUR.balanceOf(alice.address)).to.be.equal(0);
       expect(await vaultManager.operatorApprovals(bob.address, router.address)).to.be.equal(1);
+      expect(await USDC.allowance(router.address, vaultManager.address)).to.be.equal(MAX_UINT256);
     });
     it('success - with collateral payment and stablecoin receipt + no repayData + to!= address(this) ', async () => {
       const name = 'testVM';
@@ -1278,6 +1276,7 @@ contract('BaseRouter - VaultManager functionalities', () => {
       expect(await agEUR.balanceOf(bob.address)).to.be.equal(UNIT_DAI);
       expect(await USDC.balanceOf(bob.address)).to.be.equal(UNIT_USDC);
       expect(await vaultManager.operatorApprovals(bob.address, router.address)).to.be.equal(1);
+      expect(await USDC.allowance(router.address, vaultManager.address)).to.be.equal(MAX_UINT256);
     });
     it('success - with collateral payment and stablecoin receipt + no repayData + to = address(this) ', async () => {
       const name = 'testVM';
@@ -1329,6 +1328,111 @@ contract('BaseRouter - VaultManager functionalities', () => {
       expect(await agEUR.balanceOf(alice.address)).to.be.equal(UNIT_DAI.mul(1));
       expect(await USDC.balanceOf(alice.address)).to.be.equal(UNIT_USDC.mul(0));
       expect(await vaultManager.operatorApprovals(bob.address, router.address)).to.be.equal(1);
+      expect(await USDC.allowance(router.address, vaultManager.address)).to.be.equal(MAX_UINT256);
+    });
+  });
+  describe('mixer - borrower with collateral amount max', () => {
+    it('success - collateral added to 1 vault with max amount', async () => {
+      const vaultManager2 = (await new MockVaultManagerPermitCollateral__factory(deployer).deploy(
+        'testVM',
+      )) as MockVaultManagerPermitCollateral;
+      vaultManager2
+        .connect(alice)
+        .setParams(
+          alice.address,
+          USDC.address,
+          agEUR.address,
+          BigNumber.from(1),
+          BigNumber.from(1),
+          BigNumber.from(1),
+          BigNumber.from(1),
+        );
+      await (await USDC.connect(governor).mint(alice.address, UNIT_USDC)).wait();
+      const permits: TypePermit[] = [
+        await signPermit(
+          alice,
+          (await USDC.nonces(alice.address)).toNumber(),
+          USDC.address,
+          Number(await (await web3.eth.getBlock('latest')).timestamp) + 1000,
+          router.address,
+          UNIT_DAI,
+          'USDC',
+        ),
+      ];
+
+      const transferData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256'],
+        [USDC.address, router.address, UNIT_USDC],
+      );
+      const callsBorrow = [createVault(alice.address), addCollateral(1, MAX_UINT256)];
+      const dataBorrow = await encodeAngleBorrowSidechain(
+        USDC.address,
+        vaultManager2.address,
+        bob.address,
+        ZERO_ADDRESS,
+        '0x',
+        callsBorrow,
+      );
+      const actions = [ActionType.transfer, ActionType.borrower];
+      const dataMixer = [transferData, dataBorrow];
+
+      await router.connect(alice).mixer(permits, actions, dataMixer);
+      expect(await USDC.balanceOf(bob.address)).to.be.equal(0);
+      expect(await USDC.balanceOf(vaultManager2.address)).to.be.equal(UNIT_USDC);
+      expect(await USDC.allowance(router.address, vaultManager2.address)).to.be.equal(MAX_UINT256);
+      expect(await vaultManager2.collatData(1)).to.be.equal(UNIT_USDC);
+    });
+    it('success - collateral added to 1 vault with partial amount', async () => {
+      const vaultManager2 = (await new MockVaultManagerPermitCollateral__factory(deployer).deploy(
+        'testVM',
+      )) as MockVaultManagerPermitCollateral;
+      vaultManager2
+        .connect(alice)
+        .setParams(
+          alice.address,
+          USDC.address,
+          agEUR.address,
+          BigNumber.from(1),
+          BigNumber.from(1),
+          BigNumber.from(1),
+          BigNumber.from(1),
+        );
+      await (await USDC.connect(governor).mint(alice.address, UNIT_USDC)).wait();
+      const permits: TypePermit[] = [
+        await signPermit(
+          alice,
+          (await USDC.nonces(alice.address)).toNumber(),
+          USDC.address,
+          Number(await (await web3.eth.getBlock('latest')).timestamp) + 1000,
+          router.address,
+          UNIT_DAI,
+          'USDC',
+        ),
+      ];
+
+      const transferData = ethers.utils.defaultAbiCoder.encode(
+        ['address', 'address', 'uint256'],
+        [USDC.address, router.address, UNIT_USDC],
+      );
+      const callsBorrow = [createVault(alice.address), addCollateral(0, UNIT_USDC.div(3))];
+      const dataBorrow = await encodeAngleBorrowSidechain(
+        USDC.address,
+        vaultManager2.address,
+        bob.address,
+        ZERO_ADDRESS,
+        '0x',
+        callsBorrow,
+      );
+
+      const actions = [ActionType.transfer, ActionType.borrower];
+      const dataMixer = [transferData, dataBorrow];
+
+      await router.connect(alice).mixer(permits, actions, dataMixer);
+      expect(await USDC.balanceOf(bob.address)).to.be.equal(0);
+      expect(await USDC.balanceOf(vaultManager2.address)).to.be.equal(UNIT_USDC.div(3));
+      expect(await USDC.balanceOf(router.address)).to.be.equal(UNIT_USDC.mul(2).div(3).add(1));
+      expect(await USDC.allowance(router.address, vaultManager2.address)).to.be.equal(MAX_UINT256);
+      expect(await vaultManager2.collatData(0)).to.be.equal(UNIT_USDC.div(3));
     });
   });
 });
