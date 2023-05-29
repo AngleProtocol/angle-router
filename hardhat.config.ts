@@ -55,26 +55,6 @@ const config: HardhatUserConfig = {
         },
       },
     ],
-    overrides: {
-      'contracts/implementations/mainnet/AngleRouterMainnet.sol': {
-        version: '0.8.17',
-        settings: {
-          optimizer: {
-            enabled: true,
-            runs: 1,
-          },
-        },
-      },
-      'contracts/mock/MockAngleRouterMainnet.sol': {
-        version: '0.8.17',
-        settings: {
-          optimizer: {
-            enabled: true,
-            runs: 1,
-          },
-        },
-      },
-    },
   },
   defaultNetwork: 'hardhat',
   networks: {

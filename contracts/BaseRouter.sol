@@ -44,7 +44,6 @@ import "./interfaces/external/uniswap/IUniswapRouter.sol";
 import "./interfaces/external/IWETH9.sol";
 import "./interfaces/ICoreBorrow.sol";
 import "./interfaces/ILiquidityGauge.sol";
-import "./interfaces/ISavingsRateIlliquid.sol";
 import "./interfaces/ISwapper.sol";
 import "./interfaces/IVaultManager.sol";
 
@@ -67,15 +66,20 @@ enum ActionType {
     deposit4626,
     redeem4626,
     withdraw4626,
+    // Deprecated
     prepareRedeemSavingsRate,
+    // Deprecated
     claimRedeemSavingsRate,
     swapIn,
     swapOut,
     claimWeeklyInterest,
     withdraw,
+    // Deprecated
     mint,
     deposit,
+    // Deprecated
     openPerpetual,
+    // Deprecated
     addToPerpetual,
     veANGLEDeposit,
     claimRewardsWithPerps
@@ -133,11 +137,7 @@ abstract contract BaseRouter is Initializable {
     error ZeroAddress();
 
     /// @notice Deploys the router contract on a chain
-    function initializeRouter(
-        address _core,
-        address _uniswapRouter,
-        address _oneInch
-    ) public initializer {
+    function initializeRouter(address _core, address _uniswapRouter, address _oneInch) public initializer {
         if (_core == address(0)) revert ZeroAddress();
         core = ICoreBorrow(_core);
         uniswapV3Router = IUniswapV3Router(_uniswapRouter);
@@ -266,18 +266,6 @@ abstract contract BaseRouter is Initializable {
                     (IERC4626, uint256, address, uint256)
                 );
                 _withdraw4626(savingsRate, amount, to, maxSharesOut);
-            } else if (actions[i] == ActionType.prepareRedeemSavingsRate) {
-                (ISavingsRateIlliquid savingsRate, uint256 amount, address to, uint256 minAmountOut) = abi.decode(
-                    data[i],
-                    (ISavingsRateIlliquid, uint256, address, uint256)
-                );
-                _prepareRedeemSavingsRate(savingsRate, amount, to, minAmountOut);
-            } else if (actions[i] == ActionType.claimRedeemSavingsRate) {
-                (ISavingsRateIlliquid savingsRate, address receiver, address[] memory strategiesToClaim) = abi.decode(
-                    data[i],
-                    (ISavingsRateIlliquid, address, address[])
-                );
-                _claimRedeemSavingsRate(savingsRate, receiver, strategiesToClaim);
             } else {
                 _chainSpecificAction(actions[i], data[i]);
             }
@@ -402,11 +390,7 @@ abstract contract BaseRouter is Initializable {
     /// @param tokenOut Token to sweep
     /// @param minAmountOut Minimum amount of tokens to recover
     /// @param to Address to which tokens should be sent
-    function _sweep(
-        address tokenOut,
-        uint256 minAmountOut,
-        address to
-    ) internal virtual {
+    function _sweep(address tokenOut, uint256 minAmountOut, address to) internal virtual {
         uint256 balanceToken = IERC20(tokenOut).balanceOf(address(this));
         _slippageCheck(balanceToken, minAmountOut);
         if (balanceToken != 0) {
@@ -536,37 +520,6 @@ abstract contract BaseRouter is Initializable {
         _slippageCheck(amountOut = savingsRate.redeem(shares, to, msg.sender), minAmountOut);
     }
 
-    /// @notice Processes the redemption of `shares` shares from an ERC4626 `SavingsRate` contract with
-    /// potentially illiquid strategies
-    /// @param savingsRate ERC4626 `SavingsRate` to redeem shares from
-    /// @param shares Amount of shares to redeem
-    /// @param to Destination of assets
-    /// @param minAmountOut Minimum amount of assets that `to` should receive in the transaction
-    /// @return amountOut Amount of assets received by `to`
-    /// @dev Note that when calling this function the user does not have the guarantee that all shares
-    /// will be immediately processed and some shares may be leftover to claim
-    /// @dev If `to` is the router address, if there are leftover funds that cannot be immediately claimed in the
-    /// transaction then they will be lost, meaning that anyone will be able to claim them
-    function _prepareRedeemSavingsRate(
-        ISavingsRateIlliquid savingsRate,
-        uint256 shares,
-        address to,
-        uint256 minAmountOut
-    ) internal returns (uint256 amountOut) {
-        _slippageCheck(amountOut = savingsRate.prepareRedeem(shares, to, msg.sender), minAmountOut);
-    }
-
-    /// @notice Claims assets from previously shares previously sent by `receiver` to the
-    /// `ssavingsRate` contract
-    /// @return amountOut Amount of assets obtained during the claim
-    function _claimRedeemSavingsRate(
-        ISavingsRateIlliquid savingsRate,
-        address receiver,
-        address[] memory strategiesToClaim
-    ) internal returns (uint256 amountOut) {
-        return savingsRate.claimRedeem(receiver, strategiesToClaim);
-    }
-
     /// @notice Allows to perform some specific actions for a chain
     function _chainSpecificAction(ActionType action, bytes calldata data) internal virtual {}
 
@@ -618,11 +571,7 @@ abstract contract BaseRouter is Initializable {
     /// @param token Address of the token to change allowance
     /// @param spender Address to change the allowance of
     /// @param amount Amount allowed
-    function _changeAllowance(
-        IERC20 token,
-        address spender,
-        uint256 amount
-    ) internal {
+    function _changeAllowance(IERC20 token, address spender, uint256 amount) internal {
         uint256 currentAllowance = token.allowance(address(this), spender);
         if (currentAllowance < amount) {
             token.safeIncreaseAllowance(spender, amount - currentAllowance);
