@@ -22,9 +22,8 @@ struct Pairs {
 /// @title AngleRouterMainnet
 /// @author Angle Core Team
 /// @notice Router contract built specifially for Angle use cases on Ethereum
-/// @dev Interfaces were designed for both advanced users which know the addresses of the protocol's contract,
-/// but most of the time users which only know addresses of the stablecoins and collateral types of the protocol
-/// can perform the actions they want without needing to understand what's happening under the hood
+/// @dev Previous implementation with an initialization function can be found here:
+/// https://etherscan.io/address/0x1b2ffdad478d8770ea0e085bdd4e31120736fcd7#code
 contract AngleRouterMainnet is BaseRouter {
     using SafeERC20 for IERC20;
 
@@ -287,26 +286,4 @@ contract AngleRouterMainnet is BaseRouter {
     function _getVeANGLE() internal view virtual returns (IVeANGLE) {
         return IVeANGLE(0x0C462Dbb9EC8cD1630f1728B2CFD2769d09f0dd5);
     }
-
-    /*
-    // Old initialization function, left here for informational purposes
-    function initialize(
-        address _core,
-        address _uniswapRouter,
-        address _oneInch,
-        IERC20 angleAddress,
-        IERC20[] calldata stablecoins,
-        IPoolManager[] calldata poolManagers,
-        ILiquidityGauge[] calldata liquidityGauges,
-        bool[] calldata justLiquidityGauges
-    ) external {
-        initializeRouter(_core, _uniswapRouter, _oneInch);
-        angleAddress.safeIncreaseAllowance(address(_getVeANGLE()), type(uint256).max);
-        // agEUR and StableMaster for agEUR
-        mapStableMasters[IERC20(0x1a7e4e63778B4f12a199C062f3eFdD288afCBce8)] = IStableMasterFront(
-            0x5adDc89785D75C86aB939E9e15bfBBb7Fc086A87
-        );
-        _addPairs(stablecoins, poolManagers, liquidityGauges, justLiquidityGauges);
-    }
-    */
 }
