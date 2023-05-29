@@ -133,11 +133,7 @@ abstract contract BaseRouter is Initializable {
     error ZeroAddress();
 
     /// @notice Deploys the router contract on a chain
-    function initializeRouter(
-        address _core,
-        address _uniswapRouter,
-        address _oneInch
-    ) public initializer {
+    function initializeRouter(address _core, address _uniswapRouter, address _oneInch) public initializer {
         if (_core == address(0)) revert ZeroAddress();
         core = ICoreBorrow(_core);
         uniswapV3Router = IUniswapV3Router(_uniswapRouter);
@@ -402,11 +398,7 @@ abstract contract BaseRouter is Initializable {
     /// @param tokenOut Token to sweep
     /// @param minAmountOut Minimum amount of tokens to recover
     /// @param to Address to which tokens should be sent
-    function _sweep(
-        address tokenOut,
-        uint256 minAmountOut,
-        address to
-    ) internal virtual {
+    function _sweep(address tokenOut, uint256 minAmountOut, address to) internal virtual {
         uint256 balanceToken = IERC20(tokenOut).balanceOf(address(this));
         _slippageCheck(balanceToken, minAmountOut);
         if (balanceToken != 0) {
@@ -448,9 +440,7 @@ abstract contract BaseRouter is Initializable {
         // Approve transfer to the `uniswapV3Router`
         // Since this router is supposed to be a trusted contract, we can leave the allowance to the token
         address uniRouter = address(uniswapV3Router);
-        uint256 currentAllowance = IERC20(inToken).allowance(address(this), uniRouter);
-        if (currentAllowance < amount)
-            IERC20(inToken).safeIncreaseAllowance(uniRouter, type(uint256).max - currentAllowance);
+        _changeAllowance(IERC20(inToken), uniRouter, type(uint256).max);
         amountOut = IUniswapV3Router(uniRouter).exactInput(
             ExactInputParams(path, address(this), block.timestamp, amount, minAmountOut)
         );
@@ -618,13 +608,11 @@ abstract contract BaseRouter is Initializable {
     /// @param token Address of the token to change allowance
     /// @param spender Address to change the allowance of
     /// @param amount Amount allowed
-    function _changeAllowance(
-        IERC20 token,
-        address spender,
-        uint256 amount
-    ) internal {
+    function _changeAllowance(IERC20 token, address spender, uint256 amount) internal {
         uint256 currentAllowance = token.allowance(address(this), spender);
-        if (currentAllowance < amount) {
+        // In case `currentAllowance < type(uint256).max / 2` and we want to increase it:
+        // Do nothing (to handle tokens that need reapprovals to 0 and save gas)
+        if (currentAllowance < amount && currentAllowance < type(uint256).max / 2) {
             token.safeIncreaseAllowance(spender, amount - currentAllowance);
         } else if (currentAllowance > amount) {
             token.safeDecreaseAllowance(spender, currentAllowance - amount);
