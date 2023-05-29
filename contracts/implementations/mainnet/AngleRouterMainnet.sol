@@ -87,25 +87,6 @@ contract AngleRouterMainnet is BaseRouter {
             ) = abi.decode(data, (uint256, bool, address, address, address));
             if (amount == type(uint256).max) amount = IERC20(sanToken).balanceOf(address(this));
             _withdraw(amount, addressProcessed, stablecoinOrStableMaster, collateralOrPoolManager);
-        } else if (action == ActionType.mint) {
-            (
-                address user,
-                uint256 amount,
-                uint256 minStableAmount,
-                bool addressProcessed,
-                address stablecoinOrStableMaster,
-                address collateral,
-                address poolManager
-            ) = abi.decode(data, (address, uint256, uint256, bool, address, address, address));
-            _mint(
-                user,
-                amount,
-                minStableAmount,
-                addressProcessed,
-                stablecoinOrStableMaster,
-                collateral,
-                IPoolManager(poolManager)
-            );
         }
     }
 
@@ -175,36 +156,6 @@ contract AngleRouterMainnet is BaseRouter {
             IERC20 token = IERC20(_feeDistributor.token());
             token.safeTransferFrom(msg.sender, address(this), amount);
         }
-    }
-
-    /// @notice Mints stablecoins using the Core module of the protocol
-    /// @param user Address to send the stablecoins to
-    /// @param amount Amount of collateral to use for the mint
-    /// @param minStableAmount Minimum stablecoin minted for the tx not to revert
-    /// @param addressProcessed Whether `msg.sender` provided the contracts address or the tokens one
-    /// @param stablecoinOrStableMaster Token associated to a `StableMaster` (if `addressProcessed` is false)
-    /// or directly the `StableMaster` contract if `addressProcessed`
-    /// @param collateral Collateral to mint from: it can be null if `addressProcessed` is true but in the corresponding
-    /// action, the `mixer` needs to get a correct address to compute the amount of tokens to use for the mint
-    /// @param poolManager PoolManager associated to the `collateral` (null if `addressProcessed` is not true)
-    function _mint(
-        address user,
-        uint256 amount,
-        uint256 minStableAmount,
-        bool addressProcessed,
-        address stablecoinOrStableMaster,
-        address collateral,
-        IPoolManager poolManager
-    ) internal {
-        IStableMasterFront stableMaster;
-        if (addressProcessed) {
-            stableMaster = IStableMasterFront(stablecoinOrStableMaster);
-        } else {
-            Pairs memory pairs;
-            (stableMaster, pairs) = _getInternalContracts(IERC20(stablecoinOrStableMaster), IERC20(collateral));
-            poolManager = pairs.poolManager;
-        }
-        stableMaster.mint(amount, user, poolManager, minStableAmount);
     }
 
     /// @notice Deposits collateral in the Core Module of the protocol

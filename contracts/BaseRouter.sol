@@ -74,6 +74,7 @@ enum ActionType {
     swapOut,
     claimWeeklyInterest,
     withdraw,
+    // Deprecated
     mint,
     deposit,
     // Deprecated
