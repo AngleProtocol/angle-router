@@ -41,25 +41,6 @@ contract AngleRouterMainnet is BaseRouter {
 
     uint256[48] private __gapMainnet;
 
-    function initialize(
-        address _core,
-        address _uniswapRouter,
-        address _oneInch,
-        IERC20 angleAddress,
-        IERC20[] calldata stablecoins,
-        IPoolManager[] calldata poolManagers,
-        ILiquidityGauge[] calldata liquidityGauges,
-        bool[] calldata justLiquidityGauges
-    ) external {
-        initializeRouter(_core, _uniswapRouter, _oneInch);
-        angleAddress.safeIncreaseAllowance(address(_getVeANGLE()), type(uint256).max);
-        // agEUR and StableMaster for agEUR
-        mapStableMasters[IERC20(0x1a7e4e63778B4f12a199C062f3eFdD288afCBce8)] = IStableMasterFront(
-            0x5adDc89785D75C86aB939E9e15bfBBb7Fc086A87
-        );
-        _addPairs(stablecoins, poolManagers, liquidityGauges, justLiquidityGauges);
-    }
-
     // =========================== ROUTER FUNCTIONALITIES ==========================
 
     /// @inheritdoc BaseRouter
@@ -126,36 +107,6 @@ contract AngleRouterMainnet is BaseRouter {
                 collateral,
                 IPoolManager(poolManager)
             );
-        } else if (action == ActionType.openPerpetual) {
-            (
-                address user,
-                uint256 amount,
-                uint256 amountCommitted,
-                uint256 extremeRateOracle,
-                uint256 minNetMargin,
-                bool addressProcessed,
-                address stablecoinOrPerpetualManager,
-                address collateral
-            ) = abi.decode(data, (address, uint256, uint256, uint256, uint256, bool, address, address));
-            _openPerpetual(
-                user,
-                amount,
-                amountCommitted,
-                extremeRateOracle,
-                minNetMargin,
-                addressProcessed,
-                stablecoinOrPerpetualManager,
-                collateral
-            );
-        } else if (action == ActionType.addToPerpetual) {
-            (
-                uint256 amount,
-                uint256 perpetualID,
-                bool addressProcessed,
-                address stablecoinOrPerpetualManager,
-                address collateral
-            ) = abi.decode(data, (uint256, uint256, bool, address, address));
-            _addToPerpetual(amount, perpetualID, addressProcessed, stablecoinOrPerpetualManager, collateral);
         }
     }
 
@@ -218,11 +169,7 @@ contract AngleRouterMainnet is BaseRouter {
     /// @param _feeDistributor Address of the fee distributor to claim to
     /// @dev If `letInContract` (and hence if funds are transferred to the router), you should approve the `angleRouter` to
     /// transfer the token claimed from the `feeDistributor`
-    function _claimWeeklyInterest(
-        address user,
-        IFeeDistributorFront _feeDistributor,
-        bool letInContract
-    ) internal {
+    function _claimWeeklyInterest(address user, IFeeDistributorFront _feeDistributor, bool letInContract) internal {
         uint256 amount = _feeDistributor.claim(user);
         if (letInContract) {
             // Fetching info from the `FeeDistributor` to process correctly the withdrawal
@@ -319,93 +266,6 @@ contract AngleRouterMainnet is BaseRouter {
         stableMaster.withdraw(amount, address(this), address(this), poolManager);
     }
 
-    /// @notice Opens a perpetual within the Core Module
-    /// @param owner Address to mint perpetual for
-    /// @param margin Margin to open the perpetual with
-    /// @param amountCommitted Commit amount in the perpetual
-    /// @param maxOracleRate Maximum oracle rate required to have a leverage position opened
-    /// @param minNetMargin Minimum net margin required to have a leverage position opened
-    /// @param addressProcessed Whether msg.sender provided the contracts addresses or the tokens ones
-    /// @param stablecoinOrPerpetualManager Token associated to the `StableMaster` (iif `addressProcessed` is false)
-    /// or address of the desired `PerpetualManager` (if `addressProcessed` is true)
-    /// @param collateral Collateral to mint from (it can be null if `addressProcessed` is true): it can be null if
-    /// `addressProcessed` is true but in the corresponding action, the `mixer` needs to get a correct address to compute
-    /// the amount of tokens to use for the deposit
-    function _openPerpetual(
-        address owner,
-        uint256 margin,
-        uint256 amountCommitted,
-        uint256 maxOracleRate,
-        uint256 minNetMargin,
-        bool addressProcessed,
-        address stablecoinOrPerpetualManager,
-        address collateral
-    ) internal returns (uint256 perpetualID) {
-        if (!addressProcessed) {
-            (, Pairs memory pairs) = _getInternalContracts(IERC20(stablecoinOrPerpetualManager), IERC20(collateral));
-            stablecoinOrPerpetualManager = address(pairs.perpetualManager);
-        }
-        return
-            IPerpetualManagerFrontWithClaim(stablecoinOrPerpetualManager).openPerpetual(
-                owner,
-                margin,
-                amountCommitted,
-                maxOracleRate,
-                minNetMargin
-            );
-    }
-
-    /// @notice Adds collateral to a perpetual
-    /// @param margin Amount of collateral to add
-    /// @param perpetualID Perpetual to add collateral to
-    /// @param addressProcessed Whether msg.sender provided the contracts addresses or the tokens ones
-    /// @param stablecoinOrPerpetualManager Token associated to the `StableMaster` (iif `addressProcessed` is false)
-    /// or address of the desired `PerpetualManager` (if `addressProcessed` is true)
-    /// @param collateral Collateral to mint from (it can be null if `addressProcessed` is true): it can be null
-    /// if `addressProcessed` is true but in the corresponding action, the `mixer` needs to get a correct address
-    /// to compute the amount of tokens to use for the deposit
-    function _addToPerpetual(
-        uint256 margin,
-        uint256 perpetualID,
-        bool addressProcessed,
-        address stablecoinOrPerpetualManager,
-        address collateral
-    ) internal {
-        if (!addressProcessed) {
-            (, Pairs memory pairs) = _getInternalContracts(IERC20(stablecoinOrPerpetualManager), IERC20(collateral));
-            stablecoinOrPerpetualManager = address(pairs.perpetualManager);
-        }
-        IPerpetualManagerFrontWithClaim(stablecoinOrPerpetualManager).addToPerpetual(perpetualID, margin);
-    }
-
-    // ============================ GOVERNANCE UTILITIES ===========================
-
-    /// @notice Adds a new `StableMaster`
-    /// @param stablecoin Address of the new stablecoin
-    /// @param stableMaster Address of the new `StableMaster`
-    function addStableMaster(IERC20 stablecoin, IStableMasterFront stableMaster) external onlyGovernorOrGuardian {
-        if (
-            address(stablecoin) == address(0) ||
-            address(mapStableMasters[stablecoin]) != address(0) ||
-            stableMaster.agToken() != address(stablecoin)
-        ) revert InvalidParams();
-        mapStableMasters[stablecoin] = stableMaster;
-    }
-
-    /// @notice Adds new collateral types to specific stablecoins
-    /// @param stablecoins Addresses of the stablecoins associated to the `StableMaster` of interest
-    /// @param poolManagers Addresses of the `PoolManager` contracts associated to the pair (stablecoin,collateral)
-    /// @param liquidityGauges Addresses of liquidity gauges contract associated to sanToken
-    /// @param justLiquidityGauges Whether just the liquidity gauge addresses should be added
-    function addPairs(
-        IERC20[] calldata stablecoins,
-        IPoolManager[] calldata poolManagers,
-        ILiquidityGauge[] calldata liquidityGauges,
-        bool[] calldata justLiquidityGauges
-    ) external onlyGovernorOrGuardian {
-        _addPairs(stablecoins, poolManagers, liquidityGauges, justLiquidityGauges);
-    }
-
     // ========================= INTERNAL UTILITY FUNCTIONS ========================
 
     /// @notice Gets Angle contracts associated to a pair (stablecoin, collateral)
@@ -413,88 +273,40 @@ contract AngleRouterMainnet is BaseRouter {
     /// @param collateral Collateral to mint/deposit/open perpetual or add collateral from
     /// @dev This function is used to check that the parameters passed by people calling some of the main
     /// router functions are correct
-    function _getInternalContracts(IERC20 stablecoin, IERC20 collateral)
-        internal
-        view
-        returns (IStableMasterFront stableMaster, Pairs memory pairs)
-    {
+    function _getInternalContracts(
+        IERC20 stablecoin,
+        IERC20 collateral
+    ) internal view returns (IStableMasterFront stableMaster, Pairs memory pairs) {
         stableMaster = mapStableMasters[stablecoin];
         pairs = mapPoolManagers[stableMaster][collateral];
         if (address(stableMaster) == address(0) || address(pairs.poolManager) == address(0)) revert ZeroAddress();
         return (stableMaster, pairs);
     }
 
-    /// @notice Internal version of the `addPairs` function
-    function _addPairs(
-        IERC20[] calldata stablecoins,
-        IPoolManager[] calldata poolManagers,
-        ILiquidityGauge[] calldata liquidityGauges,
-        bool[] calldata justLiquidityGauges
-    ) internal {
-        uint256 stablecoinsLength = stablecoins.length;
-        if (
-            poolManagers.length != stablecoinsLength ||
-            liquidityGauges.length != stablecoinsLength ||
-            justLiquidityGauges.length != stablecoinsLength
-        ) revert IncompatibleLengths();
-        for (uint256 i; i < stablecoinsLength; ++i) {
-            IStableMasterFront stableMaster = mapStableMasters[stablecoins[i]];
-            _addPair(stableMaster, poolManagers[i], liquidityGauges[i], justLiquidityGauges[i]);
-        }
-    }
-
-    /// @notice Adds new collateral type to specific stablecoin
-    /// @param stableMaster Address of the `StableMaster` associated to the stablecoin of interest
-    /// @param poolManager Address of the `PoolManager` contract associated to the pair (stablecoin,collateral)
-    /// @param liquidityGauge Address of the liquidity gauge contract associated to sanToken
-    /// @param justLiquidityGauge Whether we should just update the liquidity gauge address
-    function _addPair(
-        IStableMasterFront stableMaster,
-        IPoolManager poolManager,
-        ILiquidityGauge liquidityGauge,
-        bool justLiquidityGauge
-    ) internal {
-        // Fetching the associated `sanToken` and `perpetualManager` from the contract
-        (
-            IERC20 collateral,
-            ISanToken sanToken,
-            IPerpetualManagerFrontWithClaim perpetualManager,
-            ,
-            ,
-            ,
-            ,
-            ,
-
-        ) = stableMaster.collateralMap(poolManager);
-        // Reverting if the poolManager is not a valid `poolManager`
-        if (address(collateral) == address(0)) revert InvalidParams();
-        Pairs storage _pairs = mapPoolManagers[stableMaster][collateral];
-        if (justLiquidityGauge) {
-            // Cannot specify a liquidity gauge if the associated poolManager does not exist
-            if (address(_pairs.poolManager) == address(0)) revert ZeroAddress();
-            ILiquidityGauge gauge = _pairs.gauge;
-            if (address(gauge) != address(0)) {
-                _changeAllowance(IERC20(address(sanToken)), address(gauge), 0);
-            }
-        } else {
-            // Checking if the pair has not already been initialized: if yes we need to make the function revert
-            // otherwise we could end up with still approved `PoolManager` and `PerpetualManager` contracts
-            if (address(_pairs.poolManager) != address(0)) revert InvalidParams();
-            _pairs.poolManager = poolManager;
-            _pairs.perpetualManager = IPerpetualManagerFrontWithClaim(address(perpetualManager));
-            _pairs.sanToken = sanToken;
-            _changeAllowance(collateral, address(stableMaster), type(uint256).max);
-            _changeAllowance(collateral, address(perpetualManager), type(uint256).max);
-        }
-        _pairs.gauge = liquidityGauge;
-        if (address(liquidityGauge) != address(0)) {
-            if (address(sanToken) != liquidityGauge.staking_token()) revert InvalidParams();
-            _changeAllowance(IERC20(address(sanToken)), address(liquidityGauge), type(uint256).max);
-        }
-    }
-
     /// @notice Returns the veANGLE address
     function _getVeANGLE() internal view virtual returns (IVeANGLE) {
         return IVeANGLE(0x0C462Dbb9EC8cD1630f1728B2CFD2769d09f0dd5);
     }
+
+    /*
+    // Old initialization function, left here for informational purposes
+    function initialize(
+        address _core,
+        address _uniswapRouter,
+        address _oneInch,
+        IERC20 angleAddress,
+        IERC20[] calldata stablecoins,
+        IPoolManager[] calldata poolManagers,
+        ILiquidityGauge[] calldata liquidityGauges,
+        bool[] calldata justLiquidityGauges
+    ) external {
+        initializeRouter(_core, _uniswapRouter, _oneInch);
+        angleAddress.safeIncreaseAllowance(address(_getVeANGLE()), type(uint256).max);
+        // agEUR and StableMaster for agEUR
+        mapStableMasters[IERC20(0x1a7e4e63778B4f12a199C062f3eFdD288afCBce8)] = IStableMasterFront(
+            0x5adDc89785D75C86aB939E9e15bfBBb7Fc086A87
+        );
+        _addPairs(stablecoins, poolManagers, liquidityGauges, justLiquidityGauges);
+    }
+    */
 }
