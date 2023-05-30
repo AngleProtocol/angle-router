@@ -432,9 +432,7 @@ abstract contract BaseRouter is Initializable {
         // Approve transfer to the `uniswapV3Router`
         // Since this router is supposed to be a trusted contract, we can leave the allowance to the token
         address uniRouter = address(uniswapV3Router);
-        uint256 currentAllowance = IERC20(inToken).allowance(address(this), uniRouter);
-        if (currentAllowance < amount)
-            IERC20(inToken).safeIncreaseAllowance(uniRouter, type(uint256).max - currentAllowance);
+        _changeAllowance(IERC20(inToken), uniRouter, type(uint256).max);
         amountOut = IUniswapV3Router(uniRouter).exactInput(
             ExactInputParams(path, address(this), block.timestamp, amount, minAmountOut)
         );
@@ -573,7 +571,9 @@ abstract contract BaseRouter is Initializable {
     /// @param amount Amount allowed
     function _changeAllowance(IERC20 token, address spender, uint256 amount) internal {
         uint256 currentAllowance = token.allowance(address(this), spender);
-        if (currentAllowance < amount) {
+        // In case `currentAllowance < type(uint256).max / 2` and we want to increase it:
+        // Do nothing (to handle tokens that need reapprovals to 0 and save gas)
+        if (currentAllowance < amount && currentAllowance < type(uint256).max / 2) {
             token.safeIncreaseAllowance(spender, amount - currentAllowance);
         } else if (currentAllowance > amount) {
             token.safeDecreaseAllowance(spender, currentAllowance - amount);
