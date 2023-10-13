@@ -19,7 +19,7 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
     chainId = ChainId.POLYGON;
     chainName = 'Polygon';
   } else {
-    chainId = ChainId.AVALANCHE;
+    chainId = ChainId.GNOSIS;
     chainName = network.name.charAt(0).toUpperCase() + network.name.substring(1);
   }
 
@@ -35,9 +35,9 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
   const routerImplementation = (await ethers.getContract(`${contractName}V2_1_Implementation`)).address;
   console.log(`Successfully deployed the implementation for the router at ${routerImplementation}`);
 
-  // const proxyAdmin = registry(chainId)?.ProxyAdminGuardian;
-  const proxyAdmin = '0xb1F2A25fFB2b095E99f430cAF507cC31F9A3EaAB';
+  const proxyAdmin = registry(chainId)?.ProxyAdminGuardian;
   const coreBorrow = registry(chainId)?.CoreBorrow;
+  console.log(proxyAdmin, coreBorrow);
   console.log('Now deploying the proxy contract');
   const dataRouter = new ethers.Contract(
     routerImplementation,

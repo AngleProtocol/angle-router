@@ -169,6 +169,84 @@ const config: HardhatUserConfig = {
       gas: 'auto',
       chainId: 1313161554,
     },
+    gnosis: {
+      live: true,
+      url: nodeUrl('gnosis'),
+      accounts: accounts('gnosis'),
+      gas: 'auto',
+      gasMultiplier: 1.3,
+      chainId: 100,
+      verify: {
+        etherscan: {
+          apiKey: etherscanKey('gnosis'),
+        },
+      },
+    },
+    polygonzkevm: {
+      live: true,
+      url: nodeUrl('polygonzkevm'),
+      accounts: accounts('polygonzkevm'),
+      gas: 'auto',
+      gasMultiplier: 1.3,
+      chainId: 1101,
+      verify: {
+        etherscan: {
+          apiKey: etherscanKey('polygonzkevm'),
+        },
+      },
+    },
+    base: {
+      live: true,
+      url: nodeUrl('base'),
+      accounts: accounts('base'),
+      gas: 'auto',
+      gasMultiplier: 1.3,
+      chainId: 8453,
+      verify: {
+        etherscan: {
+          apiKey: etherscanKey('base'),
+        },
+      },
+    },
+    linea: {
+      live: true,
+      url: nodeUrl('linea'),
+      accounts: accounts('linea'),
+      gas: 'auto',
+      gasMultiplier: 1.3,
+      chainId: 59144,
+      verify: {
+        etherscan: {
+          apiKey: etherscanKey('linea'),
+        },
+      },
+    },
+    zksync: {
+      live: true,
+      url: nodeUrl('zksync'),
+      accounts: accounts('zksync'),
+      gas: 'auto',
+      gasMultiplier: 1.3,
+      chainId: 324,
+      verify: {
+        etherscan: {
+          apiKey: etherscanKey('zksync'),
+        },
+      },
+    },
+    mantle: {
+      live: true,
+      url: nodeUrl('mantle'),
+      accounts: accounts('mantle'),
+      gas: 'auto',
+      gasMultiplier: 1.3,
+      chainId: 5000,
+      verify: {
+        etherscan: {
+          apiKey: etherscanKey('mantle'),
+        },
+      },
+    },
   },
   paths: {
     sources: './contracts',

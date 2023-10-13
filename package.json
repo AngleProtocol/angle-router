@@ -1,5 +1,5 @@
 {
-  "name": "angle-borrow",
+  "name": "angle-router",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -41,7 +41,7 @@
   },
   "homepage": "https://github.com/AngleProtocol/angle-borrow#readme",
   "devDependencies": {
-    "@angleprotocol/sdk": "^1.1.24",
+    "@angleprotocol/sdk": "^3.0.122",
     "@chainlink/contracts": "0.2.1",
     "@nomiclabs/hardhat-ethers": "npm:hardhat-deploy-ethers",
     "@nomiclabs/hardhat-etherscan": "3.1.0",
