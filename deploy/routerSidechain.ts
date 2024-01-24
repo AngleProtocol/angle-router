@@ -16,10 +16,10 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
   let chainName: string;
 
   if (!network.live) {
-    chainId = ChainId.POLYGON;
-    chainName = 'Polygon';
+    chainId = ChainId.CELO;
+    chainName = 'Celo';
   } else {
-    chainId = ChainId.GNOSIS;
+    chainId = ChainId.CELO;
     chainName = network.name.charAt(0).toUpperCase() + network.name.substring(1);
   }
 

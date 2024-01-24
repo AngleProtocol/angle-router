@@ -67,8 +67,8 @@ const config: HardhatUserConfig = {
       forking: {
         enabled: argv.fork || false,
         // For mainnet
-        url: nodeUrl('fork'),
-        blockNumber: 15975107,
+        url: nodeUrl('celo'),
+        blockNumber: 23689026,
         // For Polygon
         /*
         url: nodeUrl('forkpolygon'),
@@ -205,6 +205,19 @@ const config: HardhatUserConfig = {
       verify: {
         etherscan: {
           apiKey: etherscanKey('base'),
+        },
+      },
+    },
+    celo: {
+      live: true,
+      url: nodeUrl('celo'),
+      accounts: accounts('celo'),
+      gas: 'auto',
+      gasMultiplier: 1.3,
+      chainId: 42220,
+      verify: {
+        etherscan: {
+          apiKey: etherscanKey('celo'),
         },
       },
     },
