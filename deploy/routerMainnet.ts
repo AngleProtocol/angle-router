@@ -11,7 +11,7 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
 
   console.log('Now deploying implementation');
 
-  await deploy('AngleRouterMainnetV2_2_Implementation', {
+  await deploy('AngleRouterMainnetV3_0_Implementation', {
     contract: 'AngleRouterMainnet',
     from: deployer.address,
     log: !argv.ci,

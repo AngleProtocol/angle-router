@@ -26,7 +26,7 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
   const contractName = `AngleRouter${chainName}`;
 
   console.log('Now deploying the implementation');
-  await deploy(`${contractName}V2_1_Implementation`, {
+  await deploy(`${contractName}V3_0_Implementation`, {
     contract: contractName,
     from: deployer.address,
     log: !argv.ci,
@@ -34,7 +34,7 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
 
   const routerImplementation = (await ethers.getContract(`${contractName}V2_1_Implementation`)).address;
   console.log(`Successfully deployed the implementation for the router at ${routerImplementation}`);
-
+/*
   const proxyAdmin = registry(chainId)?.ProxyAdminGuardian;
   const coreBorrow = registry(chainId)?.CoreBorrow;
   console.log(proxyAdmin, coreBorrow);
@@ -56,6 +56,7 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
   console.log(`${router} ${routerImplementation} ${proxyAdmin} ${dataRouter}`);
   console.log('');
   console.log('Success');
+  */
 };
 
 func.tags = ['routerSidechain'];
