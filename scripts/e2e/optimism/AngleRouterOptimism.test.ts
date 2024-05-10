@@ -4,8 +4,8 @@ import { parseEther, parseUnits } from 'ethers/lib/utils';
 import hre, { contract, ethers } from 'hardhat';
 
 import {
-  AngleRouterBase,
-  AngleRouterBase__factory,
+  AngleRouterOptimism,
+  AngleRouterOptimism__factory,
   ERC20,
   ERC20__factory,
   Mock1Inch,
@@ -18,12 +18,12 @@ import {
   MockTokenPermit__factory,
   MockUniswapV3Router,
   MockUniswapV3Router__factory,
-} from '../../../../../typechain';
-import { expect } from '../../../../../utils/chai-setup';
-import { ActionType, TypePermit } from '../../../../../utils/helpers';
-import { deployUpgradeable, expectApprox, ZERO_ADDRESS } from '../../../utils/helpers';
+} from '../../../typechain';
+import { expect } from '../../../utils/chai-setup';
+import { ActionType, TypePermit } from '../../../utils/helpers';
+import { deployUpgradeable, expectApprox, ZERO_ADDRESS } from '../../../test/hardhat/utils/helpers';
 
-contract('AngleRouterBase', () => {
+contract('AngleRouterOptimism', () => {
   let deployer: SignerWithAddress;
   let USDC: MockTokenPermit;
   let agEUR: MockAgToken;
@@ -33,7 +33,7 @@ contract('AngleRouterBase', () => {
   let bob: SignerWithAddress;
   let uniswap: MockUniswapV3Router;
   let oneInch: Mock1Inch;
-  let router: AngleRouterBase;
+  let router: AngleRouterOptimism;
   let USDCdecimal: BigNumber;
   let permits: TypePermit[];
 
@@ -51,16 +51,16 @@ contract('AngleRouterBase', () => {
       params: [
         {
           forking: {
-            jsonRpcUrl: process.env.ETH_NODE_URI_BASE,
-            // Changing Base fork block breaks some tests
-            blockNumber: 13370373,
+            jsonRpcUrl: process.env.ETH_NODE_URI_OPTIMISM,
+            // Changing Optimism fork block breaks some tests
+            blockNumber: 83995,
           },
         },
       ],
     });
     await hre.network.provider.send('hardhat_setBalance', [alice.address, '0x10000000000000000000000000000']);
     // If the forked-network state needs to be reset between each test, run this
-    router = (await deployUpgradeable(new AngleRouterBase__factory(deployer))) as AngleRouterBase;
+    router = (await deployUpgradeable(new AngleRouterOptimism__factory(deployer))) as AngleRouterOptimism;
     USDC = (await new MockTokenPermit__factory(deployer).deploy('USDC', 'USDC', USDCdecimal)) as MockTokenPermit;
     agEUR = (await deployUpgradeable(new MockAgToken__factory(deployer))) as MockAgToken;
     await agEUR.initialize('agEUR', 'agEUR', ZERO_ADDRESS, ZERO_ADDRESS);

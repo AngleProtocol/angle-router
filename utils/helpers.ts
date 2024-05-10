@@ -97,4 +97,5 @@ export enum ActionType {
   addToPerpetual,
   veANGLEDeposit,
   claimRewardsWithPerps,
+  deposit4626Referral
 }
