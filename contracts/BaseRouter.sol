@@ -82,7 +82,9 @@ enum ActionType {
     // Deprecated
     addToPerpetual,
     veANGLEDeposit,
-    claimRewardsWithPerps
+    claimRewardsWithPerps,
+    deposit4626Referral,
+    mint4626Referral
 }
 
 /// @notice Data needed to get permits
@@ -135,6 +137,14 @@ abstract contract BaseRouter is Initializable {
     error TooSmallAmountOut();
     error TransferFailed();
     error ZeroAddress();
+
+    event ReferredDeposit(
+        address indexed caller,
+        address indexed owner,
+        uint256 assets,
+        uint256 shares,
+        address indexed referrer
+    );
 
     /// @notice Deploys the router contract on a chain
     function initializeRouter(address _core, address _uniswapRouter, address _oneInch) public initializer {
@@ -254,6 +264,28 @@ abstract contract BaseRouter is Initializable {
                 );
                 _changeAllowance(token, address(savingsRate), type(uint256).max);
                 _deposit4626(savingsRate, amount, to, minSharesOut);
+            } else if (actions[i] == ActionType.mint4626Referral) {
+                (
+                    IERC20 token,
+                    IERC4626 savingsRate,
+                    uint256 shares,
+                    address to,
+                    uint256 maxAmountIn,
+                    address referrer
+                ) = abi.decode(data[i], (IERC20, IERC4626, uint256, address, uint256, address));
+                _changeAllowance(token, address(savingsRate), type(uint256).max);
+                _mint4626Referral(savingsRate, shares, to, maxAmountIn, referrer);
+            } else if (actions[i] == ActionType.deposit4626Referral) {
+                (
+                    IERC20 token,
+                    IERC4626 savingsRate,
+                    uint256 amount,
+                    address to,
+                    uint256 minSharesOut,
+                    address referrer
+                ) = abi.decode(data[i], (IERC20, IERC4626, uint256, address, uint256, address));
+                _changeAllowance(token, address(savingsRate), type(uint256).max);
+                _deposit4626Referral(savingsRate, amount, to, minSharesOut, referrer);
             } else if (actions[i] == ActionType.redeem4626) {
                 (IERC4626 savingsRate, uint256 shares, address to, uint256 minAmountOut) = abi.decode(
                     data[i],
@@ -270,6 +302,19 @@ abstract contract BaseRouter is Initializable {
                 _chainSpecificAction(actions[i], data[i]);
             }
         }
+    }
+
+    function deposit4626WithReferral(
+        IERC20 token,
+        IERC4626 savings,
+        uint256 amount,
+        address to,
+        uint256 minSharesOut,
+        address referrer
+    ) external {
+        token.safeTransferFrom(msg.sender, address(this), amount);
+        _changeAllowance(token, address(savings), type(uint256).max);
+        _deposit4626Referral(savings, amount, to, minSharesOut, referrer);
     }
 
     /// @notice Wrapper built on top of the base `mixer` function to grant approval to a `VaultManager` contract before performing
@@ -486,6 +531,30 @@ abstract contract BaseRouter is Initializable {
         uint256 minSharesOut
     ) internal returns (uint256 sharesOut) {
         _slippageCheck(sharesOut = savingsRate.deposit(amount, to), minSharesOut);
+    }
+
+    /// @notice Same as _deposit4626 but with the ability to specify a referring address
+    function _mint4626Referral(
+        IERC4626 savingsRate,
+        uint256 shares,
+        address to,
+        uint256 maxAmountIn,
+        address referrer
+    ) internal returns (uint256 amountIn) {
+        amountIn = _mint4626(savingsRate, shares, to, maxAmountIn);
+        emit ReferredDeposit(msg.sender, to, amountIn, shares, referrer);
+    }
+
+    /// @notice Same as _deposit4626 but with the ability to specify a referring address
+    function _deposit4626Referral(
+        IERC4626 savingsRate,
+        uint256 amount,
+        address to,
+        uint256 minSharesOut,
+        address referrer
+    ) internal returns (uint256 sharesOut) {
+        sharesOut = _deposit4626(savingsRate, amount, to, minSharesOut);
+        emit ReferredDeposit(msg.sender, to, amount, sharesOut, referrer);
     }
 
     /// @notice Withdraws `amount` from an ERC4626 contract
