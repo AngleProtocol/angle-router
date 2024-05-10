@@ -149,7 +149,11 @@ contract AngleRouterMainnet is BaseRouter {
     /// @param _feeDistributor Address of the fee distributor to claim to
     /// @dev If `letInContract` (and hence if funds are transferred to the router), you should approve the `angleRouter` to
     /// transfer the token claimed from the `feeDistributor`
-    function _claimWeeklyInterest(address user, IFeeDistributorFront _feeDistributor, bool letInContract) internal {
+    function _claimWeeklyInterest(
+        address user,
+        IFeeDistributorFront _feeDistributor,
+        bool letInContract
+    ) internal {
         uint256 amount = _feeDistributor.claim(user);
         if (letInContract) {
             // Fetching info from the `FeeDistributor` to process correctly the withdrawal
@@ -223,10 +227,11 @@ contract AngleRouterMainnet is BaseRouter {
     /// @param collateral Collateral to mint/deposit/open perpetual or add collateral from
     /// @dev This function is used to check that the parameters passed by people calling some of the main
     /// router functions are correct
-    function _getInternalContracts(
-        IERC20 stablecoin,
-        IERC20 collateral
-    ) internal view returns (IStableMasterFront stableMaster, Pairs memory pairs) {
+    function _getInternalContracts(IERC20 stablecoin, IERC20 collateral)
+        internal
+        view
+        returns (IStableMasterFront stableMaster, Pairs memory pairs)
+    {
         stableMaster = mapStableMasters[stablecoin];
         pairs = mapPoolManagers[stableMaster][collateral];
         if (address(stableMaster) == address(0) || address(pairs.poolManager) == address(0)) revert ZeroAddress();
