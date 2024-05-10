@@ -61,7 +61,7 @@ contract AngleRouterMainnetTest is BaseTest {
         address to,
         uint256 gainOrLoss
     ) public {
-        vm.assume(to != address(0) && to != address(router));
+        vm.assume(to != address(0) && to != address(router) && to != address(savingsRate));
         uint256 balanceUsers = BASE_TOKENS * 1 ether;
         deal(address(token), address(_alice), balanceUsers);
 
@@ -101,12 +101,7 @@ contract AngleRouterMainnetTest is BaseTest {
         assertEq(token.balanceOf(address(to)), 0);
     }
 
-    function testMint4626ForgotFunds(
-        uint256 initShares,
-        uint256 shares,
-        uint256 maxAmount,
-        uint256 gainOrLoss
-    ) public {
+    function testMint4626ForgotFunds(uint256 initShares, uint256 shares, uint256 maxAmount, uint256 gainOrLoss) public {
         address to = address(router);
         uint256 balanceUsers = BASE_TOKENS * 1 ether;
         deal(address(token), address(_alice), balanceUsers);
@@ -154,7 +149,7 @@ contract AngleRouterMainnetTest is BaseTest {
         address to,
         uint256 gainOrLoss
     ) public {
-        vm.assume(to != address(0) && to != address(router));
+        vm.assume(to != address(0) && to != address(router) && to != address(savingsRate));
 
         uint256 balanceUsers = BASE_TOKENS * 1 ether;
         deal(address(token), address(_alice), balanceUsers);
@@ -246,7 +241,7 @@ contract AngleRouterMainnetTest is BaseTest {
         uint256 gainOrLoss,
         uint256 gainOrLoss2
     ) public {
-        vm.assume(to != address(0) && to != address(router));
+        vm.assume(to != address(0) && to != address(router) && to != address(savingsRate));
         uint256 balanceUsers = BASE_TOKENS * 1 ether;
         deal(address(token), address(_alice), balanceUsers);
 
@@ -401,7 +396,7 @@ contract AngleRouterMainnetTest is BaseTest {
         uint256 gainOrLoss,
         uint256 gainOrLoss2
     ) public {
-        vm.assume(to != address(0) && to != address(router));
+        vm.assume(to != address(0) && to != address(router) && to != address(savingsRate));
         uint256 balanceUsers = BASE_TOKENS * 1 ether;
         deal(address(token), address(_alice), balanceUsers);
 
