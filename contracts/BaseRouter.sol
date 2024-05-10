@@ -56,9 +56,11 @@ enum ActionType {
     unwrapNative,
     sweep,
     sweepNative,
+    // Deprecated
     uniswapV3,
     oneInch,
     claimRewards,
+    // Deprecated
     gaugeDeposit,
     borrower,
     swapper,
@@ -73,16 +75,20 @@ enum ActionType {
     swapIn,
     swapOut,
     claimWeeklyInterest,
+    // Deprecated
     withdraw,
     // Deprecated
     mint,
+    // Deprecated
     deposit,
     // Deprecated
     openPerpetual,
     // Deprecated
     addToPerpetual,
     veANGLEDeposit,
-    claimRewardsWithPerps
+    // Deprecated
+    claimRewardsWithPerps,
+    deposit4626Referral
 }
 
 /// @notice Data needed to get permits
@@ -136,8 +142,21 @@ abstract contract BaseRouter is Initializable {
     error TransferFailed();
     error ZeroAddress();
 
+    event ReferredDeposit(
+        address caller,
+        address indexed owner,
+        uint256 assets,
+        uint256 shares,
+        address indexed savings,
+        address indexed referrer
+    );
+
     /// @notice Deploys the router contract on a chain
-    function initializeRouter(address _core, address _uniswapRouter, address _oneInch) public initializer {
+    function initializeRouter(
+        address _core,
+        address _uniswapRouter,
+        address _oneInch
+    ) public initializer {
         if (_core == address(0)) revert ZeroAddress();
         core = ICoreBorrow(_core);
         uniswapV3Router = IUniswapV3Router(_uniswapRouter);
@@ -195,12 +214,6 @@ abstract contract BaseRouter is Initializable {
             } else if (actions[i] == ActionType.sweepNative) {
                 uint256 routerBalance = address(this).balance;
                 if (routerBalance != 0) _safeTransferNative(msg.sender, routerBalance);
-            } else if (actions[i] == ActionType.uniswapV3) {
-                (address inToken, uint256 amount, uint256 minAmountOut, bytes memory path) = abi.decode(
-                    data[i],
-                    (address, uint256, uint256, bytes)
-                );
-                _swapOnUniswapV3(IERC20(inToken), amount, minAmountOut, path);
             } else if (actions[i] == ActionType.oneInch) {
                 (address inToken, uint256 minAmountOut, bytes memory payload) = abi.decode(
                     data[i],
@@ -210,12 +223,6 @@ abstract contract BaseRouter is Initializable {
             } else if (actions[i] == ActionType.claimRewards) {
                 (address user, address[] memory claimLiquidityGauges) = abi.decode(data[i], (address, address[]));
                 _claimRewards(user, claimLiquidityGauges);
-            } else if (actions[i] == ActionType.gaugeDeposit) {
-                (address user, uint256 amount, address gauge, bool shouldClaimRewards) = abi.decode(
-                    data[i],
-                    (address, uint256, address, bool)
-                );
-                _gaugeDeposit(user, amount, ILiquidityGauge(gauge), shouldClaimRewards);
             } else if (actions[i] == ActionType.borrower) {
                 (
                     address collateral,
@@ -254,6 +261,17 @@ abstract contract BaseRouter is Initializable {
                 );
                 _changeAllowance(token, address(savingsRate), type(uint256).max);
                 _deposit4626(savingsRate, amount, to, minSharesOut);
+            } else if (actions[i] == ActionType.deposit4626Referral) {
+                (
+                    IERC20 token,
+                    IERC4626 savingsRate,
+                    uint256 amount,
+                    address to,
+                    uint256 minSharesOut,
+                    address referrer
+                ) = abi.decode(data[i], (IERC20, IERC4626, uint256, address, uint256, address));
+                _changeAllowance(token, address(savingsRate), type(uint256).max);
+                _deposit4626Referral(savingsRate, amount, to, minSharesOut, referrer);
             } else if (actions[i] == ActionType.redeem4626) {
                 (IERC4626 savingsRate, uint256 shares, address to, uint256 minAmountOut) = abi.decode(
                     data[i],
@@ -270,6 +288,21 @@ abstract contract BaseRouter is Initializable {
                 _chainSpecificAction(actions[i], data[i]);
             }
         }
+    }
+
+    /// @notice Wrapper built on top of the base `_deposit4626Referral` function to add a proxy enabling to track
+    /// addresses depositing from a certain referring address into an ERC4626 contract
+    function deposit4626Referral(
+        IERC20 token,
+        IERC4626 savings,
+        uint256 amount,
+        address to,
+        uint256 minSharesOut,
+        address referrer
+    ) external {
+        token.safeTransferFrom(msg.sender, address(this), amount);
+        _changeAllowance(token, address(savings), type(uint256).max);
+        _deposit4626Referral(savings, amount, to, minSharesOut, referrer);
     }
 
     /// @notice Wrapper built on top of the base `mixer` function to grant approval to a `VaultManager` contract before performing
@@ -370,27 +403,15 @@ abstract contract BaseRouter is Initializable {
         return IVaultManagerFunctions(vaultManager).angle(actionsBorrow, dataBorrow, msg.sender, to, who, repayData);
     }
 
-    /// @notice Allows to deposit tokens into a gauge
-    /// @param user Address on behalf of which deposits should be made in the gauge
-    /// @param amount Amount to stake
-    /// @param gauge Liquidity gauge to stake in
-    /// @param shouldClaimRewards Whether to claim or not previously accumulated rewards
-    /// @dev You should be cautious on who will receive the rewards (if `shouldClaimRewards` is true)
-    /// @dev The function will revert if the gauge has not already been approved by the contract
-    function _gaugeDeposit(
-        address user,
-        uint256 amount,
-        ILiquidityGauge gauge,
-        bool shouldClaimRewards
-    ) internal virtual {
-        gauge.deposit(amount, user, shouldClaimRewards);
-    }
-
     /// @notice Sweeps tokens from the router contract
     /// @param tokenOut Token to sweep
     /// @param minAmountOut Minimum amount of tokens to recover
     /// @param to Address to which tokens should be sent
-    function _sweep(address tokenOut, uint256 minAmountOut, address to) internal virtual {
+    function _sweep(
+        address tokenOut,
+        uint256 minAmountOut,
+        address to
+    ) internal virtual {
         uint256 balanceToken = IERC20(tokenOut).balanceOf(address(this));
         _slippageCheck(balanceToken, minAmountOut);
         if (balanceToken != 0) {
@@ -416,26 +437,6 @@ abstract contract BaseRouter is Initializable {
         bytes memory data
     ) internal {
         swapper.swap(inToken, outToken, outTokenRecipient, outTokenOwed, inTokenObtained, data);
-    }
-
-    /// @notice Allows to swap between tokens via UniswapV3 (if there is a path)
-    /// @param inToken Token used as entrance of the swap
-    /// @param amount Amount of in token to swap
-    /// @param minAmountOut Minimum amount of outToken accepted for the swap to happen
-    /// @param path Bytes representing the path to swap your input token to the accepted collateral
-    function _swapOnUniswapV3(
-        IERC20 inToken,
-        uint256 amount,
-        uint256 minAmountOut,
-        bytes memory path
-    ) internal returns (uint256 amountOut) {
-        // Approve transfer to the `uniswapV3Router`
-        // Since this router is supposed to be a trusted contract, we can leave the allowance to the token
-        address uniRouter = address(uniswapV3Router);
-        _changeAllowance(IERC20(inToken), uniRouter, type(uint256).max);
-        amountOut = IUniswapV3Router(uniRouter).exactInput(
-            ExactInputParams(path, address(this), block.timestamp, amount, minAmountOut)
-        );
     }
 
     /// @notice Swaps an inToken to another token via 1Inch Router
@@ -486,6 +487,18 @@ abstract contract BaseRouter is Initializable {
         uint256 minSharesOut
     ) internal returns (uint256 sharesOut) {
         _slippageCheck(sharesOut = savingsRate.deposit(amount, to), minSharesOut);
+    }
+
+    /// @notice Same as _deposit4626 but with the ability to specify a referring address
+    function _deposit4626Referral(
+        IERC4626 savingsRate,
+        uint256 amount,
+        address to,
+        uint256 minSharesOut,
+        address referrer
+    ) internal returns (uint256 sharesOut) {
+        sharesOut = _deposit4626(savingsRate, amount, to, minSharesOut);
+        emit ReferredDeposit(msg.sender, to, amount, sharesOut, address(savingsRate), referrer);
     }
 
     /// @notice Withdraws `amount` from an ERC4626 contract
@@ -569,7 +582,11 @@ abstract contract BaseRouter is Initializable {
     /// @param token Address of the token to change allowance
     /// @param spender Address to change the allowance of
     /// @param amount Amount allowed
-    function _changeAllowance(IERC20 token, address spender, uint256 amount) internal {
+    function _changeAllowance(
+        IERC20 token,
+        address spender,
+        uint256 amount
+    ) internal {
         uint256 currentAllowance = token.allowance(address(this), spender);
         // In case `currentAllowance < type(uint256).max / 2` and we want to increase it:
         // Do nothing (to handle tokens that need reapprovals to 0 and save gas)

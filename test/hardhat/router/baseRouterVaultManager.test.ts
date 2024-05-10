@@ -8,8 +8,6 @@ import {
   MockAgToken,
   MockAgToken__factory,
   MockTokenPermit,
-  MockVaultManager,
-  MockVaultManager__factory,
   MockVaultManagerPermit,
   MockVaultManagerPermit__factory,
   MockVaultManagerPermitCollateral,

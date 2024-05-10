@@ -1,35 +1,46 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
-import { BytesLike } from 'ethers';
+import { BigNumber, BytesLike } from 'ethers';
 import { parseEther, parseUnits } from 'ethers/lib/utils';
 import hre, { contract, ethers } from 'hardhat';
 
 import {
-  AngleRouterMainnet,
-  AngleRouterMainnet__factory,
+  AngleRouterBase,
+  AngleRouterBase__factory,
   ERC20,
   ERC20__factory,
+  Mock1Inch,
+  Mock1Inch__factory,
+  MockAgToken,
+  MockAgToken__factory,
   MockCoreBorrow,
   MockCoreBorrow__factory,
   MockTokenPermit,
   MockTokenPermit__factory,
-} from '../../../../../typechain';
-import { expect } from '../../../../../utils/chai-setup';
-import { ActionType, TypePermit } from '../../../../../utils/helpers';
-import { deployUpgradeable, expectApprox } from '../../../utils/helpers';
+  MockUniswapV3Router,
+  MockUniswapV3Router__factory,
+} from '../../../typechain';
+import { expect } from '../../../utils/chai-setup';
+import { ActionType, TypePermit } from '../../../utils/helpers';
+import { deployUpgradeable, expectApprox, ZERO_ADDRESS } from '../../../test/hardhat/utils/helpers';
 
-contract('AngleRouterMainnet - Wrapping logic', () => {
+contract('AngleRouterBase', () => {
   let deployer: SignerWithAddress;
   let USDC: MockTokenPermit;
+  let agEUR: MockAgToken;
   let wETH: ERC20;
   let core: MockCoreBorrow;
   let alice: SignerWithAddress;
   let bob: SignerWithAddress;
-  let router: AngleRouterMainnet;
+  let uniswap: MockUniswapV3Router;
+  let oneInch: Mock1Inch;
+  let router: AngleRouterBase;
+  let USDCdecimal: BigNumber;
   let permits: TypePermit[];
 
   before(async () => {
     ({ deployer, alice, bob } = await ethers.getNamedSigners());
-    wETH = (await ethers.getContractAt(ERC20__factory.abi, '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2')) as ERC20;
+    USDCdecimal = BigNumber.from('6');
+    wETH = (await ethers.getContractAt(ERC20__factory.abi, '0x4200000000000000000000000000000000000006')) as ERC20;
 
     permits = [];
   });
@@ -40,35 +51,44 @@ contract('AngleRouterMainnet - Wrapping logic', () => {
       params: [
         {
           forking: {
-            jsonRpcUrl: process.env.ETH_NODE_URI_MAINNET,
-            // Changing Ethereum fork block breaks some tests
-            blockNumber: 15983159,
+            jsonRpcUrl: process.env.ETH_NODE_URI_BASE,
+            // Changing Base fork block breaks some tests
+            blockNumber: 13370373,
           },
         },
       ],
     });
     await hre.network.provider.send('hardhat_setBalance', [alice.address, '0x10000000000000000000000000000']);
     // If the forked-network state needs to be reset between each test, run this
-    router = (await deployUpgradeable(new AngleRouterMainnet__factory(deployer))) as AngleRouterMainnet;
-    USDC = (await new MockTokenPermit__factory(deployer).deploy('USDC', 'USDC', 6)) as MockTokenPermit;
+    router = (await deployUpgradeable(new AngleRouterBase__factory(deployer))) as AngleRouterBase;
+    USDC = (await new MockTokenPermit__factory(deployer).deploy('USDC', 'USDC', USDCdecimal)) as MockTokenPermit;
+    agEUR = (await deployUpgradeable(new MockAgToken__factory(deployer))) as MockAgToken;
+    await agEUR.initialize('agEUR', 'agEUR', ZERO_ADDRESS, ZERO_ADDRESS);
+    uniswap = (await new MockUniswapV3Router__factory(deployer).deploy(
+      USDC.address,
+      agEUR.address,
+    )) as MockUniswapV3Router;
+    oneInch = (await new Mock1Inch__factory(deployer).deploy(USDC.address, agEUR.address)) as Mock1Inch;
     core = (await new MockCoreBorrow__factory(deployer).deploy()) as MockCoreBorrow;
     await core.toggleGovernor(alice.address);
     await core.toggleGuardian(alice.address);
     await core.toggleGuardian(bob.address);
+    await router.initializeRouter(core.address, uniswap.address, oneInch.address);
   });
 
   describe('mixer', () => {
     describe('sweepNative', () => {
       it('success - amount transferred to the vault', async () => {
-        await USDC.mint(alice.address, parseUnits('1', 6));
-        await USDC.connect(alice).approve(router.address, parseUnits('1', 6));
+        await USDC.mint(alice.address, parseUnits('1', USDCdecimal));
+        await USDC.connect(alice).approve(router.address, parseUnits('1', USDCdecimal));
 
         const transferData = ethers.utils.defaultAbiCoder.encode(
           ['address', 'address', 'uint256'],
-          [USDC.address, router.address, parseUnits('0.3', 6)],
+          [USDC.address, router.address, parseUnits('0.3', USDCdecimal)],
         );
         const actions = [ActionType.transfer];
         const dataMixer = [transferData];
+
         await router.connect(alice).mixer(permits, actions, dataMixer, { value: parseEther('1') });
 
         const actions2 = [ActionType.sweepNative];
@@ -83,7 +103,6 @@ contract('AngleRouterMainnet - Wrapping logic', () => {
         expectApprox(await ethers.provider.getBalance(alice.address), balance, 0.1);
       });
     });
-
     describe('wrapNative', () => {
       it('success - when there is nothing in the action', async () => {
         const actions = [ActionType.wrapNative];

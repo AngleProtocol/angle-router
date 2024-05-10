@@ -18,10 +18,10 @@ import {
   MockTokenPermit__factory,
   MockUniswapV3Router,
   MockUniswapV3Router__factory,
-} from '../../../../../typechain';
-import { expect } from '../../../../../utils/chai-setup';
-import { ActionType, TypePermit } from '../../../../../utils/helpers';
-import { deployUpgradeable, expectApprox, ZERO_ADDRESS } from '../../../utils/helpers';
+} from '../../../typechain';
+import { expect } from '../../../utils/chai-setup';
+import { ActionType, TypePermit } from '../../../utils/helpers';
+import { deployUpgradeable, expectApprox, ZERO_ADDRESS } from '../../../test/hardhat/utils/helpers';
 
 contract('AngleRouterAvalanche', () => {
   let deployer: SignerWithAddress;

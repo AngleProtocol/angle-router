@@ -67,7 +67,7 @@ contract RouterSidechainSavingsRateActionsTest is BaseTest {
         address to,
         uint256 gainOrLoss
     ) public {
-        vm.assume(to != address(0));
+        vm.assume(to != address(0) && to != address(savingsRate) && to != address(router));
         uint256 balanceUsers = BASE_TOKENS * 1 ether;
         deal(address(token), address(_alice), balanceUsers);
 
@@ -119,7 +119,7 @@ contract RouterSidechainSavingsRateActionsTest is BaseTest {
         address to,
         uint256 gainOrLoss
     ) public {
-        vm.assume(to != address(0));
+        vm.assume(to != address(0) && to != address(savingsRate) && to != address(router));
         uint256 balanceUsers = BASE_TOKENS * 1 ether;
         deal(address(token), address(_alice), balanceUsers);
 
@@ -170,7 +170,7 @@ contract RouterSidechainSavingsRateActionsTest is BaseTest {
         uint256 gainOrLoss,
         uint256 gainOrLoss2
     ) public {
-        vm.assume(to != address(0));
+        vm.assume(to != address(0) && to != address(savingsRate) && to != address(router));
         uint256 balanceUsers = BASE_TOKENS * 1 ether;
         deal(address(token), address(_alice), balanceUsers);
 
@@ -248,7 +248,7 @@ contract RouterSidechainSavingsRateActionsTest is BaseTest {
         uint256 gainOrLoss,
         uint256 gainOrLoss2
     ) public {
-        vm.assume(to != address(0));
+        vm.assume(to != address(0) && to != address(savingsRate) && to != address(router));
         uint256 balanceUsers = BASE_TOKENS * 1 ether;
         deal(address(token), address(_alice), balanceUsers);
 

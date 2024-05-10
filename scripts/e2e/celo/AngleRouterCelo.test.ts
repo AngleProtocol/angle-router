@@ -4,10 +4,8 @@ import { parseEther, parseUnits } from 'ethers/lib/utils';
 import hre, { contract, ethers } from 'hardhat';
 
 import {
-  AngleRouterOptimism,
-  AngleRouterOptimism__factory,
-  ERC20,
-  ERC20__factory,
+  AngleRouterGnosis,
+  AngleRouterGnosis__factory,
   Mock1Inch,
   Mock1Inch__factory,
   MockAgToken,
@@ -18,30 +16,27 @@ import {
   MockTokenPermit__factory,
   MockUniswapV3Router,
   MockUniswapV3Router__factory,
-} from '../../../../../typechain';
-import { expect } from '../../../../../utils/chai-setup';
-import { ActionType, TypePermit } from '../../../../../utils/helpers';
-import { deployUpgradeable, expectApprox, ZERO_ADDRESS } from '../../../utils/helpers';
+} from '../../../typechain';
+import { expect } from '../../../utils/chai-setup';
+import { ActionType, TypePermit } from '../../../utils/helpers';
+import { deployUpgradeable, expectApprox, ZERO_ADDRESS } from '../../../test/hardhat/utils/helpers';
 
-contract('AngleRouterOptimism', () => {
+contract('AngleRouterCelo', () => {
   let deployer: SignerWithAddress;
   let USDC: MockTokenPermit;
   let agEUR: MockAgToken;
-  let wETH: ERC20;
   let core: MockCoreBorrow;
   let alice: SignerWithAddress;
   let bob: SignerWithAddress;
   let uniswap: MockUniswapV3Router;
   let oneInch: Mock1Inch;
-  let router: AngleRouterOptimism;
+  let router: AngleRouterGnosis;
   let USDCdecimal: BigNumber;
   let permits: TypePermit[];
 
   before(async () => {
     ({ deployer, alice, bob } = await ethers.getNamedSigners());
     USDCdecimal = BigNumber.from('6');
-    wETH = (await ethers.getContractAt(ERC20__factory.abi, '0x4200000000000000000000000000000000000006')) as ERC20;
-
     permits = [];
   });
 
@@ -51,16 +46,15 @@ contract('AngleRouterOptimism', () => {
       params: [
         {
           forking: {
-            jsonRpcUrl: process.env.ETH_NODE_URI_OPTIMISM,
-            // Changing Optimism fork block breaks some tests
-            blockNumber: 83995,
+            jsonRpcUrl: process.env.ETH_NODE_URI_CELO,
+            blockNumber: 23688884,
           },
         },
       ],
     });
     await hre.network.provider.send('hardhat_setBalance', [alice.address, '0x10000000000000000000000000000']);
     // If the forked-network state needs to be reset between each test, run this
-    router = (await deployUpgradeable(new AngleRouterOptimism__factory(deployer))) as AngleRouterOptimism;
+    router = (await deployUpgradeable(new AngleRouterGnosis__factory(deployer))) as AngleRouterGnosis;
     USDC = (await new MockTokenPermit__factory(deployer).deploy('USDC', 'USDC', USDCdecimal)) as MockTokenPermit;
     agEUR = (await deployUpgradeable(new MockAgToken__factory(deployer))) as MockAgToken;
     await agEUR.initialize('agEUR', 'agEUR', ZERO_ADDRESS, ZERO_ADDRESS);
@@ -96,7 +90,7 @@ contract('AngleRouterOptimism', () => {
         await router.connect(alice).mixer(permits, actions2, []);
         expectApprox((await ethers.provider.getBalance(alice.address)).sub(balance), parseEther('1'), 0.1);
       });
-      it('success - when there is no ETH balance', async () => {
+      it('success - when there is no CELO balance', async () => {
         const actions = [ActionType.sweepNative];
         const balance = await ethers.provider.getBalance(alice.address);
         await router.connect(alice).mixer(permits, actions, []);
@@ -104,40 +98,18 @@ contract('AngleRouterOptimism', () => {
       });
     });
     describe('wrapNative', () => {
-      it('success - when there is nothing in the action', async () => {
+      it('reverts - because zero address', async () => {
         const actions = [ActionType.wrapNative];
         const dataMixer: BytesLike[] = [];
-        await router.connect(alice).mixer(permits, actions, dataMixer, { value: parseEther('1') });
-        expect(await wETH.balanceOf(router.address)).to.be.equal(parseEther('1'));
+        await expect(router.connect(alice).mixer(permits, actions, dataMixer, { value: parseEther('1') })).to.be
+          .reverted;
       });
     });
     describe('unwrapNative', () => {
-      it('success - when there are no wETH', async () => {
+      it('reverts - because zero address', async () => {
         const actions = [ActionType.unwrapNative];
         const unwrapData = ethers.utils.defaultAbiCoder.encode(['uint256', 'address'], [0, bob.address]);
-        await router.connect(alice).mixer(permits, actions, [unwrapData]);
-        expect(await wETH.balanceOf(router.address)).to.be.equal(parseEther('0'));
-        expect(await wETH.balanceOf(bob.address)).to.be.equal(parseEther('0'));
-      });
-      it('reverts - because of slippage wETH', async () => {
-        const actions = [ActionType.unwrapNative];
-        const unwrapData = ethers.utils.defaultAbiCoder.encode(['uint256', 'address'], [parseEther('1'), bob.address]);
-        await expect(router.connect(alice).mixer(permits, actions, [unwrapData])).to.be.revertedWith(
-          'TooSmallAmountOut',
-        );
-      });
-      it('success - when there are some wETH', async () => {
-        const actions = [ActionType.wrapNative];
-        const dataMixer: BytesLike[] = [];
-        await router.connect(alice).mixer(permits, actions, dataMixer, { value: parseEther('1') });
-        expect(await wETH.balanceOf(router.address)).to.be.equal(parseEther('1'));
-        const actions2 = [ActionType.unwrapNative];
-        const unwrapData = ethers.utils.defaultAbiCoder.encode(['uint256', 'address'], [0, bob.address]);
-        const balance = await ethers.provider.getBalance(bob.address);
-        await router.connect(alice).mixer(permits, actions2, [unwrapData]);
-        expect(await wETH.balanceOf(router.address)).to.be.equal(parseEther('0'));
-        expect(await wETH.balanceOf(bob.address)).to.be.equal(parseEther('0'));
-        expect(await ethers.provider.getBalance(bob.address)).to.be.equal(parseEther('1').add(balance));
+        await expect(router.connect(alice).mixer(permits, actions, [unwrapData])).to.be.reverted;
       });
     });
   });
