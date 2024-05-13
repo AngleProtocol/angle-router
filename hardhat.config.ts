@@ -21,7 +21,7 @@ import { TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS } from 'hardhat/builtin-tasks/ta
 import { HardhatUserConfig, subtask } from 'hardhat/config';
 import yargs from 'yargs';
 
-import { accounts, etherscanKey, nodeUrl } from './utils/network';
+import { accounts, etherscanKey, nodeUrl, getPkey } from './utils/network';
 
 // Otherwise, ".sol" files from "test" are picked up during compilation and throw an error
 subtask(TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS).setAction(async (_, __, runSuper) => {
@@ -100,7 +100,7 @@ const config: HardhatUserConfig = {
     polygon: {
       live: true,
       url: nodeUrl('polygon'),
-      accounts: accounts('polygon'),
+      accounts: [getPkey()],
       gas: 'auto',
       verify: {
         etherscan: {
@@ -111,7 +111,7 @@ const config: HardhatUserConfig = {
     mainnet: {
       live: true,
       url: nodeUrl('mainnet'),
-      accounts: accounts('mainnet'),
+      accounts: [getPkey()],
       gas: 'auto',
       gasMultiplier: 1.3,
       chainId: 1,
@@ -129,7 +129,7 @@ const config: HardhatUserConfig = {
     optimism: {
       live: true,
       url: nodeUrl('optimism'),
-      accounts: accounts('optimism'),
+      accounts: [getPkey()],
       gas: 'auto',
       chainId: 10,
       verify: {
@@ -141,7 +141,7 @@ const config: HardhatUserConfig = {
     arbitrum: {
       live: true,
       url: nodeUrl('arbitrum'),
-      accounts: accounts('arbitrum'),
+      accounts: [getPkey()],
       gas: 'auto',
       chainId: 42161,
       verify: {
@@ -153,7 +153,7 @@ const config: HardhatUserConfig = {
     avalanche: {
       live: true,
       url: nodeUrl('avalanche'),
-      accounts: accounts('avalanche'),
+      accounts: [getPkey()],
       gas: 'auto',
       chainId: 43114,
       verify: {
@@ -172,7 +172,7 @@ const config: HardhatUserConfig = {
     gnosis: {
       live: true,
       url: nodeUrl('gnosis'),
-      accounts: accounts('gnosis'),
+      accounts: [getPkey()],
       gas: 'auto',
       gasMultiplier: 1.3,
       chainId: 100,
@@ -185,7 +185,7 @@ const config: HardhatUserConfig = {
     polygonzkevm: {
       live: true,
       url: nodeUrl('polygonzkevm'),
-      accounts: accounts('polygonzkevm'),
+      accounts: [getPkey()],
       gas: 'auto',
       gasMultiplier: 1.3,
       chainId: 1101,
@@ -198,7 +198,7 @@ const config: HardhatUserConfig = {
     base: {
       live: true,
       url: nodeUrl('base'),
-      accounts: accounts('base'),
+      accounts: [getPkey()],
       gas: 'auto',
       gasMultiplier: 1.3,
       chainId: 8453,
@@ -211,7 +211,7 @@ const config: HardhatUserConfig = {
     celo: {
       live: true,
       url: nodeUrl('celo'),
-      accounts: accounts('celo'),
+      accounts: [getPkey()],
       gas: 'auto',
       gasMultiplier: 1.3,
       chainId: 42220,

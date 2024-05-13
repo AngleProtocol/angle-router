@@ -16,10 +16,10 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
   let chainName: string;
 
   if (!network.live) {
-    chainId = ChainId.BASE;
+    chainId = ChainId.GNOSIS;
     chainName = 'Base';
   } else {
-    chainId = ChainId.BASE;
+    chainId = ChainId.MAINNET;
     chainName = network.name.charAt(0).toUpperCase() + network.name.substring(1);
   }
 
@@ -32,7 +32,7 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
     log: !argv.ci,
   });
 
-  const routerImplementation = (await ethers.getContract(`${contractName}V2_1_Implementation`)).address;
+  const routerImplementation = (await ethers.getContract(`${contractName}V3_0_Implementation`)).address;
   console.log(`Successfully deployed the implementation for the router at ${routerImplementation}`);
 /*
   const proxyAdmin = registry(chainId)?.ProxyAdminGuardian;
@@ -59,5 +59,5 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
   */
 };
 
-func.tags = ['routerSidechain'];
+func.tags = ['router'];
 export default func;

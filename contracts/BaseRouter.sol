@@ -73,7 +73,9 @@ enum ActionType {
     prepareRedeemSavingsRate,
     // Deprecated
     claimRedeemSavingsRate,
+    // Deprecated
     swapIn,
+    // Deprecated
     swapOut,
     claimWeeklyInterest,
     // Deprecated

@@ -6,7 +6,7 @@ import { ERC4626 } from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.
 import "./BaseTest.t.sol";
 import "../../contracts/mock/MockTokenPermit.sol";
 import { MockSavingsRate } from "../../contracts/mock/MockSavingsRate.sol";
-import { MockRouterSidechain, IUniswapV3Router, PermitType, ActionType, PermitType, BaseAngleRouterSidechain, BaseRouter } from "../../contracts/mock/MockRouterSidechain.sol";
+import { MockRouterSidechain, IUniswapV3Router, PermitType, ActionType, PermitType, BaseRouter } from "../../contracts/mock/MockRouterSidechain.sol";
 
 contract RouterSidechainSavingsRateActionsTest is BaseTest {
     IUniswapV3Router public constant uniswapV3Router = IUniswapV3Router(0xE592427A0AEce92De3Edee1F18E0157C05861564);
