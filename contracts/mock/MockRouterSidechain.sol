@@ -8,12 +8,12 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "../interfaces/external/IWETH9.sol";
 
-import "../BaseAngleRouterSidechain.sol";
+import "../BaseRouter.sol";
 
 /// @title MockRouterSidechain
 /// @author Angle Core Team
 /// @notice Mock contract but built for tests as if to be deployed on Ethereum
-contract MockRouterSidechain is BaseAngleRouterSidechain {
+contract MockRouterSidechain is BaseRouter {
     IWETH9 public constant WETH = IWETH9(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
 
     function _wrapNative() internal pure override returns (uint256) {

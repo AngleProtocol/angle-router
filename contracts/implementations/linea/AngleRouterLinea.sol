@@ -4,12 +4,12 @@ pragma solidity ^0.8.17;
 
 import "../../BaseRouter.sol";
 
-/// @title AngleRouterPolygon
+/// @title AngleRouterLinea
 /// @author Angle Core Team
-/// @notice Router contract built specifially for Angle use cases on Polygon
-contract AngleRouterPolygon is BaseRouter {
+/// @notice Router contract built specifially for Angle use cases on Linea
+contract AngleRouterLinea is BaseRouter {
     /// @inheritdoc BaseRouter
     function _getNativeWrapper() internal pure override returns (IWETH9) {
-        return IWETH9(0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270);
+        return IWETH9(0xe5D7C2a44FfDDf6b295A15c148167daaAf5Cf34f);
     }
 }

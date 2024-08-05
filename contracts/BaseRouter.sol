@@ -43,6 +43,7 @@ import "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import "./interfaces/external/uniswap/IUniswapRouter.sol";
 import "./interfaces/external/IWETH9.sol";
 import "./interfaces/ICoreBorrow.sol";
+import "./interfaces/IDepositWithReferral.sol";
 import "./interfaces/ILiquidityGauge.sol";
 import "./interfaces/ISwapper.sol";
 import "./interfaces/IVaultManager.sol";
@@ -72,7 +73,9 @@ enum ActionType {
     prepareRedeemSavingsRate,
     // Deprecated
     claimRedeemSavingsRate,
+    // Deprecated
     swapIn,
+    // Deprecated
     swapOut,
     claimWeeklyInterest,
     // Deprecated
@@ -117,7 +120,7 @@ struct PermitVaultManagerType {
 /// @author Angle Core Team
 /// @notice Base contract that Angle router contracts on different chains should override
 /// @dev Router contracts are designed to facilitate the composition of actions on the different modules of the protocol
-abstract contract BaseRouter is Initializable {
+abstract contract BaseRouter is Initializable, IDepositWithReferral {
     using SafeERC20 for IERC20;
 
     // ================================= REFERENCES ================================
@@ -152,11 +155,7 @@ abstract contract BaseRouter is Initializable {
     );
 
     /// @notice Deploys the router contract on a chain
-    function initializeRouter(
-        address _core,
-        address _uniswapRouter,
-        address _oneInch
-    ) public initializer {
+    function initializeRouter(address _core, address _uniswapRouter, address _oneInch) public initializer {
         if (_core == address(0)) revert ZeroAddress();
         core = ICoreBorrow(_core);
         uniswapV3Router = IUniswapV3Router(_uniswapRouter);
@@ -293,16 +292,16 @@ abstract contract BaseRouter is Initializable {
     /// @notice Wrapper built on top of the base `_deposit4626Referral` function to add a proxy enabling to track
     /// addresses depositing from a certain referring address into an ERC4626 contract
     function deposit4626Referral(
-        IERC20 token,
-        IERC4626 savings,
+        address token,
+        address savings,
         uint256 amount,
         address to,
         uint256 minSharesOut,
         address referrer
-    ) external {
-        token.safeTransferFrom(msg.sender, address(this), amount);
-        _changeAllowance(token, address(savings), type(uint256).max);
-        _deposit4626Referral(savings, amount, to, minSharesOut, referrer);
+    ) external returns (uint256 sharesOut) {
+        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+        _changeAllowance(IERC20(token), savings, type(uint256).max);
+        sharesOut = _deposit4626Referral(IERC4626(savings), amount, to, minSharesOut, referrer);
     }
 
     /// @notice Wrapper built on top of the base `mixer` function to grant approval to a `VaultManager` contract before performing
@@ -407,11 +406,7 @@ abstract contract BaseRouter is Initializable {
     /// @param tokenOut Token to sweep
     /// @param minAmountOut Minimum amount of tokens to recover
     /// @param to Address to which tokens should be sent
-    function _sweep(
-        address tokenOut,
-        uint256 minAmountOut,
-        address to
-    ) internal virtual {
+    function _sweep(address tokenOut, uint256 minAmountOut, address to) internal virtual {
         uint256 balanceToken = IERC20(tokenOut).balanceOf(address(this));
         _slippageCheck(balanceToken, minAmountOut);
         if (balanceToken != 0) {
@@ -582,11 +577,7 @@ abstract contract BaseRouter is Initializable {
     /// @param token Address of the token to change allowance
     /// @param spender Address to change the allowance of
     /// @param amount Amount allowed
-    function _changeAllowance(
-        IERC20 token,
-        address spender,
-        uint256 amount
-    ) internal {
+    function _changeAllowance(IERC20 token, address spender, uint256 amount) internal {
         uint256 currentAllowance = token.allowance(address(this), spender);
         // In case `currentAllowance < type(uint256).max / 2` and we want to increase it:
         // Do nothing (to handle tokens that need reapprovals to 0 and save gas)

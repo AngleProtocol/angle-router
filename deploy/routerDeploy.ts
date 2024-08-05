@@ -16,27 +16,30 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
   let chainName: string;
 
   if (!network.live) {
-    chainId = ChainId.BASE;
-    chainName = 'Base';
+    chainId = ChainId.LINEA;
+    chainName = 'Linea';
   } else {
-    chainId = ChainId.BASE;
+    chainId = ChainId.LINEA;
     chainName = network.name.charAt(0).toUpperCase() + network.name.substring(1);
   }
 
   const contractName = `AngleRouter${chainName}`;
 
   console.log('Now deploying the implementation');
-  await deploy(`${contractName}V2_1_Implementation`, {
+  /*
+  await deploy(`${contractName}V3_0_Implementation`, {
     contract: contractName,
     from: deployer.address,
     log: !argv.ci,
   });
+  */
 
-  const routerImplementation = (await ethers.getContract(`${contractName}V2_1_Implementation`)).address;
+  const routerImplementation = (await ethers.getContract(`${contractName}V3_0_Implementation`)).address;
   console.log(`Successfully deployed the implementation for the router at ${routerImplementation}`);
 
   const proxyAdmin = registry(chainId)?.ProxyAdminGuardian;
   const coreBorrow = registry(chainId)?.CoreBorrow;
+  // const coreBorrow = "0x4b1E2c2762667331Bc91648052F646d1b0d35984";
   console.log(proxyAdmin, coreBorrow);
   console.log('Now deploying the proxy contract');
   const dataRouter = new ethers.Contract(
@@ -44,7 +47,7 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
     AngleRouterPolygon__factory.createInterface(),
   ).interface.encodeFunctionData('initializeRouter', [coreBorrow, json.uniswapV3Router, json.oneInchRouter]);
 
-  await deploy(`${contractName}V2`, {
+  await deploy(`${contractName}V3`, {
     contract: 'TransparentUpgradeableProxy',
     from: deployer.address,
     args: [routerImplementation, proxyAdmin, dataRouter],
@@ -58,5 +61,5 @@ const func: DeployFunction = async ({ ethers, deployments, network }) => {
   console.log('Success');
 };
 
-func.tags = ['routerSidechain'];
+func.tags = ['router'];
 export default func;
