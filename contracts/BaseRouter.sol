@@ -481,6 +481,7 @@ abstract contract BaseRouter is Initializable, IDepositWithReferral {
         address to,
         uint256 minSharesOut
     ) internal returns (uint256 sharesOut) {
+        if (amount == type(uint256).max) amount = IERC20(savingsRate.asset()).balanceOf(address(this));
         _slippageCheck(sharesOut = savingsRate.deposit(amount, to), minSharesOut);
     }
 
