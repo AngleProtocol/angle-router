@@ -101,7 +101,12 @@ contract AngleRouterMainnetTest is BaseTest {
         assertEq(token.balanceOf(address(to)), 0);
     }
 
-    function testMint4626ForgotFunds(uint256 initShares, uint256 shares, uint256 maxAmount, uint256 gainOrLoss) public {
+    function testMint4626ForgotFunds(
+        uint256 initShares,
+        uint256 shares,
+        uint256 maxAmount,
+        uint256 gainOrLoss
+    ) public {
         address to = address(router);
         uint256 balanceUsers = BASE_TOKENS * 1 ether;
         deal(address(token), address(_alice), balanceUsers);
@@ -187,6 +192,52 @@ contract AngleRouterMainnetTest is BaseTest {
         assertEq(token.balanceOf(address(router)), 0);
         assertEq(token.balanceOf(address(_alice)), balanceUsers - amount);
         assertEq(token.balanceOf(address(to)), 0);
+    }
+
+    function testDeposit4626MaxBalance(
+        uint256 initShares,
+        uint256 amount,
+        uint256 minSharesOut,
+        uint256 gainOrLoss
+    ) public {
+        address to = address(router);
+
+        uint256 balanceUsers = BASE_TOKENS * 1 ether;
+        deal(address(token), address(_alice), balanceUsers);
+
+        _randomizeSavingsRate(gainOrLoss, initShares);
+
+        amount = bound(amount, 0, balanceUsers);
+        uint256 previewDeposit = savingsRate.previewDeposit(amount);
+
+        PermitType[] memory paramsPermit = new PermitType[](0);
+        ActionType[] memory actionType = new ActionType[](2);
+        bytes[] memory data = new bytes[](2);
+
+        actionType[0] = ActionType.transfer;
+        data[0] = abi.encode(token, router, amount);
+        actionType[1] = ActionType.deposit4626;
+        data[1] = abi.encode(token, savingsRate, type(uint256).max, to, minSharesOut);
+
+        uint256 mintedShares = savingsRate.convertToShares(amount);
+
+        vm.startPrank(_alice);
+        token.approve(address(router), type(uint256).max);
+        // as this is a mock vault, previewMint is exactly what is needed to mint
+        if (previewDeposit < minSharesOut) {
+            vm.expectRevert(BaseRouter.TooSmallAmountOut.selector);
+            router.mixer(paramsPermit, actionType, data);
+            return;
+        } else {
+            router.mixer(paramsPermit, actionType, data);
+        }
+        vm.stopPrank();
+
+        assertEq(savingsRate.balanceOf(address(to)), previewDeposit);
+        assertEq(savingsRate.balanceOf(address(to)), mintedShares);
+
+        assertEq(token.balanceOf(address(router)), 0);
+        assertEq(token.balanceOf(address(_alice)), balanceUsers - amount);
     }
 
     function testDeposit4626ForgotFunds(
