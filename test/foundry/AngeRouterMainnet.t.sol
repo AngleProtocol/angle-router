@@ -147,50 +147,6 @@ contract AngleRouterMainnetTest is BaseTest {
         assertEq(token.balanceOf(address(to)), 0);
     }
 
-    function testMint4626MaxBalance(
-        uint256 initShares,
-        uint256 maxAmount,
-        uint256 gainOrLoss
-    ) public {
-        address to = address(router);
-        uint256 balanceUsers = BASE_TOKENS * 1 ether;
-        deal(address(token), address(_alice), balanceUsers);
-
-        _randomizeSavingsRate(gainOrLoss, initShares);
-
-        uint256 shares = savingsRate.previewDeposit(balanceUsers);
-        uint256 previewMint = savingsRate.previewMint(shares);
-
-        // this can be done with foundry though
-        // https://book.getfoundry.sh/tutorials/testing-eip712?highlight=permit#diving-in
-        PermitType[] memory paramsPermit = new PermitType[](0);
-        ActionType[] memory actionType = new ActionType[](2);
-        bytes[] memory data = new bytes[](2);
-
-        actionType[0] = ActionType.transfer;
-        data[0] = abi.encode(token, router, previewMint);
-        actionType[1] = ActionType.mint4626;
-        data[1] = abi.encode(token, savingsRate, type(uint256).max, to, maxAmount);
-
-        vm.startPrank(_alice);
-        token.approve(address(router), type(uint256).max);
-        // as this is a mock vault, previewMint is exactly what is needed to mint
-        if (maxAmount < previewMint) {
-            vm.expectRevert(BaseRouter.TooSmallAmountOut.selector);
-            router.mixer(paramsPermit, actionType, data);
-            return;
-        } else {
-            router.mixer(paramsPermit, actionType, data);
-        }
-        vm.stopPrank();
-
-        assertEq(savingsRate.balanceOf(address(to)), shares);
-
-        assertEq(token.balanceOf(address(router)), 0);
-        assertEq(token.balanceOf(address(_alice)), balanceUsers - previewMint);
-        assertEq(token.balanceOf(address(to)), 0);
-    }
-
     function testDeposit4626GoodPractice(
         uint256 initShares,
         uint256 amount,
@@ -322,6 +278,53 @@ contract AngleRouterMainnetTest is BaseTest {
         vm.stopPrank();
 
         assertEq(savingsRate.balanceOf(address(to)), previewDeposit);
+
+        assertEq(token.balanceOf(address(router)), 0);
+        assertEq(token.balanceOf(address(_alice)), balanceUsers - amount);
+    }
+
+    function testDepositReferral4626MaxBalance(
+        uint256 initShares,
+        uint256 amount,
+        uint256 minSharesOut,
+        uint256 gainOrLoss,
+        address referrer
+    ) public {
+        address to = address(router);
+
+        uint256 balanceUsers = BASE_TOKENS * 1 ether;
+        deal(address(token), address(_alice), balanceUsers);
+
+        _randomizeSavingsRate(gainOrLoss, initShares);
+
+        amount = bound(amount, 0, balanceUsers);
+        uint256 previewDeposit = savingsRate.previewDeposit(amount);
+
+        PermitType[] memory paramsPermit = new PermitType[](0);
+        ActionType[] memory actionType = new ActionType[](2);
+        bytes[] memory data = new bytes[](2);
+
+        actionType[0] = ActionType.transfer;
+        data[0] = abi.encode(token, router, amount);
+        actionType[1] = ActionType.deposit4626Referral;
+        data[1] = abi.encode(token, savingsRate, type(uint256).max, to, minSharesOut, referrer);
+
+        uint256 mintedShares = savingsRate.convertToShares(amount);
+
+        vm.startPrank(_alice);
+        token.approve(address(router), type(uint256).max);
+        // as this is a mock vault, previewMint is exactly what is needed to mint
+        if (previewDeposit < minSharesOut) {
+            vm.expectRevert(BaseRouter.TooSmallAmountOut.selector);
+            router.mixer(paramsPermit, actionType, data);
+            return;
+        } else {
+            router.mixer(paramsPermit, actionType, data);
+        }
+        vm.stopPrank();
+
+        assertEq(savingsRate.balanceOf(address(to)), previewDeposit);
+        assertEq(savingsRate.balanceOf(address(to)), mintedShares);
 
         assertEq(token.balanceOf(address(router)), 0);
         assertEq(token.balanceOf(address(_alice)), balanceUsers - amount);
