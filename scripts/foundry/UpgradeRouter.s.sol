@@ -17,6 +17,11 @@ contract UpgradeRouterScript is Script, CommonUtils {
     function run() public {
         uint256 chainId = vm.envUint("CHAIN_ID");
 
+        uint256 deployerPrivateKey = vm.deriveKey(vm.envString("MNEMONIC_MAINNET"), 0);
+        address deployer = vm.addr(deployerPrivateKey);
+        console.log("Address: %s", deployer);
+        vm.startBroadcast(deployerPrivateKey);
+
         address routerImpl;
         if (chainId == CHAIN_ETHEREUM) {
             routerImpl = address(new AngleRouterMainnet());
@@ -39,5 +44,7 @@ contract UpgradeRouterScript is Script, CommonUtils {
         }
 
         console.log("Deployed router implementation at address: %s", routerImpl);
+
+        vm.stopBroadcast();
     }
 }
