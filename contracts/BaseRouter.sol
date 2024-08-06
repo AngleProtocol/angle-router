@@ -48,8 +48,6 @@ import "./interfaces/ILiquidityGauge.sol";
 import "./interfaces/ISwapper.sol";
 import "./interfaces/IVaultManager.sol";
 
-import "forge-std/console.sol";
-
 // ============================== STRUCTS AND ENUM =============================
 
 /// @notice Action types
