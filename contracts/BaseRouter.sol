@@ -155,7 +155,11 @@ abstract contract BaseRouter is Initializable, IDepositWithReferral {
     );
 
     /// @notice Deploys the router contract on a chain
-    function initializeRouter(address _core, address _uniswapRouter, address _oneInch) public initializer {
+    function initializeRouter(
+        address _core,
+        address _uniswapRouter,
+        address _oneInch
+    ) public initializer {
         if (_core == address(0)) revert ZeroAddress();
         core = ICoreBorrow(_core);
         uniswapV3Router = IUniswapV3Router(_uniswapRouter);
@@ -409,7 +413,11 @@ abstract contract BaseRouter is Initializable, IDepositWithReferral {
     /// @param tokenOut Token to sweep
     /// @param minAmountOut Minimum amount of tokens to recover
     /// @param to Address to which tokens should be sent
-    function _sweep(address tokenOut, uint256 minAmountOut, address to) internal virtual {
+    function _sweep(
+        address tokenOut,
+        uint256 minAmountOut,
+        address to
+    ) internal virtual {
         uint256 balanceToken = IERC20(tokenOut).balanceOf(address(this));
         _slippageCheck(balanceToken, minAmountOut);
         if (balanceToken != 0) {
@@ -580,7 +588,11 @@ abstract contract BaseRouter is Initializable, IDepositWithReferral {
     /// @param token Address of the token to change allowance
     /// @param spender Address to change the allowance of
     /// @param amount Amount allowed
-    function _changeAllowance(IERC20 token, address spender, uint256 amount) internal {
+    function _changeAllowance(
+        IERC20 token,
+        address spender,
+        uint256 amount
+    ) internal {
         uint256 currentAllowance = token.allowance(address(this), spender);
         // In case `currentAllowance < type(uint256).max / 2` and we want to increase it:
         // Do nothing (to handle tokens that need reapprovals to 0 and save gas)
