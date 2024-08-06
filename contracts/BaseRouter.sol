@@ -251,6 +251,7 @@ abstract contract BaseRouter is Initializable, IDepositWithReferral {
                     data[i],
                     (IERC20, IERC4626, uint256, address, uint256)
                 );
+                if (shares == type(uint256).max) shares = savingsRate.convertToShares(token.balanceOf(address(this)));
                 _changeAllowance(token, address(savingsRate), type(uint256).max);
                 _mint4626(savingsRate, shares, to, maxAmountIn);
             } else if (actions[i] == ActionType.deposit4626) {
@@ -258,6 +259,7 @@ abstract contract BaseRouter is Initializable, IDepositWithReferral {
                     data[i],
                     (IERC20, IERC4626, uint256, address, uint256)
                 );
+                if (amount == type(uint256).max) amount = token.balanceOf(address(this));
                 _changeAllowance(token, address(savingsRate), type(uint256).max);
                 _deposit4626(savingsRate, amount, to, minSharesOut);
             } else if (actions[i] == ActionType.deposit4626Referral) {
@@ -269,6 +271,7 @@ abstract contract BaseRouter is Initializable, IDepositWithReferral {
                     uint256 minSharesOut,
                     address referrer
                 ) = abi.decode(data[i], (IERC20, IERC4626, uint256, address, uint256, address));
+                if (amount == type(uint256).max) amount = token.balanceOf(address(this));
                 _changeAllowance(token, address(savingsRate), type(uint256).max);
                 _deposit4626Referral(savingsRate, amount, to, minSharesOut, referrer);
             } else if (actions[i] == ActionType.redeem4626) {
@@ -276,6 +279,7 @@ abstract contract BaseRouter is Initializable, IDepositWithReferral {
                     data[i],
                     (IERC4626, uint256, address, uint256)
                 );
+                if (shares == type(uint256).max) shares = savingsRate.balanceOf(address(this));
                 _redeem4626(savingsRate, shares, to, minAmountOut);
             } else if (actions[i] == ActionType.withdraw4626) {
                 (IERC4626 savingsRate, uint256 amount, address to, uint256 maxSharesOut) = abi.decode(
