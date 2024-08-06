@@ -253,7 +253,6 @@ abstract contract BaseRouter is Initializable, IDepositWithReferral {
                     data[i],
                     (IERC20, IERC4626, uint256, address, uint256)
                 );
-                if (shares == type(uint256).max) shares = savingsRate.previewDeposit(token.balanceOf(address(this)));
                 _changeAllowance(token, address(savingsRate), type(uint256).max);
                 _mint4626(savingsRate, shares, to, maxAmountIn);
             } else if (actions[i] == ActionType.deposit4626) {
@@ -487,7 +486,6 @@ abstract contract BaseRouter is Initializable, IDepositWithReferral {
         address to,
         uint256 minSharesOut
     ) internal returns (uint256 sharesOut) {
-        if (amount == type(uint256).max) amount = IERC20(savingsRate.asset()).balanceOf(address(this));
         _slippageCheck(sharesOut = savingsRate.deposit(amount, to), minSharesOut);
     }
 
