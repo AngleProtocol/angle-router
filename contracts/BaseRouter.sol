@@ -48,6 +48,8 @@ import "./interfaces/ILiquidityGauge.sol";
 import "./interfaces/ISwapper.sol";
 import "./interfaces/IVaultManager.sol";
 
+import "forge-std/console.sol";
+
 // ============================== STRUCTS AND ENUM =============================
 
 /// @notice Action types
@@ -251,7 +253,7 @@ abstract contract BaseRouter is Initializable, IDepositWithReferral {
                     data[i],
                     (IERC20, IERC4626, uint256, address, uint256)
                 );
-                if (shares == type(uint256).max) shares = savingsRate.convertToShares(token.balanceOf(address(this)));
+                if (shares == type(uint256).max) shares = savingsRate.previewDeposit(token.balanceOf(address(this)));
                 _changeAllowance(token, address(savingsRate), type(uint256).max);
                 _mint4626(savingsRate, shares, to, maxAmountIn);
             } else if (actions[i] == ActionType.deposit4626) {
@@ -279,7 +281,7 @@ abstract contract BaseRouter is Initializable, IDepositWithReferral {
                     data[i],
                     (IERC4626, uint256, address, uint256)
                 );
-                if (shares == type(uint256).max) shares = savingsRate.balanceOf(address(this));
+                if (shares == type(uint256).max) shares = savingsRate.balanceOf(msg.sender);
                 _redeem4626(savingsRate, shares, to, minAmountOut);
             } else if (actions[i] == ActionType.withdraw4626) {
                 (IERC4626 savingsRate, uint256 amount, address to, uint256 maxSharesOut) = abi.decode(

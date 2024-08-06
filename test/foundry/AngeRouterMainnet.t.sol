@@ -147,6 +147,50 @@ contract AngleRouterMainnetTest is BaseTest {
         assertEq(token.balanceOf(address(to)), 0);
     }
 
+    function testMint4626MaxBalance(
+        uint256 initShares,
+        uint256 maxAmount,
+        uint256 gainOrLoss
+    ) public {
+        address to = address(router);
+        uint256 balanceUsers = BASE_TOKENS * 1 ether;
+        deal(address(token), address(_alice), balanceUsers);
+
+        _randomizeSavingsRate(gainOrLoss, initShares);
+
+        uint256 shares = savingsRate.previewDeposit(balanceUsers);
+        uint256 previewMint = savingsRate.previewMint(shares);
+
+        // this can be done with foundry though
+        // https://book.getfoundry.sh/tutorials/testing-eip712?highlight=permit#diving-in
+        PermitType[] memory paramsPermit = new PermitType[](0);
+        ActionType[] memory actionType = new ActionType[](2);
+        bytes[] memory data = new bytes[](2);
+
+        actionType[0] = ActionType.transfer;
+        data[0] = abi.encode(token, router, previewMint);
+        actionType[1] = ActionType.mint4626;
+        data[1] = abi.encode(token, savingsRate, type(uint256).max, to, maxAmount);
+
+        vm.startPrank(_alice);
+        token.approve(address(router), type(uint256).max);
+        // as this is a mock vault, previewMint is exactly what is needed to mint
+        if (maxAmount < previewMint) {
+            vm.expectRevert(BaseRouter.TooSmallAmountOut.selector);
+            router.mixer(paramsPermit, actionType, data);
+            return;
+        } else {
+            router.mixer(paramsPermit, actionType, data);
+        }
+        vm.stopPrank();
+
+        assertEq(savingsRate.balanceOf(address(to)), shares);
+
+        assertEq(token.balanceOf(address(router)), 0);
+        assertEq(token.balanceOf(address(_alice)), balanceUsers - previewMint);
+        assertEq(token.balanceOf(address(to)), 0);
+    }
+
     function testDeposit4626GoodPractice(
         uint256 initShares,
         uint256 amount,
@@ -417,6 +461,78 @@ contract AngleRouterMainnetTest is BaseTest {
 
             actionType[0] = ActionType.redeem4626;
             data[0] = abi.encode(savingsRate, sharesToBurn, address(router), minAmount);
+
+            previewRedeem = savingsRate.previewRedeem(sharesToBurn);
+            vm.startPrank(_alice);
+            savingsRate.approve(address(router), type(uint256).max);
+            // as this is a mock vault, previewRedeem is exactly what should be received
+            if (previewRedeem < minAmount) {
+                vm.expectRevert(BaseRouter.TooSmallAmountOut.selector);
+                router.mixer(paramsPermit, actionType, data);
+                return;
+            } else {
+                router.mixer(paramsPermit, actionType, data);
+            }
+            vm.stopPrank();
+            assertEq(savingsRate.balanceOf(address(_alice)), previewDeposit - sharesToBurn);
+        }
+
+        assertEq(savingsRate.balanceOf(address(router)), 0);
+        assertEq(token.balanceOf(address(router)), previewRedeem);
+        assertEq(token.balanceOf(address(_alice)), balanceUsers - aliceAmount);
+    }
+
+    function testRedeem4626MaxBalance(
+        uint256 initShares,
+        uint256 aliceAmount,
+        uint256 minAmount,
+        uint256 gainOrLoss,
+        uint256 gainOrLoss2
+    ) public {
+        uint256 balanceUsers = BASE_TOKENS * 1 ether;
+        deal(address(token), address(_alice), balanceUsers);
+
+        _randomizeSavingsRate(gainOrLoss, initShares);
+
+        aliceAmount = bound(aliceAmount, 0, balanceUsers);
+        uint256 previewDeposit = savingsRate.previewDeposit(aliceAmount);
+        // otherwise there could be overflows
+        vm.assume(previewDeposit < type(uint256).max / BASE_PARAMS);
+
+        uint256 previewRedeem;
+        {
+            // do a first deposit
+            PermitType[] memory paramsPermit = new PermitType[](0);
+            ActionType[] memory actionType = new ActionType[](2);
+            bytes[] memory data = new bytes[](2);
+
+            actionType[0] = ActionType.transfer;
+            data[0] = abi.encode(token, router, aliceAmount);
+            actionType[1] = ActionType.deposit4626;
+            data[1] = abi.encode(token, savingsRate, aliceAmount, _alice, previewDeposit);
+
+            vm.startPrank(_alice);
+            token.approve(address(router), type(uint256).max);
+            router.mixer(paramsPermit, actionType, data);
+            vm.stopPrank();
+
+            assertEq(savingsRate.balanceOf(address(router)), 0);
+            assertEq(savingsRate.balanceOf(address(_alice)), previewDeposit);
+            assertEq(token.balanceOf(address(router)), 0);
+            assertEq(token.balanceOf(address(_alice)), balanceUsers - aliceAmount);
+
+            // make the savings rate have a loss / gain
+            gainOrLoss2 = bound(gainOrLoss2, 1, 1 ether * 1 ether);
+            deal(address(token), address(savingsRate), gainOrLoss2);
+
+            // then redeem
+            uint256 sharesToBurn = savingsRate.balanceOf(_alice);
+
+            actionType = new ActionType[](1);
+            data = new bytes[](1);
+
+            actionType[0] = ActionType.redeem4626;
+            data[0] = abi.encode(savingsRate, type(uint256).max, address(router), minAmount);
 
             previewRedeem = savingsRate.previewRedeem(sharesToBurn);
             vm.startPrank(_alice);
