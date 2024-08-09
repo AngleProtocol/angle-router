@@ -1,6 +1,6 @@
 # <img src="logo.svg" alt="Angle Router Contracts" height="40px"> Angle Router Contracts
 
-[![CI](https://github.com/AngleProtocol/angle-router/workflows/CI/badge.svg)](https://github.com/AngleProtocol/angle-router/actions?query=workflow%3ACI)
+[![CI](https://github.com/AngleProtocol/angle-router/actions/workflows/ci.yml/badge.svg)](https://github.com/AngleProtocol/angle-router/actions?query=workflow%3ACI)
 
 ## Documentation
 
