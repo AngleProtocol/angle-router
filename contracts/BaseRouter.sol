@@ -155,7 +155,11 @@ abstract contract BaseRouter is Initializable, IDepositWithReferral {
     );
 
     /// @notice Deploys the router contract on a chain
-    function initializeRouter(address _core, address _uniswapRouter, address _oneInch) public initializer {
+    function initializeRouter(
+        address _core,
+        address _uniswapRouter,
+        address _oneInch
+    ) public initializer {
         if (_core == address(0)) revert ZeroAddress();
         core = ICoreBorrow(_core);
         uniswapV3Router = IUniswapV3Router(_uniswapRouter);
@@ -258,6 +262,7 @@ abstract contract BaseRouter is Initializable, IDepositWithReferral {
                     data[i],
                     (IERC20, IERC4626, uint256, address, uint256)
                 );
+                if (amount == type(uint256).max) amount = token.balanceOf(address(this));
                 _changeAllowance(token, address(savingsRate), type(uint256).max);
                 _deposit4626(savingsRate, amount, to, minSharesOut);
             } else if (actions[i] == ActionType.deposit4626Referral) {
@@ -269,6 +274,7 @@ abstract contract BaseRouter is Initializable, IDepositWithReferral {
                     uint256 minSharesOut,
                     address referrer
                 ) = abi.decode(data[i], (IERC20, IERC4626, uint256, address, uint256, address));
+                if (amount == type(uint256).max) amount = token.balanceOf(address(this));
                 _changeAllowance(token, address(savingsRate), type(uint256).max);
                 _deposit4626Referral(savingsRate, amount, to, minSharesOut, referrer);
             } else if (actions[i] == ActionType.redeem4626) {
@@ -276,6 +282,7 @@ abstract contract BaseRouter is Initializable, IDepositWithReferral {
                     data[i],
                     (IERC4626, uint256, address, uint256)
                 );
+                if (shares == type(uint256).max) shares = savingsRate.balanceOf(msg.sender);
                 _redeem4626(savingsRate, shares, to, minAmountOut);
             } else if (actions[i] == ActionType.withdraw4626) {
                 (IERC4626 savingsRate, uint256 amount, address to, uint256 maxSharesOut) = abi.decode(
@@ -406,7 +413,11 @@ abstract contract BaseRouter is Initializable, IDepositWithReferral {
     /// @param tokenOut Token to sweep
     /// @param minAmountOut Minimum amount of tokens to recover
     /// @param to Address to which tokens should be sent
-    function _sweep(address tokenOut, uint256 minAmountOut, address to) internal virtual {
+    function _sweep(
+        address tokenOut,
+        uint256 minAmountOut,
+        address to
+    ) internal virtual {
         uint256 balanceToken = IERC20(tokenOut).balanceOf(address(this));
         _slippageCheck(balanceToken, minAmountOut);
         if (balanceToken != 0) {
@@ -577,7 +588,11 @@ abstract contract BaseRouter is Initializable, IDepositWithReferral {
     /// @param token Address of the token to change allowance
     /// @param spender Address to change the allowance of
     /// @param amount Amount allowed
-    function _changeAllowance(IERC20 token, address spender, uint256 amount) internal {
+    function _changeAllowance(
+        IERC20 token,
+        address spender,
+        uint256 amount
+    ) internal {
         uint256 currentAllowance = token.allowance(address(this), spender);
         // In case `currentAllowance < type(uint256).max / 2` and we want to increase it:
         // Do nothing (to handle tokens that need reapprovals to 0 and save gas)
