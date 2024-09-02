@@ -97,6 +97,12 @@ const config: HardhatUserConfig = {
       accounts: accounts('mumbai'),
       gas: 'auto',
     },
+    xlayer: {
+      live: true,
+      url: nodeUrl('xlayer'),
+      accounts: accounts('xlayer'),
+      gas: 'auto',
+    },
     polygon: {
       live: true,
       url: nodeUrl('polygon'),
